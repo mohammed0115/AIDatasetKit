@@ -43,6 +43,9 @@ class KitConfig:
             reported as potentially misleading.
         dense_encoding_warning_categories: Total one-hot category count above
             which a dense-only model is reported as a memory risk.
+        numeric_text_ratio_threshold: Fraction of a text column's values that must
+            parse as numbers before the column is reported as numeric data stored
+            as text.
         task_detection_max_classes: Upper bound on distinct target values for an
             integer target to be read as classification.
         task_detection_unique_ratio: Upper bound on the distinct-to-row ratio for
@@ -67,6 +70,7 @@ class KitConfig:
     leakage_correlation_threshold: float = 0.98
     imbalance_threshold: float = 0.2
     dense_encoding_warning_categories: int = 1000
+    numeric_text_ratio_threshold: float = 0.75
 
     task_detection_max_classes: int = 20
     task_detection_unique_ratio: float = 0.05
@@ -83,6 +87,9 @@ class KitConfig:
         self._require_closed_unit_interval("leakage_correlation_threshold", self.leakage_correlation_threshold)
         self._require_open_unit_interval("imbalance_threshold", self.imbalance_threshold)
         self._require_closed_unit_interval("task_detection_unique_ratio", self.task_detection_unique_ratio)
+        self._require_closed_unit_interval(
+            "numeric_text_ratio_threshold", self.numeric_text_ratio_threshold
+        )
 
         if self.cv_folds < 2:
             raise ConfigurationError(f"cv_folds must be at least 2, got {self.cv_folds}.")
