@@ -58,6 +58,11 @@ FORBIDDEN_PAIRS: frozenset[tuple[str, str]] = frozenset(
     {
         ("models", "preprocessing"),
         ("preprocessing", "models"),
+        # A model describes what it needs; it does not inspect data to find out.
+        # The layer numbers permit this import, so it is named explicitly.
+        ("models", "profiling"),
+        ("models", "statistics"),
+        ("preprocessing", "profiling"),
     }
 )
 

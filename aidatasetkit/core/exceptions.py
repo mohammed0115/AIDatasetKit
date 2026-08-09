@@ -26,6 +26,8 @@ __all__ = [
     "IncompatibleModelError",
     "ModelError",
     "UnknownModelError",
+    "DuplicateModelError",
+    "InvalidModelParameterError",
     "AmbiguousModelAliasError",
     "MissingDependencyError",
     "WorkflowStateError",
@@ -123,6 +125,18 @@ class ModelError(AIDatasetKitError):
 
 class UnknownModelError(ModelError):
     """No model is registered under the requested name or alias."""
+
+
+class DuplicateModelError(ModelError):
+    """A registration would overwrite or shadow an existing model.
+
+    The registry never replaces silently: a clashing canonical name or an alias
+    that could not be resolved unambiguously is refused at registration time.
+    """
+
+
+class InvalidModelParameterError(ModelError):
+    """A parameter was passed that the underlying estimator does not accept."""
 
 
 class AmbiguousModelAliasError(ModelError):

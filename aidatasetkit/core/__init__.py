@@ -12,8 +12,10 @@ from aidatasetkit.core.exceptions import (
     AmbiguousTaskError,
     ConfigurationError,
     DomainError,
+    DuplicateModelError,
     EmptyDataError,
     IncompatibleModelError,
+    InvalidModelParameterError,
     MissingDependencyError,
     MissingValueError,
     ModelError,
@@ -44,6 +46,7 @@ from aidatasetkit.core.types import (
     Severity,
     TargetProfile,
     TaskType,
+    jsonable,
 )
 
 __all__ = [
@@ -55,12 +58,14 @@ __all__ = [
     "ColumnKinds",
     "ConfigurationError",
     "DomainError",
+    "DuplicateModelError",
     "EmptyDataError",
     "EnvironmentVersions",
     "Estimator",
     "INTERPRETABILITY_RANK",
     "IncompatibleModelError",
     "Interpretability",
+    "InvalidModelParameterError",
     "KitConfig",
     "MissingDependencyError",
     "MissingValueError",
@@ -86,5 +91,6 @@ __all__ = [
     "capture_environment",
     "detect_column_kinds",
     "detect_kind",
+    "jsonable",
     "to_float_array",
 ]

@@ -41,6 +41,7 @@ __all__ = [
     "QualityReport",
     "TargetProfile",
     "RunMetadata",
+    "jsonable",
 ]
 
 
@@ -363,7 +364,7 @@ class ColumnProfile:
             "is_near_constant": self.is_near_constant,
             "is_high_cardinality": self.is_high_cardinality,
             "is_id_like": self.is_id_like,
-            "dominant_value": _jsonable(self.dominant_value),
+            "dominant_value": jsonable(self.dominant_value),
             "dominant_ratio": self.dominant_ratio,
             "infinite_count": self.infinite_count,
             "memory_usage_bytes": self.memory_usage_bytes,
@@ -450,7 +451,7 @@ class QualityIssue:
             "severity": self.severity.value,
             "message": self.message,
             "column": None if self.column is None else str(self.column),
-            "details": {str(key): _jsonable(value) for key, value in self.details.items()},
+            "details": {str(key): jsonable(value) for key, value in self.details.items()},
             "recommendation": self.recommendation,
             "requires_review": self.requires_review,
         }
@@ -573,7 +574,7 @@ class TargetProfile:
             "n_classes": self.n_classes,
             "is_binary": self.is_binary,
             "classes": (
-                None if self.classes is None else [_jsonable(label) for label in self.classes]
+                None if self.classes is None else [jsonable(label) for label in self.classes]
             ),
             "class_counts": (
                 None
@@ -585,7 +586,7 @@ class TargetProfile:
                 if self.class_ratios is None
                 else {str(label): float(share) for label, share in self.class_ratios.items()}
             ),
-            "positive_label": _jsonable(self.positive_label),
+            "positive_label": jsonable(self.positive_label),
             "positive_label_resolved": self.positive_label_resolved,
             "imbalance_ratio": self.imbalance_ratio,
             "numeric": None if self.numeric is None else self.numeric.to_dict(),
@@ -624,7 +625,7 @@ class RunMetadata:
             "model_name": self.model_name,
             "task_type": self.task_type.value,
             "model_parameters": {
-                str(key): _jsonable(value) for key, value in self.model_parameters.items()
+                str(key): jsonable(value) for key, value in self.model_parameters.items()
             },
             "random_state": self.random_state,
             "training_rows": self.training_rows,
@@ -637,7 +638,7 @@ class RunMetadata:
         }
 
 
-def _jsonable(value: Any) -> Any:
+def jsonable(value: Any) -> Any:
     """Coerce a value into something ``json.dumps`` accepts.
 
     Model parameters routinely contain estimator instances, numpy scalars, and
@@ -648,10 +649,10 @@ def _jsonable(value: Any) -> Any:
     if isinstance(value, StrEnum):
         return value.value
     if isinstance(value, (list, tuple)):
-        return [_jsonable(item) for item in value]
+        return [jsonable(item) for item in value]
     if isinstance(value, Mapping):
-        return {str(key): _jsonable(item) for key, item in value.items()}
+        return {str(key): jsonable(item) for key, item in value.items()}
     item_method = getattr(value, "item", None)
     if callable(item_method) and getattr(value, "ndim", None) == 0:
-        return _jsonable(item_method())
+        return jsonable(item_method())
     return repr(value)
