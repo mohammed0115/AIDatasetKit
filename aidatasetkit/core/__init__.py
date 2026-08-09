@@ -1,0 +1,90 @@
+"""Foundation layer: vocabulary, configuration, and input validation.
+
+This package imports nothing from the rest of the library. Every other layer
+depends on it, which is what keeps the dependency graph acyclic.
+"""
+
+from aidatasetkit.core.arrays import NanPolicy, to_float_array
+from aidatasetkit.core.config import KitConfig
+from aidatasetkit.core.exceptions import (
+    AIDatasetKitError,
+    AmbiguousModelAliasError,
+    AmbiguousTaskError,
+    ConfigurationError,
+    DomainError,
+    EmptyDataError,
+    IncompatibleModelError,
+    MissingDependencyError,
+    MissingValueError,
+    ModelError,
+    NonFiniteValueError,
+    NonNumericDataError,
+    PredictionValidationError,
+    SchemaError,
+    ShapeError,
+    TaskError,
+    UnknownModelError,
+    UnsupportedTaskError,
+    ValidationError,
+    WorkflowStateError,
+)
+from aidatasetkit.core.provenance import EnvironmentVersions, capture_environment
+from aidatasetkit.core.schema import detect_column_kinds, detect_kind
+from aidatasetkit.core.types import (
+    INTERPRETABILITY_RANK,
+    SUPERVISED_TASKS,
+    Backend,
+    ColumnKind,
+    ColumnKinds,
+    Estimator,
+    Interpretability,
+    PreprocessingProfile,
+    ProbabilisticEstimator,
+    RunMetadata,
+    Severity,
+    TargetProfile,
+    TaskType,
+)
+
+__all__ = [
+    "AIDatasetKitError",
+    "AmbiguousModelAliasError",
+    "AmbiguousTaskError",
+    "Backend",
+    "ColumnKind",
+    "ColumnKinds",
+    "ConfigurationError",
+    "DomainError",
+    "EmptyDataError",
+    "EnvironmentVersions",
+    "Estimator",
+    "INTERPRETABILITY_RANK",
+    "IncompatibleModelError",
+    "Interpretability",
+    "KitConfig",
+    "MissingDependencyError",
+    "MissingValueError",
+    "ModelError",
+    "NanPolicy",
+    "NonFiniteValueError",
+    "NonNumericDataError",
+    "PredictionValidationError",
+    "PreprocessingProfile",
+    "ProbabilisticEstimator",
+    "RunMetadata",
+    "SUPERVISED_TASKS",
+    "SchemaError",
+    "Severity",
+    "ShapeError",
+    "TargetProfile",
+    "TaskError",
+    "TaskType",
+    "UnknownModelError",
+    "UnsupportedTaskError",
+    "ValidationError",
+    "WorkflowStateError",
+    "capture_environment",
+    "detect_column_kinds",
+    "detect_kind",
+    "to_float_array",
+]

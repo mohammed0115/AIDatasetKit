@@ -1,0 +1,146 @@
+"""Exception hierarchy for the whole library.
+
+Every error raised by ``aidatasetkit`` derives from :class:`AIDatasetKitError`, so
+callers can catch library failures without also swallowing unrelated bugs.
+
+The library never silences a problem: invalid input raises rather than returning
+``NaN``, an empty frame, or a silently-dropped row.
+"""
+
+from __future__ import annotations
+
+__all__ = [
+    "AIDatasetKitError",
+    "ValidationError",
+    "EmptyDataError",
+    "ShapeError",
+    "NonNumericDataError",
+    "MissingValueError",
+    "NonFiniteValueError",
+    "DomainError",
+    "ConfigurationError",
+    "SchemaError",
+    "TaskError",
+    "AmbiguousTaskError",
+    "UnsupportedTaskError",
+    "IncompatibleModelError",
+    "ModelError",
+    "UnknownModelError",
+    "AmbiguousModelAliasError",
+    "MissingDependencyError",
+    "WorkflowStateError",
+    "PredictionValidationError",
+]
+
+
+class AIDatasetKitError(Exception):
+    """Base class for every error raised by this library."""
+
+
+# --------------------------------------------------------------------------- #
+# Input validation
+# --------------------------------------------------------------------------- #
+
+
+class ValidationError(AIDatasetKitError):
+    """Input did not satisfy a documented precondition."""
+
+
+class EmptyDataError(ValidationError):
+    """Input contained no usable observations."""
+
+
+class ShapeError(ValidationError):
+    """Input had the wrong dimensionality."""
+
+
+class NonNumericDataError(ValidationError):
+    """Input could not be interpreted as numeric values."""
+
+
+class MissingValueError(ValidationError):
+    """Input contained missing values under ``nan_policy="raise"``."""
+
+
+class NonFiniteValueError(ValidationError):
+    """Input contained ``inf`` or ``-inf`` where finite values were required."""
+
+
+class DomainError(ValidationError):
+    """Values fell outside the mathematical domain of the requested operation.
+
+    Raised, for example, by the geometric and harmonic means when the input
+    contains non-positive values.
+    """
+
+
+# --------------------------------------------------------------------------- #
+# Configuration and dataset structure
+# --------------------------------------------------------------------------- #
+
+
+class ConfigurationError(AIDatasetKitError):
+    """A :class:`~aidatasetkit.core.config.KitConfig` value was invalid."""
+
+
+class SchemaError(AIDatasetKitError):
+    """The dataset structure was unusable (missing or duplicated columns)."""
+
+
+# --------------------------------------------------------------------------- #
+# Task resolution
+# --------------------------------------------------------------------------- #
+
+
+class TaskError(AIDatasetKitError):
+    """Base class for machine-learning task resolution failures."""
+
+
+class AmbiguousTaskError(TaskError):
+    """The task could not be inferred from the target and no override was given.
+
+    The library refuses to guess between, say, multiclass classification and
+    regression for an integer target; pass ``task=`` explicitly instead.
+    """
+
+
+class UnsupportedTaskError(TaskError):
+    """The requested task family is not implemented in this version."""
+
+
+class IncompatibleModelError(TaskError):
+    """A model's declared capabilities do not match the resolved task."""
+
+
+# --------------------------------------------------------------------------- #
+# Model registry
+# --------------------------------------------------------------------------- #
+
+
+class ModelError(AIDatasetKitError):
+    """Base class for model registry and construction failures."""
+
+
+class UnknownModelError(ModelError):
+    """No model is registered under the requested name or alias."""
+
+
+class AmbiguousModelAliasError(ModelError):
+    """A short alias matched more than one model and no task narrowed it down."""
+
+
+class MissingDependencyError(ModelError):
+    """A model requires an optional package that is not installed."""
+
+
+# --------------------------------------------------------------------------- #
+# Workflow and output
+# --------------------------------------------------------------------------- #
+
+
+class WorkflowStateError(AIDatasetKitError):
+    """A facade method was called before its prerequisites were satisfied."""
+
+
+class PredictionValidationError(AIDatasetKitError):
+    """A prediction frame failed its output contract."""
