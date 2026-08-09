@@ -28,7 +28,7 @@ from aidatasetkit.core.exceptions import (
     ValidationError,
 )
 
-__all__ = ["NanPolicy", "to_float_array"]
+__all__ = ["NanPolicy", "to_float_array", "to_float_arrays"]
 
 #: How :func:`to_float_array` reacts to missing values.
 #:
@@ -110,6 +110,91 @@ def to_float_array(
             )
 
     return values
+
+
+def to_float_arrays(
+    x: Any,
+    y: Any,
+    *,
+    nan_policy: NanPolicy = "raise",
+    allow_inf: bool = False,
+    names: tuple[str, str] = ("x", "y"),
+) -> tuple[np.ndarray, np.ndarray]:
+    """Coerce two paired inputs, applying the missing-value policy *jointly*.
+
+    Paired statistics must not clean their inputs independently. Dropping missing
+    values from ``x`` and from ``y`` separately would shift the two series
+    relative to each other and silently correlate mismatched observations, so
+    omission here removes whole pairs.
+
+    Args:
+        x: First input, one-dimensional and numeric.
+        y: Second input, of the same length as ``x``.
+        nan_policy: ``"raise"`` to reject missing values, ``"omit"`` to drop any
+            pair in which either side is missing.
+        allow_inf: Whether infinities may survive into the results.
+        names: Labels for the two inputs, used in error messages.
+
+    Returns:
+        Two new one-dimensional ``float64`` arrays of equal length.
+
+    Raises:
+        ValidationError: If ``nan_policy`` is unknown or an input is unusable.
+        ShapeError: If either input is not one-dimensional, or the lengths differ.
+        EmptyDataError: If no complete pairs remain.
+        MissingValueError: If a pair is incomplete and ``nan_policy="raise"``.
+        NonFiniteValueError: If values are infinite and ``allow_inf`` is false.
+    """
+    if nan_policy not in _VALID_POLICIES:
+        raise ValidationError(
+            f"nan_policy must be one of {list(_VALID_POLICIES)}, got {nan_policy!r}."
+        )
+
+    x_values = _as_float64(x, names[0])
+    y_values = _as_float64(y, names[1])
+
+    for values, label in ((x_values, names[0]), (y_values, names[1])):
+        if values.ndim != 1:
+            raise ShapeError(
+                f"{label} must be one-dimensional, got an array with {values.ndim} "
+                f"dimensions and shape {values.shape}."
+            )
+
+    if x_values.size != y_values.size:
+        raise ShapeError(
+            f"{names[0]} and {names[1]} must have the same length, got "
+            f"{x_values.size} and {y_values.size}."
+        )
+    if x_values.size == 0:
+        raise EmptyDataError(
+            f"{names[0]} and {names[1]} are empty; at least one pair is required."
+        )
+
+    missing = np.isnan(x_values) | np.isnan(y_values)
+    if missing.any():
+        if nan_policy == "raise":
+            raise MissingValueError(
+                f"{names[0]} and {names[1]} contain {int(missing.sum())} incomplete "
+                'pair(s). Pass nan_policy="omit" to drop them, or impute them first.'
+            )
+        x_values = x_values[~missing]
+        y_values = y_values[~missing]
+        if x_values.size == 0:
+            raise EmptyDataError(
+                f"No complete pairs remain in {names[0]} and {names[1]} after omitting "
+                "missing values."
+            )
+
+    if not allow_inf:
+        for values, label in ((x_values, names[0]), (y_values, names[1])):
+            infinite = np.isinf(values)
+            if infinite.any():
+                raise NonFiniteValueError(
+                    f"{label} contains {int(infinite.sum())} infinite value(s). "
+                    "Pass allow_inf=True to keep them, or clean them first."
+                )
+
+    return x_values, y_values
 
 
 def _as_float64(data: Any, name: str) -> np.ndarray:

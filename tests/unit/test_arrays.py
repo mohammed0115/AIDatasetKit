@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from aidatasetkit.core import to_float_array
+from aidatasetkit.core.arrays import to_float_arrays
 from aidatasetkit.core.exceptions import (
     EmptyDataError,
     MissingValueError,
@@ -157,3 +158,60 @@ class TestRejectedInput:
     def test_error_messages_use_the_supplied_name(self):
         with pytest.raises(EmptyDataError, match="weights"):
             to_float_array([], name="weights")
+
+
+class TestPairedConversion:
+    def test_both_inputs_are_converted(self):
+        x, y = to_float_arrays([1, 2, 3], pd.Series([4.0, 5.0, 6.0]))
+        np.testing.assert_array_equal(x, np.array([1.0, 2.0, 3.0]))
+        np.testing.assert_array_equal(y, np.array([4.0, 5.0, 6.0]))
+
+    def test_mismatched_lengths_are_rejected(self):
+        with pytest.raises(ShapeError, match="same length"):
+            to_float_arrays([1, 2, 3], [1, 2])
+
+    def test_missing_values_raise_by_default(self):
+        with pytest.raises(MissingValueError, match="incomplete pair"):
+            to_float_arrays([1.0, np.nan], [1.0, 2.0])
+
+    def test_omission_removes_the_whole_pair_from_both_sides(self):
+        """Independent cleaning would misalign the two series."""
+        x, y = to_float_arrays(
+            [1.0, np.nan, 3.0, 4.0], [10.0, 20.0, np.nan, 40.0], nan_policy="omit"
+        )
+        np.testing.assert_array_equal(x, np.array([1.0, 4.0]))
+        np.testing.assert_array_equal(y, np.array([10.0, 40.0]))
+
+    def test_the_two_results_always_have_equal_length(self):
+        x, y = to_float_arrays(
+            [1.0, np.nan, 3.0], [np.nan, 2.0, 3.0], nan_policy="omit"
+        )
+        assert x.size == y.size == 1
+
+    def test_no_complete_pairs_is_an_error(self):
+        with pytest.raises(EmptyDataError, match="No complete pairs"):
+            to_float_arrays([1.0, np.nan], [np.nan, 2.0], nan_policy="omit")
+
+    def test_empty_inputs_are_rejected(self):
+        with pytest.raises(EmptyDataError):
+            to_float_arrays([], [])
+
+    def test_infinities_raise_by_default(self):
+        with pytest.raises(NonFiniteValueError):
+            to_float_arrays([1.0, np.inf], [1.0, 2.0])
+
+    def test_infinities_survive_when_allowed(self):
+        x, _ = to_float_arrays([1.0, np.inf], [1.0, 2.0], allow_inf=True)
+        assert np.isinf(x[1])
+
+    def test_two_dimensional_input_is_rejected(self):
+        with pytest.raises(ShapeError, match="one-dimensional"):
+            to_float_arrays(np.zeros((2, 2)), np.zeros((2, 2)))
+
+    def test_unknown_policy_is_rejected(self):
+        with pytest.raises(ValidationError, match="nan_policy"):
+            to_float_arrays([1.0], [2.0], nan_policy="propagate")
+
+    def test_error_messages_use_the_supplied_names(self):
+        with pytest.raises(ShapeError, match="feature.*target|target.*feature"):
+            to_float_arrays([1.0, 2.0], [1.0], names=("feature", "target"))
