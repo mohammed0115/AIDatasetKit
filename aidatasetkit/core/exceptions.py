@@ -30,6 +30,10 @@ __all__ = [
     "InvalidModelParameterError",
     "AmbiguousModelAliasError",
     "MissingDependencyError",
+    "PreprocessingError",
+    "AmbiguousFeatureRoleError",
+    "MissingOrdinalOrderError",
+    "NoUsableFeaturesError",
     "VisualizationError",
     "InvalidVisualizationRequest",
     "UnsupportedChartError",
@@ -165,6 +169,31 @@ class MissingDependencyError(AIDatasetKitError):
 # --------------------------------------------------------------------------- #
 # Workflow and output
 # --------------------------------------------------------------------------- #
+
+
+class PreprocessingError(AIDatasetKitError):
+    """Base class for preprocessing planning and building failures."""
+
+
+class AmbiguousFeatureRoleError(PreprocessingError):
+    """A feature was assigned two incompatible roles.
+
+    Raised when overrides contradict each other -- a column declared both
+    numeric and ordinal, say -- rather than letting one silently win.
+    """
+
+
+class MissingOrdinalOrderError(PreprocessingError):
+    """A feature was declared ordinal without the order its encoding needs.
+
+    The library never infers an ordering from the alphabet, from first
+    appearance, or from frequency: those produce a number that looks like a
+    measurement and means nothing.
+    """
+
+
+class NoUsableFeaturesError(PreprocessingError):
+    """Every column was excluded or held back for review, leaving nothing to fit."""
 
 
 class VisualizationError(AIDatasetKitError):
