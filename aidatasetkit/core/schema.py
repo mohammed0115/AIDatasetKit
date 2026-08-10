@@ -25,9 +25,9 @@ __all__ = ["detect_column_kinds", "detect_kind"]
 def detect_kind(series: pd.Series) -> ColumnKind:
     """Classify a single column by dtype.
 
-    The order of the checks matters. Booleans are numeric to pandas, and pandas
-    categoricals answer ``True`` to the string-dtype predicate, so the narrower
-    kinds are tested first.
+    The order of the checks matters. Booleans and complex numbers are both
+    numeric to pandas, and pandas categoricals answer ``True`` to the string-dtype
+    predicate, so the narrower kinds are tested first.
     """
     if pdt.is_bool_dtype(series):
         return ColumnKind.BOOLEAN
@@ -35,6 +35,11 @@ def detect_kind(series: pd.Series) -> ColumnKind:
         return ColumnKind.DATETIME
     if isinstance(series.dtype, pd.CategoricalDtype):
         return ColumnKind.CATEGORICAL
+    if pdt.is_complex_dtype(series):
+        # Numeric to pandas, but every statistic here is a real-valued formula.
+        # Left as NUMERIC, a mean or a standard deviation would be computed from
+        # the real part alone and reported as if it described the column.
+        return ColumnKind.OTHER
     if pdt.is_numeric_dtype(series):
         return ColumnKind.NUMERIC
     if pdt.is_string_dtype(series) or series.dtype == object:

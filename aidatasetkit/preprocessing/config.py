@@ -14,6 +14,7 @@ Nothing here makes the library guess harder.
 from __future__ import annotations
 
 import dataclasses
+import math
 from collections.abc import Hashable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -179,6 +180,27 @@ class PreprocessingConfig:
                     f"{type(value).__name__}. Pass ({value!r},) to name one column."
                 )
             object.__setattr__(self, name, tuple(value))
+
+        for name in ("numeric_fill_value", "explicit_mapping_unknown_value"):
+            value = getattr(self, name)
+            if value is None:
+                continue
+            try:
+                number = float(value)
+            except (TypeError, ValueError) as error:
+                raise ConfigurationError(
+                    f"{name} must be a number, got {value!r}."
+                ) from error
+            if not math.isfinite(number):
+                # Imputing with an infinity puts a value in the matrix that no
+                # estimator can fit, and NaN would make a fill value that fills
+                # nothing -- and that compares unequal to itself, so a plan could
+                # not even be matched against the configuration that made it.
+                raise ConfigurationError(
+                    f"{name} must be a finite number, got {value!r}. "
+                    "Imputing with it would put a value in the feature matrix that "
+                    "no model can be fitted on."
+                )
 
         if not isinstance(self.categorical_fill_value, str) or not self.categorical_fill_value:
             raise ConfigurationError(

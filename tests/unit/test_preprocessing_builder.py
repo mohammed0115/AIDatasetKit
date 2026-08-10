@@ -236,7 +236,9 @@ class TestOrdinal:
     def test_an_unknown_level_fails_clearly_by_default(self, education, config):
         _, pre = make(education, config=config)
         pre.fit(education)
-        with pytest.raises(ValueError, match="unknown categories"):
+        with pytest.raises(
+            PreprocessingError, match=r"'education'.*\['doctorate'\].*does not rank"
+        ):
             pre.transform(pd.DataFrame({"education": ["doctorate"]}))
 
     def test_an_unknown_level_can_be_encoded_by_explicit_policy(self, education):

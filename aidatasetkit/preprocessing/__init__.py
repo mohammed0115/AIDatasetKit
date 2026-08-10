@@ -51,6 +51,7 @@ from aidatasetkit.preprocessing.transformers import (
     ExplicitMappingEncoder,
     NumericCaster,
     NumericTextConverter,
+    OrdinalDomainGuard,
 )
 from aidatasetkit.preprocessing.types import (
     FeatureAction,
@@ -80,6 +81,7 @@ __all__ = [
     "NumericScaler",
     "NumericTextConverter",
     "NumericTextPolicy",
+    "OrdinalDomainGuard",
     "PreprocessingConfig",
     "PreprocessingPlan",
     "PreprocessingPlanner",

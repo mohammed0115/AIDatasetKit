@@ -109,9 +109,13 @@ def _imported_modules(path: Path) -> set[str]:
                     f"{path} uses a relative import. The project uses absolute imports "
                     "only, which is what makes this analysis exact."
                 )
-            if node.module == PACKAGE_NAME or (
-                node.module and node.module.startswith(f"{PACKAGE_NAME}.")
-            ):
+            if node.module == PACKAGE_NAME:
+                # `from aidatasetkit import models` reaches a sibling component
+                # just as surely as importing its module path, but records only
+                # the root as the module. The names carry the components.
+                for alias in node.names:
+                    imported.add(f"{PACKAGE_NAME}.{alias.name}")
+            elif node.module and node.module.startswith(f"{PACKAGE_NAME}."):
                 imported.add(node.module)
 
     return imported

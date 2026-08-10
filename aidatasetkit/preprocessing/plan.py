@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Hashable, Sequence
-from types import MappingProxyType
 from typing import Any
 
 import pandas as pd
@@ -39,6 +38,7 @@ from aidatasetkit.preprocessing.config import (
 from aidatasetkit.preprocessing.feature_detector import FeatureDetector
 from aidatasetkit.preprocessing.types import (
     FeatureAction,
+    FrozenMapping,
     FeatureDecision,
     FeatureRole,
     FeatureSpec,
@@ -136,6 +136,9 @@ class PreprocessingPlanner:
         """
         preprocessing_profile = _as_profile(capabilities)
         report = quality if quality is not None else QualityReport()
+        # Checked before anything else: a NaN label makes every later lookup fail
+        # with a bare KeyError naming nothing.
+        _plan_label_normalisation(frame)
         if target is not None and target not in frame.columns:
             raise SchemaError(
                 f"The target {target!r} is not a column of this frame. Available: "
@@ -157,7 +160,7 @@ class PreprocessingPlanner:
             decisions=decisions,
             specs=specs,
             preprocessing_profile=preprocessing_profile,
-            config=MappingProxyType(self._config.to_dict()),
+            config=FrozenMapping(self._config.to_dict()),
             label_normalisation=_plan_label_normalisation(frame),
             target_name=None if target is None else str(target),
             categorical_sentinel=sentinel,
@@ -574,7 +577,18 @@ def _plan_label_normalisation(frame: pd.DataFrame) -> LabelNormalisation:
         )
 
     labels = list(frame.columns)
-    if not labels or all(isinstance(label, str) for label in labels):
+    unusable = [label for label in labels if label != label]
+    if unusable:
+        raise SchemaError(
+            "A column label is NaN, which no lookup can match -- pandas produces one "
+            "from a missing header. Name the column before preprocessing."
+        )
+
+    # type() rather than isinstance(): numpy.str_ subclasses str, so it passes an
+    # isinstance check and skips renaming, and scikit-learn then rejects the frame
+    # with "No valid specification of the columns" -- a message about the labels
+    # that never mentions them.
+    if not labels or all(type(label) is str for label in labels):
         return LabelNormalisation()
 
     types = sorted({type(label).__name__ for label in labels})

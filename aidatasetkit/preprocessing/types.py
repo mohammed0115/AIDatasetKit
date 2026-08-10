@@ -28,6 +28,7 @@ from typing import Any
 from aidatasetkit.core.types import ColumnKind, PreprocessingProfile, jsonable
 
 __all__ = [
+    "FrozenMapping",
     "FeatureRole",
     "FeatureAction",
     "FeatureSpec",
@@ -36,6 +37,35 @@ __all__ = [
     "PreprocessingPlan",
     "TargetEncoding",
 ]
+
+
+class FrozenMapping(Mapping):
+    """A read-only mapping that still pickles.
+
+    ``types.MappingProxyType`` is read-only but cannot be pickled or deep-copied,
+    which would make every plan -- and every fitted preprocessor holding one --
+    impossible to persist. This keeps the immutability and drops the restriction.
+    """
+
+    __slots__ = ("_data",)
+
+    def __init__(self, data: Mapping[str, Any] | None = None) -> None:
+        object.__setattr__(self, "_data", dict(data or {}))
+
+    def __getitem__(self, key: str) -> Any:
+        return self._data[key]
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __repr__(self) -> str:
+        return f"FrozenMapping({self._data!r})"
+
+    def __reduce__(self):
+        return (FrozenMapping, (self._data,))
 
 
 class FeatureRole(StrEnum):
@@ -316,7 +346,13 @@ class PreprocessingPlan:
         profile, the sentinel, each column's role and ordered steps, its ordinal
         levels, its explicit mapping, and the parameter values that the step names
         alone do not pin down (a constant fill value, an unknown-ordinal
-        encoding). Two plans that would execute differently cannot collide.
+        encoding, what an unmapped value becomes). Two plans that would execute
+        differently cannot collide.
+
+        Policies that decide *whether* a column is used -- the high-cardinality
+        and numeric-text policies, and whether a proven target duplicate is
+        dropped -- are absent on purpose: they act by changing a column's role,
+        steps, or presence, all of which are recorded per column below.
         """
         import hashlib
 
@@ -326,6 +362,9 @@ class PreprocessingPlan:
             f"numeric_fill={self.config.get('numeric_fill_value')!r}",
             f"unknown_ordinal={self.config.get('unknown_ordinal_policy')!r}"
             f":{self.config.get('unknown_ordinal_value')!r}",
+            # What an unmapped value becomes. Two plans can share every step name
+            # and every mapping and still put different numbers in the matrix.
+            f"unmapped={self.config.get('explicit_mapping_unknown_value')!r}",
         ]
         for decision in self.decisions:
             if decision.action is not FeatureAction.INCLUDE:

@@ -463,3 +463,78 @@ class TestPublicSurface:
         ):
             assert name in package.__all__
             assert getattr(package, name) is not None
+
+
+class TestInfinityGuardDoesNotFailOpen:
+    """Found by the final verification pass: the guard had two blind spots, and
+    in both the infinity was stopped only by a raw sklearn error naming neither
+    the column nor the cause."""
+
+    def test_a_text_column_holding_both_inf_and_an_unparseable_value(self):
+        """The direct float cast raised, so the guard used to skip the column."""
+        frame = pd.DataFrame(
+            {"a": [str(v % 37) if v % 3 else ("inf" if v % 2 else "unknown") for v in range(200)]}
+        )
+        config = PreprocessingConfig(numeric_text_policy=NumericTextPolicy.CONVERT)
+        _, pre = build(frame, config)
+        with pytest.raises(PreprocessingError, match=r"'a' contains \d+ infinite"):
+            pre.fit(frame)
+
+    def test_no_raw_sklearn_error_escapes_for_that_case(self):
+        frame = pd.DataFrame(
+            {"a": [str(v % 37) if v % 3 else ("inf" if v % 2 else "unknown") for v in range(200)]}
+        )
+        config = PreprocessingConfig(numeric_text_policy=NumericTextPolicy.CONVERT)
+        _, pre = build(frame, config)
+        with pytest.raises(AIDatasetKitError):
+            pre.fit(frame)
+
+    def test_parsing_reports_the_infinity_it_created(self):
+        frame = pd.DataFrame({"a": ["inf", "1", "2"] * 40})
+        config = PreprocessingConfig(
+            numeric_text_policy=NumericTextPolicy.CONVERT, force_include=("a",)
+        )
+        _, pre = build(frame, config)
+        with pytest.raises(PreprocessingError, match="infinite"):
+            pre.fit(frame)
+
+
+class TestExplicitMappingDestinationsAreValidated:
+    @pytest.fixture
+    def frame(self) -> pd.DataFrame:
+        return pd.DataFrame({"g": ["M", "F"] * 60})
+
+    @pytest.mark.parametrize("bad", [np.inf, -np.inf, np.nan])
+    def test_a_non_finite_destination_is_refused(self, frame, bad):
+        """A mapped infinity reached sklearn and failed there instead."""
+        config = PreprocessingConfig(explicit_mappings={"g": {"M": bad, "F": 0}})
+        _, pre = build(frame, config)
+        with pytest.raises(PreprocessingError, match="does not support infinity or NaN"):
+            pre.fit(frame)
+
+    def test_the_refusal_names_the_column_and_the_category(self, frame):
+        config = PreprocessingConfig(explicit_mappings={"g": {"M": np.inf, "F": 0}})
+        _, pre = build(frame, config)
+        with pytest.raises(PreprocessingError, match=r"for 'g' maps 'M'"):
+            pre.fit(frame)
+
+    def test_a_non_numeric_destination_is_refused(self, frame):
+        config = PreprocessingConfig(explicit_mappings={"g": {"M": "high", "F": "low"}})
+        _, pre = build(frame, config)
+        with pytest.raises(PreprocessingError, match="is not a number"):
+            pre.fit(frame)
+
+    def test_a_non_finite_unknown_value_is_refused(self, frame):
+        """Now at construction rather than at fit: the option itself is invalid."""
+        from aidatasetkit.core.exceptions import ConfigurationError
+
+        with pytest.raises(ConfigurationError, match="explicit_mapping_unknown_value"):
+            PreprocessingConfig(
+                explicit_mappings={"g": {"M": 1, "F": 0}},
+                explicit_mapping_unknown_value=np.inf,
+            )
+
+    def test_a_valid_numeric_mapping_still_works(self, frame):
+        config = PreprocessingConfig(explicit_mappings={"g": {"M": 1, "F": 0}})
+        _, pre = build(frame, config)
+        assert set(dense(pre.fit_transform(frame)).ravel().tolist()) == {0.0, 1.0}

@@ -276,8 +276,14 @@ def _has_text_collision(values: pd.Series) -> bool:
 
     ``1`` and ``"1"`` are different categories. Any encoding that goes through
     text would merge them, and nothing downstream could separate them again.
+
+    Distinctness is taken by type *and* text rather than from
+    :meth:`pandas.Series.unique`, which de-duplicates by ``==``: with ``True``
+    present, the integer ``1`` is dropped as a duplicate of it, and the collision
+    between that ``1`` and the string ``"1"`` becomes invisible.
     """
-    distinct = values.dropna().unique()
-    if len(distinct) < 2:
+    present = values.dropna()
+    if present.empty:
         return False
-    return len({str(value) for value in distinct}) < len(distinct)
+    typed = {(type(value).__name__, str(value)) for value in present}
+    return len({text for _, text in typed}) < len(typed)

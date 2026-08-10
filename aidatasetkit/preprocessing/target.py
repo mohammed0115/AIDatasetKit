@@ -100,6 +100,7 @@ class TargetLabelEncoder:
                 "deliberately first."
             )
 
+        _require_uniform_labels(series)
         encoder = LabelEncoder()
         encoder.fit(series.to_numpy())
         classes = tuple(encoder.classes_.tolist())
@@ -138,6 +139,16 @@ class TargetLabelEncoder:
                 "This target encoder has not been fitted; call fit(y_train) first."
             )
         series = _as_series(y)
+        if series.isna().any():
+            # The unseen-label check below drops NaN before comparing, so without
+            # this a null label reaches LabelEncoder and comes back as "previously
+            # unseen labels: nan" -- which reads as a vocabulary problem rather
+            # than a row with no label at all.
+            raise PreprocessingError(
+                f"The target contains {int(series.isna().sum())} missing value(s). "
+                "A row without a label cannot be encoded; drop or fill them "
+                "deliberately first."
+            )
         known = set(self.encoding.classes)
         unseen = sorted({str(v) for v in series.dropna().unique() if v not in known})
         if unseen:
@@ -173,11 +184,18 @@ class TargetLabelEncoder:
         """Check every value names an actual class, and return it as an index."""
         try:
             values = np.asarray(y, dtype="float64")
-        except (TypeError, ValueError) as error:
+        except (TypeError, ValueError, OverflowError) as error:
+            # OverflowError is numpy's answer to an int too large for float64. It
+            # is not a subclass of the other two, and uncaught it escapes as a
+            # bare "int too large to convert to float".
             raise PreprocessingError(
-                f"Encoded class labels must be numbers, got {type(y).__name__}: {error}"
+                f"Encoded class labels must be numbers within the range of a class "
+                f"index, got {type(y).__name__}: {error}"
             ) from error
 
+        # A single code is not ambiguous the way a matrix of them is, so it is
+        # read as a sequence of one rather than refused.
+        values = np.atleast_1d(values)
         if values.ndim > 1:
             raise PreprocessingError(
                 f"Encoded class labels must be one-dimensional, got {values.ndim} "
@@ -246,6 +264,27 @@ class TargetLabelEncoder:
                 f"{[str(c) for c in classes]}."
             )
         return candidate, mapping[candidate], source_resolved
+
+
+def _require_uniform_labels(series: pd.Series) -> None:
+    """Refuse a target that mixes strings with numbers.
+
+    scikit-learn answers this with "Encoders require their input argument must be
+    uniformly strings or numbers", which says nothing about which column, which
+    values, or what to do. Casting the numbers to strings would look like a fix
+    and is not: ``1`` and ``"1"`` are then one class, and nobody decided that.
+    """
+    numeric_types = (int, float, complex, np.number)
+    values = series.to_numpy()
+    if len({isinstance(value, numeric_types) for value in values}) > 1:
+        numbers = sorted({repr(v) for v in values if isinstance(v, numeric_types)})
+        text = sorted({repr(v) for v in values if not isinstance(v, numeric_types)})
+        raise PreprocessingError(
+            f"The target mixes numbers ({', '.join(numbers[:3])}) with text "
+            f"({', '.join(text[:3])}). Which class a value belongs to would depend on "
+            "how it was written down, so the labels have to be made one kind or the "
+            "other deliberately -- 1 and '1' are not obviously the same class."
+        )
 
 
 def _refuse_continuous(series: pd.Series) -> None:
