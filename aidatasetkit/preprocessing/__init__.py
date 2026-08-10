@@ -47,7 +47,9 @@ from aidatasetkit.preprocessing.feature_detector import FeatureDetector
 from aidatasetkit.preprocessing.plan import PreprocessingPlanner
 from aidatasetkit.preprocessing.target import TargetLabelEncoder
 from aidatasetkit.preprocessing.transformers import (
+    CategoricalCaster,
     ExplicitMappingEncoder,
+    NumericCaster,
     NumericTextConverter,
 )
 from aidatasetkit.preprocessing.types import (
@@ -62,6 +64,7 @@ from aidatasetkit.preprocessing.types import (
 
 __all__ = [
     "BlueprintCache",
+    "CategoricalCaster",
     "CategoricalImputation",
     "ExplicitMappingEncoder",
     "FeatureAction",
@@ -72,6 +75,7 @@ __all__ = [
     "FittedPreprocessor",
     "HighCardinalityPolicy",
     "LabelNormalisation",
+    "NumericCaster",
     "NumericImputation",
     "NumericScaler",
     "NumericTextConverter",

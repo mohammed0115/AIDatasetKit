@@ -311,14 +311,27 @@ class PreprocessingPlan:
         Two plans with the same fingerprint build the same transformer, so a
         blueprint can be reused between them. Reasons and review flags are
         excluded: they explain a decision without changing what gets built.
+
+        Everything that *does* change what gets built is here -- the capability
+        profile, the sentinel, each column's role and ordered steps, its ordinal
+        levels, its explicit mapping, and the parameter values that the step names
+        alone do not pin down (a constant fill value, an unknown-ordinal
+        encoding). Two plans that would execute differently cannot collide.
         """
         import hashlib
 
-        parts = [self.preprocessing_profile.key, self.categorical_sentinel]
+        parts = [
+            self.preprocessing_profile.key,
+            self.categorical_sentinel,
+            f"numeric_fill={self.config.get('numeric_fill_value')!r}",
+            f"unknown_ordinal={self.config.get('unknown_ordinal_policy')!r}"
+            f":{self.config.get('unknown_ordinal_value')!r}",
+        ]
         for decision in self.decisions:
             if decision.action is not FeatureAction.INCLUDE:
                 continue
             spec = self.spec_for(decision.feature)
+            mapping = spec.explicit_mapping
             parts.append(
                 "|".join(
                     (
@@ -328,6 +341,11 @@ class PreprocessingPlan:
                         ""
                         if spec.ordinal_order is None
                         else ",".join(str(v) for v in spec.ordinal_order),
+                        ""
+                        if mapping is None
+                        else ",".join(
+                            f"{k!r}={v!r}" for k, v in sorted(mapping.items(), key=lambda i: str(i[0]))
+                        ),
                     )
                 )
             )

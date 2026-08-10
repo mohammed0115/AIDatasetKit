@@ -136,6 +136,11 @@ class PreprocessingPlanner:
         """
         preprocessing_profile = _as_profile(capabilities)
         report = quality if quality is not None else QualityReport()
+        if target is not None and target not in frame.columns:
+            raise SchemaError(
+                f"The target {target!r} is not a column of this frame. Available: "
+                f"{[str(c) for c in list(frame.columns)[:20]]}."
+            )
         _require_complete_profile(frame, profile, target)
         specs = self._detector.detect(frame, profile, report, target=target)
 
@@ -189,9 +194,9 @@ class PreprocessingPlanner:
         if spec.role is FeatureRole.NUMERIC:
             return self._numeric(spec, profile, forced)
         if spec.role is FeatureRole.ORDINAL:
-            return self._ordinal(spec, sentinel)
+            return self._ordinal(spec, sentinel, forced)
         if spec.role in (FeatureRole.NOMINAL, FeatureRole.BINARY_CATEGORICAL):
-            return self._categorical(spec, profile, sentinel)
+            return self._categorical(spec, profile, sentinel, forced)
         if spec.role is FeatureRole.ID_LIKE:
             return self._identifier(spec, forced)
         if spec.role is FeatureRole.DATETIME:
@@ -244,13 +249,25 @@ class PreprocessingPlanner:
                     f"Excluded because {spec.name!r} was proved equal to the target in "
                     "every row. Training on it would measure nothing.",
                 )
-        if spec.infinite_count and not config.allow_infinite:
+        if spec.infinite_count:
             return self._review(
                 spec,
                 "infinite_values",
                 f"Held back because {spec.name!r} contains {spec.infinite_count} "
-                "infinite value(s). No estimator here accepts one, and replacing it "
-                "with a finite number would be a measurement nobody took.",
+                "infinite value(s). This version does not support infinity as a "
+                "trainable value: no estimator here accepts one, and replacing it "
+                "with a finite number would be a measurement nobody took. Remove or "
+                "cap the values yourself if they are meaningful.",
+                details={"infinite_count": spec.infinite_count},
+            )
+        if "categorical_type_collision" in spec.review_codes:
+            return self._review(
+                spec,
+                "categorical_type_collision",
+                f"Held back because {spec.name!r} holds distinct categories that "
+                "share a text form, such as 1 and '1'. Encoding them would merge "
+                "two different categories into one level. Convert the column to a "
+                "single consistent type first.",
             )
         if (
             "possible_numeric_stored_as_text" in spec.review_codes
@@ -335,7 +352,11 @@ class PreprocessingPlanner:
         )
 
     def _categorical(
-        self, spec: FeatureSpec, profile: PreprocessingProfile, sentinel: str
+        self,
+        spec: FeatureSpec,
+        profile: PreprocessingProfile,
+        sentinel: str,
+        forced: bool = False,
     ) -> FeatureDecision:
         """One-hot, unless the analyst supplied an explicit mapping.
 
@@ -355,7 +376,7 @@ class PreprocessingPlanner:
                     "encoding is inferred."
                 ),
                 steps=(STEP_EXPLICIT_MAPPING,),
-                requires_review=self._flagged(spec, False),
+                requires_review=self._flagged(spec, forced),
                 details={"levels": len(spec.explicit_mapping)},
             )
 
@@ -374,7 +395,7 @@ class PreprocessingPlanner:
                 "rather than failing."
             ),
             steps=(impute_step, STEP_ONEHOT),
-            requires_review=self._flagged(spec, False),
+            requires_review=self._flagged(spec, forced),
             details={
                 "cardinality": spec.cardinality,
                 "sparse_output": profile.supports_sparse_input,
@@ -382,7 +403,9 @@ class PreprocessingPlanner:
             },
         )
 
-    def _ordinal(self, spec: FeatureSpec, sentinel: str) -> FeatureDecision:
+    def _ordinal(
+        self, spec: FeatureSpec, sentinel: str, forced: bool = False
+    ) -> FeatureDecision:
         """Encode against the order the analyst supplied, never an inferred one."""
         impute_step, impute_reason = self._categorical_imputation(
             spec, sentinel, ordinal=True
@@ -399,7 +422,7 @@ class PreprocessingPlanner:
                 "encoding against that order."
             ),
             steps=(impute_step, STEP_ORDINAL),
-            requires_review=self._flagged(spec, False),
+            requires_review=self._flagged(spec, forced),
             details={"levels": len(order), "order": [str(v) for v in order]},
         )
 

@@ -118,9 +118,10 @@ class PreprocessingConfig:
         unknown_ordinal_policy: What to do with an unseen ordinal value.
         unknown_ordinal_value: Encoded value used when that policy is ``ENCODE``.
         numeric_text_policy: What to do with numbers stored as text.
-        allow_infinite: Whether a column containing infinities may be used. False
-            by default: no estimator in the library accepts one, and silently
-            replacing it would be a fabricated measurement.
+        explicit_mapping_unknown_value: What an unmapped value becomes in a column
+            with an explicit mapping. ``None`` -- the default -- makes an unmapped
+            value an error naming the column and the offending values, rather
+            than a number nobody chose.
         drop_exact_target_duplicates: Whether a feature the quality inspector
             proved equal to the target is excluded. True by default -- that
             finding is certain, not heuristic.
@@ -146,7 +147,7 @@ class PreprocessingConfig:
     unknown_ordinal_policy: UnknownOrdinalPolicy = UnknownOrdinalPolicy.ERROR
     unknown_ordinal_value: int = -1
     numeric_text_policy: NumericTextPolicy = NumericTextPolicy.REVIEW
-    allow_infinite: bool = False
+    explicit_mapping_unknown_value: float | None = None
     drop_exact_target_duplicates: bool = True
 
     def __post_init__(self) -> None:

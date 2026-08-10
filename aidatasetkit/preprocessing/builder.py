@@ -224,10 +224,35 @@ class FittedPreprocessor:
                 "are not in the frame it was given."
             )
 
+        self._require_finite(X)
         normalisation = self._plan.label_normalisation
         if not normalisation.applied:
             return X
         return X.rename(columns=dict(normalisation.mapping))
+
+    def _require_finite(self, X: pd.DataFrame) -> None:
+        """Refuse infinities before scikit-learn reports them without a column name.
+
+        This version does not support infinity as a trainable value. The planner
+        holds such a column back, but one can still arrive here -- through
+        force_include, through a test row, or created by parsing text such as
+        "inf" -- so the check runs on every fit and every transform.
+        """
+        for column in self._plan.numeric_features:
+            if column not in X.columns:
+                continue
+            try:
+                values = X[column].to_numpy(dtype="float64", na_value=np.nan)
+            except (TypeError, ValueError):
+                continue
+            infinite = int(np.isinf(values).sum())
+            if infinite:
+                raise PreprocessingError(
+                    f"Column {column!r} contains {infinite} infinite value(s), which "
+                    "this version does not support as a trainable value. Remove the "
+                    "rows, cap the values, or exclude the column -- the library will "
+                    "not replace an infinity with a number nobody measured."
+                )
 
     def _require_fitted(self) -> None:
         if not self._fitted:
@@ -361,6 +386,7 @@ class PreprocessorBuilder:
         "numeric_scaler",
         "unknown_ordinal_policy",
         "unknown_ordinal_value",
+        "explicit_mapping_unknown_value",
     )
 
     def _require_matching_config(self, plan: PreprocessingPlan) -> None:
@@ -491,7 +517,13 @@ class PreprocessorBuilder:
             original = normalisation.original(name)
             mappings[name] = dict(plan.spec_for(original).explicit_mapping or {})
         steps: list[tuple[str, Any]] = [
-            ("mapping", ExplicitMappingEncoder(mappings=mappings))
+            (
+                "mapping",
+                ExplicitMappingEncoder(
+                    mappings=mappings,
+                    unknown_value=self._config.explicit_mapping_unknown_value,
+                ),
+            )
         ]
         # A mapped column is a number like any other: it needs the same gap
         # filling and the same scaling the capability profile asked for, or a NaN

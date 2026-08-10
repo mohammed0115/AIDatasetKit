@@ -152,12 +152,59 @@ class TargetLabelEncoder:
         return self.fit(y, target_profile).transform(y)
 
     def inverse_transform(self, y: Any) -> np.ndarray:
-        """Turn encoded values back into the caller's original labels."""
+        """Turn encoded values back into the caller's original labels.
+
+        Only whole numbers inside the class range are accepted. ``1`` and ``1.0``
+        both name class 1; ``1.9`` names nothing, and casting it to an ``int``
+        would answer "class 1" to a question that had no valid answer.
+
+        Raises:
+            PreprocessingError: If a value is missing, infinite, not a whole
+                number, or outside the range of class indices.
+        """
         if self._encoder is None:
             raise PreprocessingError(
                 "This target encoder has not been fitted; call fit(y_train) first."
             )
-        return self._encoder.inverse_transform(np.asarray(y).astype(int))
+        codes = self._validate_codes(y)
+        return self._encoder.inverse_transform(codes)
+
+    def _validate_codes(self, y: Any) -> np.ndarray:
+        """Check every value names an actual class, and return it as an index."""
+        try:
+            values = np.asarray(y, dtype="float64")
+        except (TypeError, ValueError) as error:
+            raise PreprocessingError(
+                f"Encoded class labels must be numbers, got {type(y).__name__}: {error}"
+            ) from error
+
+        if values.ndim > 1:
+            raise PreprocessingError(
+                f"Encoded class labels must be one-dimensional, got {values.ndim} "
+                "dimensions."
+            )
+        if not np.all(np.isfinite(values)):
+            offenders = values[~np.isfinite(values)][:5]
+            raise PreprocessingError(
+                f"Encoded class labels contain non-finite value(s) {offenders.tolist()}. "
+                "Every value must name a class."
+            )
+        if not np.all(values == np.floor(values)):
+            offenders = sorted({float(v) for v in values[values != np.floor(values)]})[:5]
+            raise PreprocessingError(
+                f"Encoded class labels must be whole numbers, got {offenders}. "
+                "Rounding them here would answer with a class the caller never named; "
+                "decode a prediction, not a probability."
+            )
+
+        count = len(self.encoding.classes)
+        out_of_range = sorted({int(v) for v in values if not 0 <= v < count})[:5]
+        if out_of_range:
+            raise PreprocessingError(
+                f"Encoded class label(s) {out_of_range} are outside the range of the "
+                f"{count} class(es) learned in training (0 to {count - 1})."
+            )
+        return values.astype("int64")
 
     def positive_column_index(self) -> int:
         """Which ``predict_proba`` column holds the positive class.

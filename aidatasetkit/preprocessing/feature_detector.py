@@ -93,7 +93,7 @@ class FeatureDetector:
         by_column = {p.name: p for p in profile.column_profiles}
 
         return tuple(
-            self._describe(column, by_column[column], report)
+            self._describe(column, by_column[column], report, frame[column])
             for column in frame.columns
             if column != target and column in by_column
         )
@@ -177,10 +177,16 @@ class FeatureDetector:
     # ------------------------------------------------------------------ #
 
     def _describe(
-        self, column: Hashable, profile: ColumnProfile, quality: QualityReport
+        self,
+        column: Hashable,
+        profile: ColumnProfile,
+        quality: QualityReport,
+        values: pd.Series,
     ) -> FeatureSpec:
         """Build the specification for one column."""
         review_codes = self._review_codes(column, quality)
+        if profile.detected_kind is ColumnKind.CATEGORICAL and _has_text_collision(values):
+            review_codes = tuple(sorted(review_codes + ("categorical_type_collision",)))
         role, source = self._resolve_role(column, profile, review_codes)
         order = self._config.ordinal_orders.get(column)
         mapping = self._config.explicit_mappings.get(column)
@@ -232,8 +238,10 @@ class FeatureDetector:
             # becomes numeric here rather than being one-hot encoded as text.
             return FeatureRole.NUMERIC, "config:numeric_text_policy"
 
-        # 3. Profiling and quality evidence.
-        if profile.is_id_like:
+        # 3. Profiling and quality evidence. force_include is an explicit override
+        #    of this heuristic, so the column falls through to schema detection and
+        #    gets a role a transformer group can actually consume.
+        if profile.is_id_like and column not in config.force_include:
             return FeatureRole.ID_LIKE, "profile:is_id_like"
 
         # 4. Schema detection, then 5. safe defaults.
@@ -261,3 +269,15 @@ class FeatureDetector:
             if issue.code in _REVIEW_CODES or issue.code == "target_leakage_exact_duplicate"
         }
         return tuple(sorted(codes))
+
+
+def _has_text_collision(values: pd.Series) -> bool:
+    """Whether two distinct categories in this column share a text form.
+
+    ``1`` and ``"1"`` are different categories. Any encoding that goes through
+    text would merge them, and nothing downstream could separate them again.
+    """
+    distinct = values.dropna().unique()
+    if len(distinct) < 2:
+        return False
+    return len({str(value) for value in distinct}) < len(distinct)

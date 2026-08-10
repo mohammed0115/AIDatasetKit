@@ -88,6 +88,8 @@ class CategoricalCaster(BaseEstimator, TransformerMixin):
         encoder asked to order ``1`` against ``"a"`` raises instead.
         """
         frame = _as_frame(X)
+        for column in frame.columns:
+            _require_no_text_collision(frame[column], column)
         cast = frame.astype(object).map(lambda v: v if pd.isna(v) else str(v))
         return cast.where(frame.notna(), np.nan)
 
@@ -235,6 +237,33 @@ class NumericTextConverter(BaseEstimator, TransformerMixin):
             else np.asarray([str(f) for f in input_features], dtype=object)
         )
         return np.asarray([str(name) for name in names], dtype=object)
+
+
+def _require_no_text_collision(series: pd.Series, column: Any) -> None:
+    """Refuse a column whose distinct values share a text form.
+
+    ``1`` and ``"1"`` are different categories; ``True`` and ``"True"`` are
+    different categories. Casting them both to text would merge them into one
+    encoded level, and no later step could tell them apart again.
+
+    Raises:
+        PreprocessingError: Naming the values that would collide.
+    """
+    values = series.dropna().unique()
+    if len(values) < 2:
+        return
+    by_text: dict[str, list[Any]] = {}
+    for value in values:
+        by_text.setdefault(str(value), []).append(value)
+    collisions = {text: found for text, found in by_text.items() if len(found) > 1}
+    if collisions:
+        example = next(iter(collisions.items()))
+        raise PreprocessingError(
+            f"Column {column!r} holds distinct categories that share a text form: "
+            f"{example[1]!r} would all become {example[0]!r}, merging categories that "
+            "are not the same. Convert the column to a single consistent type before "
+            "preprocessing."
+        )
 
 
 def _as_frame(X: Any) -> pd.DataFrame:

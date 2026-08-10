@@ -222,14 +222,21 @@ class TestExclusionAndReview:
         assert decision.action is FeatureAction.REVIEW
         assert decision.reason_code == "infinite_values"
 
-    def test_infinities_can_be_accepted_explicitly(self):
+    @pytest.mark.parametrize("bad", [np.inf, -np.inf])
+    def test_both_signs_of_infinity_are_held_back(self, bad):
         values = np.arange(100.0) % 37
-        values[3] = np.inf
+        values[3] = bad
         frame = pd.DataFrame({"ratio": values})
-        config = PreprocessingConfig(allow_infinite=True)
-        assert plan_for(frame, config=config).decision_for("ratio").action is (
-            FeatureAction.INCLUDE
-        )
+        decision = plan_for(frame).decision_for("ratio")
+        assert decision.action is FeatureAction.REVIEW
+        assert "does not support infinity" in decision.reason
+
+    def test_a_column_whose_categories_collide_as_text_is_held_back(self):
+        """1 and "1" are different categories; encoding would merge them."""
+        frame = pd.DataFrame({"c": pd.Series([1, "1", 2] * 40, dtype=object)})
+        decision = plan_for(frame).decision_for("c")
+        assert decision.action is FeatureAction.REVIEW
+        assert decision.reason_code == "categorical_type_collision"
 
     def test_numeric_text_is_held_for_review_not_converted(self):
         frame = pd.DataFrame({"amount": [str(v % 37) for v in range(200)]})
