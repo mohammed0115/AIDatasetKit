@@ -55,15 +55,35 @@ class TestPreprocessingProfile:
         cache = {capabilities().preprocessing_profile(): "shared"}
         assert cache[capabilities(is_baseline=True).preprocessing_profile()] == "shared"
 
-    def test_the_two_built_in_models_map_to_the_documented_profiles(self):
+    def test_every_built_in_model_maps_to_the_documented_profile(self):
+        """The full table, so a capability cannot change without saying so here."""
         profiles = {
             entry.canonical_name: entry.capabilities.preprocessing_profile().key
             for entry in default_registry().catalog()
         }
         assert profiles == {
+            # The tree family keeps native NaN and gives up sparse: scikit-learn
+            # supports each alone and refuses the two together.
+            "decision_tree_classifier": "scaling=0,sparse=0,native_nan=1",
+            "extra_trees_classifier": "scaling=0,sparse=0,native_nan=1",
+            "random_forest_classifier": "scaling=0,sparse=0,native_nan=1",
+            "hist_gradient_boosting_classifier": "scaling=0,sparse=0,native_nan=1",
+            # The baseline genuinely takes both, because it reads neither.
             "dummy_classifier": "scaling=0,sparse=1,native_nan=1",
+            "gradient_boosting_classifier": "scaling=0,sparse=1,native_nan=0",
+            "knn_classifier": "scaling=1,sparse=1,native_nan=0",
             "logistic_regression": "scaling=1,sparse=1,native_nan=0",
+            "gaussian_nb": "scaling=1,sparse=0,native_nan=0",
         }
+
+    def test_nine_models_need_only_five_preprocessors(self):
+        from tests.conftest import BUILT_IN_PROFILE_COUNT
+
+        keys = {
+            entry.capabilities.preprocessing_profile()
+            for entry in default_registry().catalog()
+        }
+        assert len(keys) == BUILT_IN_PROFILE_COUNT
 
     def test_logistic_regression_requires_scaling(self):
         capability = default_registry().resolve("logistic_regression").capabilities
@@ -163,9 +183,33 @@ class TestSerialisation:
 
 
 class TestInterpretability:
-    def test_both_proof_models_are_readable(self):
+    def test_every_model_declares_a_real_level(self):
         for entry in default_registry().catalog():
-            assert entry.capabilities.interpretability_level is Interpretability.HIGH
+            assert isinstance(
+                entry.capabilities.interpretability_level, Interpretability
+            )
+
+    def test_the_catalog_uses_more_than_one_level(self):
+        """A field where every model scored the same would be describing nothing."""
+        levels = {
+            entry.capabilities.interpretability_level
+            for entry in default_registry().catalog()
+        }
+        assert levels == {
+            Interpretability.HIGH,
+            Interpretability.MEDIUM,
+            Interpretability.LOW,
+        }
+
+    def test_the_levels_follow_what_a_fitted_model_lets_you_read(self):
+        """A tree is rules, a forest is importances, a neighbourhood is neither."""
+        levels = {
+            entry.canonical_name: entry.capabilities.interpretability_level
+            for entry in default_registry().catalog()
+        }
+        assert levels["decision_tree_classifier"] is Interpretability.HIGH
+        assert levels["random_forest_classifier"] is Interpretability.MEDIUM
+        assert levels["knn_classifier"] is Interpretability.LOW
 
     def test_it_is_typed_rather_than_a_bare_string(self):
         assert isinstance(capabilities().interpretability_level, Interpretability)

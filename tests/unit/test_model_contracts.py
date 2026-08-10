@@ -13,6 +13,8 @@ moment it is registered, without anyone remembering to extend this file.
 
 from __future__ import annotations
 
+import inspect
+
 import numpy as np
 import pytest
 from scipy.sparse import csr_matrix
@@ -29,6 +31,50 @@ CLASSIFIERS = [e for e in REGISTRATIONS if e.task_type is TaskType.CLASSIFICATIO
 
 def _identify(entry) -> str:
     return entry.canonical_name
+
+
+#: Cost knobs turned down for the tests that actually fit. Ensembles default to a
+#: hundred members, which is right in production and pure waste on eighty rows.
+_SMALL = {"n_estimators": 5, "max_iter": 10}
+
+
+def _small(entry) -> dict:
+    """Choose cost overrides from the estimator's *signature*, never its name.
+
+    ``n_estimators`` is unambiguous. ``max_iter`` is not: on a booster it is the
+    number of boosting rounds and shrinking it is free, while on
+    ``LogisticRegression`` it is the convergence budget and shrinking it buys a
+    ``ConvergenceWarning`` -- which, under ``-W error``, is a failure. The
+    estimators where it means "rounds" are exactly those that also accept
+    ``early_stopping``, so that is the discriminator, and no model name appears.
+    """
+    accepted = set(inspect.signature(type(entry.strategy_type().build())).parameters)
+    overrides = {}
+    if "n_estimators" in accepted:
+        overrides["n_estimators"] = _SMALL["n_estimators"]
+    if "max_iter" in accepted and "early_stopping" in accepted:
+        overrides["max_iter"] = _SMALL["max_iter"]
+    return overrides
+
+
+def _build(entry, **params):
+    """Build a fresh estimator sized for a test rather than for production."""
+    return entry.strategy_type().build(**{**_small(entry), **params})
+
+
+def _sparse_as_delivered(entry, features):
+    """The sparse matrix this model would actually be handed by S4.
+
+    Not a scrubbed one. A model declaring ``handles_missing_values`` is never
+    given imputed data, so the sparse matrix reaching it still carries its gaps
+    -- and scikit-learn's tree family accepts sparse, accepts NaN, and refuses
+    sparse-carrying-NaN. Testing the declaration against a matrix nobody would
+    build would answer a question nobody asks.
+    """
+    values = np.abs(features).copy()
+    if entry.capabilities.handles_missing_values:
+        values[0, 0] = np.nan
+    return csr_matrix(values)
 
 
 def _binary_data() -> tuple[np.ndarray, np.ndarray]:
@@ -71,7 +117,7 @@ class TestEveryRegisteredModel:
     def test_a_fitted_estimator_does_not_leak_into_the_next_build(self, entry, binary):
         features, target = binary
         strategy = entry.strategy_type()
-        strategy.build().fit(features, target)
+        _build(entry).fit(features, target)
         assert not hasattr(strategy.build(), "classes_")
 
     def test_the_built_estimator_satisfies_our_own_contract(self, entry):
@@ -116,34 +162,34 @@ class TestEveryClassifier:
 
     def test_fit_and_predict_on_binary_data(self, entry, binary):
         features, target = binary
-        predictions = entry.strategy_type().build().fit(features, target).predict(features)
+        predictions = _build(entry).fit(features, target).predict(features)
         assert predictions.shape == target.shape
         assert set(np.unique(predictions)) <= set(np.unique(target))
 
     def test_sklearn_backed_models_can_be_cloned(self, entry):
         if entry.backend is not Backend.SKLEARN:
             pytest.skip("clone is a scikit-learn contract")
-        estimator = entry.strategy_type().build()
+        estimator = _build(entry)
         copy = clone(estimator)
         assert copy is not estimator
         assert copy.get_params() == estimator.get_params()
 
     def test_a_clone_of_a_fitted_estimator_is_unfitted(self, entry, binary):
         features, target = binary
-        fitted = entry.strategy_type().build().fit(features, target)
+        fitted = _build(entry).fit(features, target)
         assert not hasattr(clone(fitted), "classes_")
 
     def test_it_composes_inside_a_pipeline(self, entry, binary):
         features, target = binary
         pipeline = Pipeline(
-            [("scaler", StandardScaler()), ("model", entry.strategy_type().build())]
+            [("scaler", StandardScaler()), ("model", _build(entry))]
         )
         pipeline.fit(features, target)
         assert pipeline.predict(features).shape == target.shape
 
     def test_predict_proba_capability_is_true_to_reality(self, entry, binary):
         features, target = binary
-        fitted = entry.strategy_type().build().fit(features, target)
+        fitted = _build(entry).fit(features, target)
 
         if not entry.capabilities.supports_predict_proba:
             assert not hasattr(fitted, "predict_proba")
@@ -159,7 +205,7 @@ class TestEveryClassifier:
         if not entry.capabilities.supports_multiclass:
             pytest.skip("model declares binary-only support")
 
-        fitted = entry.strategy_type().build().fit(features, target)
+        fitted = _build(entry).fit(features, target)
         assert len(fitted.classes_) == len(np.unique(target)) == 3
         assert fitted.predict(features).shape == target.shape
         if entry.capabilities.supports_predict_proba:
@@ -167,13 +213,13 @@ class TestEveryClassifier:
 
     def test_sparse_capability_is_true_to_reality(self, entry, binary):
         features, target = binary
-        sparse = csr_matrix(np.abs(features))
+        sparse = _sparse_as_delivered(entry, features)
         if not entry.capabilities.supports_sparse_input:
-            estimator = entry.strategy_type().build()
+            estimator = _build(entry)
             with pytest.raises((TypeError, ValueError)):
                 estimator.fit(sparse, target)
             return
-        fitted = entry.strategy_type().build().fit(sparse, target)
+        fitted = _build(entry).fit(sparse, target)
         assert fitted.predict(sparse).shape == target.shape
 
     def test_missing_value_capability_is_true_to_reality(self, entry, binary):
@@ -183,17 +229,59 @@ class TestEveryClassifier:
         with_nan[0, 0] = np.nan
 
         if entry.capabilities.handles_missing_values:
-            fitted = entry.strategy_type().build().fit(with_nan, target)
+            fitted = _build(entry).fit(with_nan, target)
             assert fitted.predict(with_nan).shape == target.shape
         else:
             with pytest.raises(ValueError, match="NaN|missing|infinity"):
-                entry.strategy_type().build().fit(with_nan, target)
+                _build(entry).fit(with_nan, target)
 
     def test_it_accepts_non_numeric_class_labels(self, entry, binary):
         features, target = binary
         labels = np.where(target == 1, "churn", "stay")
-        fitted = entry.strategy_type().build().fit(features, labels)
+        fitted = _build(entry).fit(features, labels)
         assert set(fitted.classes_) == {"churn", "stay"}
+
+
+@pytest.mark.parametrize("entry", CLASSIFIERS, ids=_identify)
+class TestCapabilitiesComposeWithEachOther:
+    """Each capability being true separately does not make the pair true.
+
+    scikit-learn's tree family accepts a ``csr_matrix``, accepts ``NaN``, and
+    raises on a ``csr_matrix`` containing ``NaN``. A model declaring both would
+    let S4 build exactly the matrix it refuses -- reproduced end to end before
+    this test existed -- so the pair has to be proved, not inferred.
+    """
+
+    def test_a_model_claiming_sparse_and_native_nan_accepts_both_at_once(
+        self, entry, binary
+    ):
+        capabilities = entry.capabilities
+        if not (capabilities.supports_sparse_input and capabilities.handles_missing_values):
+            pytest.skip("model does not claim both")
+        features, target = binary
+        values = np.abs(features).copy()
+        values[0, 0] = np.nan
+        matrix = csr_matrix(values)
+        fitted = _build(entry).fit(matrix, target)
+        assert fitted.predict(matrix).shape == target.shape
+
+    def test_a_model_that_cannot_take_both_does_not_claim_both(self, entry, binary):
+        """The contrapositive, so the skip above can never hide a false claim."""
+        features, target = binary
+        values = np.abs(features).copy()
+        values[0, 0] = np.nan
+        matrix = csr_matrix(values)
+        try:
+            _build(entry).fit(matrix, target)
+        except (TypeError, ValueError):
+            accepts_both = False
+        else:
+            accepts_both = True
+        claims_both = (
+            entry.capabilities.supports_sparse_input
+            and entry.capabilities.handles_missing_values
+        )
+        assert claims_both <= accepts_both
 
 
 class TestTheContractsThemselves:

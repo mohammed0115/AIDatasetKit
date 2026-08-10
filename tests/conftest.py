@@ -14,6 +14,27 @@ from aidatasetkit.core import KitConfig
 
 RANDOM_SEED = 20240101
 
+#: The built-in classification catalog, in the canonical order the registry
+#: publishes. Written here rather than in each test file that needs it, so that
+#: adding a model to the library is one edit and not four -- and so that a model
+#: appearing or vanishing is a failure rather than a quietly updated expectation.
+BUILT_IN_CLASSIFIERS = (
+    "decision_tree_classifier",
+    "dummy_classifier",
+    "extra_trees_classifier",
+    "gaussian_nb",
+    "gradient_boosting_classifier",
+    "hist_gradient_boosting_classifier",
+    "knn_classifier",
+    "logistic_regression",
+    "random_forest_classifier",
+)
+
+#: Distinct PreprocessingProfile keys across that catalog. Nine models, five
+#: preprocessors: the reuse S4 caches on, stated as a number so that a change to
+#: any capability has to be acknowledged here.
+BUILT_IN_PROFILE_COUNT = 5
+
 
 @pytest.fixture
 def config() -> KitConfig:

@@ -21,6 +21,8 @@ from aidatasetkit.core.exceptions import (
     ValidationError,
 )
 from aidatasetkit.core.types import Backend, Interpretability, TaskType
+from tests.conftest import BUILT_IN_CLASSIFIERS
+
 from aidatasetkit.models import (
     ModelCapabilities,
     ModelRegistry,
@@ -465,10 +467,7 @@ class TestSerialisation:
 
 class TestIsolationFromTheBuiltInRegistry:
     def test_the_built_in_registry_holds_the_expected_models(self):
-        assert set(default_registry().available()) == {
-            "dummy_classifier",
-            "logistic_regression",
-        }
+        assert set(default_registry().available()) == set(BUILT_IN_CLASSIFIERS)
 
     def test_a_scratch_registry_starts_empty(self):
         assert len(ModelRegistry()) == 0

@@ -17,6 +17,8 @@ from scipy import sparse
 from sklearn.pipeline import Pipeline
 
 from aidatasetkit.core.types import RunMetadata, TaskType
+from tests.conftest import BUILT_IN_PROFILE_COUNT
+
 from aidatasetkit.models import ModelFactory, default_registry
 from aidatasetkit.preprocessing import (
     FeatureAction,
@@ -279,7 +281,9 @@ class TestModelIntegration:
         decoded = encoder.inverse_transform(pipeline.predict(churn_train.drop(columns=["Churn"])))
         assert set(decoded) <= {"churn", "stay"}
 
-    def test_the_two_models_get_different_preprocessing(self, churn_train, config):
+    def test_models_with_different_capabilities_get_different_preprocessing(
+        self, churn_train, config
+    ):
         profile = DataProfiler().profile(churn_train)
         planner = PreprocessingPlanner(config)
         plans = {
@@ -289,7 +293,7 @@ class TestModelIntegration:
             for entry in default_registry().catalog()
         }
         fingerprints = {name: plan.fingerprint for name, plan in plans.items()}
-        assert len(set(fingerprints.values())) == 2
+        assert len(set(fingerprints.values())) == BUILT_IN_PROFILE_COUNT
 
     def test_that_difference_comes_from_capabilities_not_names(self, churn_train, config):
         profile = DataProfiler().profile(churn_train)

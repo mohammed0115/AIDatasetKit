@@ -24,6 +24,8 @@ from aidatasetkit.core.types import (
     TargetProfile,
     TaskType,
 )
+from tests.conftest import BUILT_IN_CLASSIFIERS
+
 from aidatasetkit.models import (
     ModelCapabilities,
     ModelFactory,
@@ -194,10 +196,9 @@ class TestTaskValidation:
             assert ModelFactory.create(name, target=MULTICLASS_TARGET) is not None
 
     def test_compatible_models_can_be_listed_for_a_target(self):
-        assert set(ModelFactory.compatible_with(BINARY_TARGET)) == {
-            "dummy_classifier",
-            "logistic_regression",
-        }
+        assert set(ModelFactory.compatible_with(BINARY_TARGET)) == set(
+            BUILT_IN_CLASSIFIERS
+        )
 
     def test_no_model_is_compatible_with_a_regression_target_yet(self):
         assert ModelFactory.compatible_with(REGRESSION_TARGET) == ()
@@ -295,11 +296,13 @@ class TestErrorCases:
 
 class TestDiscovery:
     def test_available_lists_the_built_in_models(self):
-        assert ModelFactory.available() == ("dummy_classifier", "logistic_regression")
+        assert ModelFactory.available() == BUILT_IN_CLASSIFIERS
 
     def test_available_filters_by_task(self):
         assert ModelFactory.available(task="regression") == ()
-        assert len(ModelFactory.available(task=TaskType.CLASSIFICATION)) == 2
+        assert len(ModelFactory.available(task=TaskType.CLASSIFICATION)) == len(
+            BUILT_IN_CLASSIFIERS
+        )
 
     def test_the_catalog_carries_structured_metadata(self):
         entries = {entry["canonical_name"]: entry for entry in ModelFactory.catalog()}
@@ -314,7 +317,7 @@ class TestDiscovery:
 
     def test_the_catalog_is_json_serialisable(self):
         payload = json.loads(json.dumps(ModelFactory.catalog()))
-        assert len(payload) == 2
+        assert len(payload) == len(BUILT_IN_CLASSIFIERS)
 
     def test_the_catalog_holds_no_estimator_objects(self):
         for entry in ModelFactory.catalog():
