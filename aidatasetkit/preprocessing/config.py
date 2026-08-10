@@ -181,7 +181,11 @@ class PreprocessingConfig:
                 )
             object.__setattr__(self, name, tuple(value))
 
-        for name in ("numeric_fill_value", "explicit_mapping_unknown_value"):
+        for name in (
+            "numeric_fill_value",
+            "explicit_mapping_unknown_value",
+            "unknown_ordinal_value",
+        ):
             value = getattr(self, name)
             if value is None:
                 continue

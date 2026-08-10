@@ -138,15 +138,23 @@ class HistGradientBoostingClassifierStrategy(ModelStrategy):
         counts boosting iterations rather than estimators -- so the catalog
         reports the budget for both boosters in comparable terms.
 
-        ``early_stopping`` is left at ``"auto"``, which enables it above 10,000
-        rows. That is scikit-learn's decision and it is honest about it; turning
-        it off would change the algorithm, and turning it on unconditionally would
-        hold back a validation split the analyst never asked to give up.
+        ``early_stopping="auto"`` restates scikit-learn's default, and it is
+        written out because of what it does rather than to pad the list: above
+        roughly ten thousand rows it turns itself on and withholds a tenth of the
+        training data as a validation set. An analyst reading ``default_params``
+        in the catalog to answer "what am I actually getting" deserves to see
+        that, and it is the least visible of the three defaults here. The value
+        is not changed: turning it off would alter the algorithm, and forcing it
+        on would give up a validation split nobody asked to give up.
 
         ``random_state`` fixes both the binning subsample and, where early
         stopping engages, the validation split.
         """
-        return {"max_iter": 100, "random_state": self.config.random_state}
+        return {
+            "max_iter": 100,
+            "early_stopping": "auto",
+            "random_state": self.config.random_state,
+        }
 
     def build(self, **params: Any) -> Estimator:
         """Construct a new, unfitted :class:`~sklearn.ensemble.HistGradientBoostingClassifier`."""

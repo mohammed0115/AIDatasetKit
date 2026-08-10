@@ -109,8 +109,13 @@ def _fresh(seed: str) -> list[str]:
 
 @pytest.fixture(scope="module")
 def fresh_runs() -> dict[str, list[str]]:
-    """The same questions answered under three different hash seeds."""
-    return {seed: _fresh(seed) for seed in ("0", "1", "12345")}
+    """The same questions answered under two different hash seeds.
+
+    Two rather than three: each spawn re-imports pandas and scikit-learn and is
+    the most expensive item in the suite, and the in-process assertions above
+    supply a third independent hash ordering.
+    """
+    return {seed: _fresh(seed) for seed in ("0", "12345")}
 
 
 class TestOrderingIsDeterministic:
@@ -257,9 +262,26 @@ class TestCatalogSerialisation:
         assert json.loads(json.dumps(catalog))[0]["canonical_name"] == EXPECTED[0]
 
     def test_no_estimator_object_leaks_into_it(self, catalog):
-        text = json.dumps(catalog)
-        for forbidden in ("Classifier(", "GaussianNB(", "object at 0x"):
-            assert forbidden not in text
+        """Every value is a JSON primitive, not merely free of three substrings.
+
+        ``jsonable`` falls back to ``repr()`` for anything it does not recognise,
+        so a leaked object arrives as a plausible-looking string. Checking the
+        types is the only guard that cannot be walked past.
+        """
+
+        def primitive(value) -> bool:
+            if isinstance(value, dict):
+                return all(isinstance(k, str) and primitive(v) for k, v in value.items())
+            if isinstance(value, list):
+                return all(primitive(v) for v in value)
+            return value is None or isinstance(value, (str, int, float, bool))
+
+        for entry in catalog:
+            assert primitive(entry), entry["canonical_name"]
+
+    def test_nothing_in_it_can_be_fitted(self, catalog):
+        for entry in catalog:
+            assert all(not hasattr(value, "fit") for value in entry.values())
 
     def test_every_entry_reports_its_capabilities(self, catalog):
         for entry in catalog:
@@ -276,11 +298,29 @@ class TestCatalogSerialisation:
         for entry in catalog:
             assert entry["default_params"], entry["canonical_name"]
 
-    def test_the_new_ensembles_publish_their_size(self, catalog):
+    @pytest.mark.parametrize(
+        "name,key,value",
+        [
+            ("random_forest_classifier", "n_estimators", 100),
+            ("extra_trees_classifier", "n_estimators", 100),
+            ("gradient_boosting_classifier", "n_estimators", 100),
+            ("hist_gradient_boosting_classifier", "max_iter", 100),
+            ("hist_gradient_boosting_classifier", "early_stopping", "auto"),
+            ("knn_classifier", "n_neighbors", 5),
+            ("gaussian_nb", "var_smoothing", 1e-9),
+        ],
+    )
+    def test_the_catalog_publishes_the_budget_a_user_is_getting(
+        self, catalog, name, key, value
+    ):
         by_name = {entry["canonical_name"]: entry for entry in catalog}
-        assert by_name["random_forest_classifier"]["default_params"]["n_estimators"] == 100
-        assert by_name["extra_trees_classifier"]["default_params"]["n_estimators"] == 100
-        assert by_name["hist_gradient_boosting_classifier"]["default_params"]["max_iter"] == 100
+        assert by_name[name]["default_params"][key] == value
+
+    def test_the_validation_split_is_not_hidden(self, catalog):
+        """Above ~10k rows this model withholds a tenth of the training data."""
+        by_name = {entry["canonical_name"]: entry for entry in catalog}
+        published = by_name["hist_gradient_boosting_classifier"]["default_params"]
+        assert "early_stopping" in published
 
     def test_the_seedless_models_publish_no_seed(self, catalog):
         """KNN and GaussianNB take no random_state; inventing one would be theatre."""

@@ -12,6 +12,17 @@ Three of these facts -- and only three -- change how a pipeline is assembled, an
 profile is what preprocessing caches on, so every model declaring the same three
 answers shares one preprocessor.
 
+Those three describe **one data contract, not three independent facts**, and the
+difference is load-bearing. scikit-learn's tree family accepts a sparse matrix,
+accepts ``NaN``, and refuses a sparse matrix containing ``NaN`` -- and a model
+declaring ``handles_missing_values`` is never handed imputed data, so the sparse
+matrix it would actually receive is precisely the one it rejects. Each field
+therefore answers "would this model accept what preprocessing would build for it
+given the others", which is why a tree can accept a clean ``csr_matrix`` in
+isolation and still, correctly, declare ``supports_sparse_input=False``. A
+declaration that were true only in isolation would let the pipeline build
+something no model could consume.
+
 Declared capabilities are enforced by contract tests that actually fit the
 estimator. Metadata that lies is worse than no metadata, because every later
 decision trusts it.
@@ -47,12 +58,15 @@ class ModelCapabilities:
         requires_scaling: Whether the algorithm is sensitive to feature scale,
             either through a distance metric or a scale-dependent penalty. Adds a
             scaler to the numeric branch of the pipeline.
-        supports_sparse_input: Whether the estimator accepts a sparse matrix. When
-            false, one-hot encoding must produce a dense array.
+        supports_sparse_input: Whether the estimator accepts the sparse matrix
+            *this library would hand it*. When false, one-hot encoding must
+            produce a dense array. Read together with ``handles_missing_values``,
+            not separately -- see the note below.
         supports_multiclass: Whether more than two classes can be fitted directly.
             Only consulted when ``task_type`` is classification.
         handles_missing_values: Whether the estimator consumes ``NaN`` without
-            raising. When true the numeric imputation step may be skipped.
+            raising. When true the numeric imputation step may be skipped, so the
+            matrix reaching the model still holds its gaps.
         interpretability_level: How readable a fitted model is to a human. Purely
             descriptive metadata for the comparison table -- it never influences
             preprocessing or selection, and it makes no claim to be a measurement.

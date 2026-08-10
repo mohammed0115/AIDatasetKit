@@ -11,9 +11,11 @@ features agreed with predictions fitted on standardised features on only 75% of
 rows, and accuracy moved from 0.763 to 0.963. Unscaled, the largest-magnitude
 feature decides every neighbourhood and the other two are noise.
 
-It is also the only model here with no ``random_state`` in its constructor, and
-none is invented for it. Its fit stores the training set and its prediction is a
-deterministic majority vote.
+It is one of the two models here whose constructor takes no ``random_state`` --
+:class:`~aidatasetkit.models.classification.naive_bayes.GaussianNBStrategy` is
+the other -- and none is invented for either. This one stores the training set
+and votes; that vote is deterministic, and was verified identical across
+separate interpreters and hash seeds.
 """
 
 from __future__ import annotations

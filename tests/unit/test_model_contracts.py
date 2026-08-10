@@ -117,7 +117,9 @@ class TestEveryRegisteredModel:
     def test_a_fitted_estimator_does_not_leak_into_the_next_build(self, entry, binary):
         features, target = binary
         strategy = entry.strategy_type()
-        _build(entry).fit(features, target)
+        # Same strategy object for both calls. Fitting an estimator from a
+        # *different* instance would prove nothing about this one.
+        strategy.build(**_small(entry)).fit(features, target)
         assert not hasattr(strategy.build(), "classes_")
 
     def test_the_built_estimator_satisfies_our_own_contract(self, entry):
@@ -286,6 +288,11 @@ class TestCapabilitiesComposeWithEachOther:
 
 class TestTheContractsThemselves:
     """Proof that the contract assertions above can actually fail.
+
+    Most of the negative branches are now reached by real models -- four
+    classifiers decline sparse input, four decline NaN -- so these deliberate
+    fakes exist for the branches the catalog does not yet exercise, and to prove
+    the assertions are capable of failing at all.
 
     Both registered models declare ``True`` for every optional capability, so
     every negative branch in the parametrised suite is currently unreachable. A
@@ -494,3 +501,126 @@ class TestLogisticRegressionSpecifics:
         features, target = binary
         fitted = ModelFactory.create("logistic_regression").fit(features, target)
         assert fitted.coef_.shape == (1, features.shape[1])
+
+
+class TestProductionDefaultsAreExercisedAndPinned:
+    """The suite shrinks ensembles to stay fast; something must still run them.
+
+    Every fitting test above builds with the cost knobs turned down, so without
+    this class the shipped defaults would be asserted as values and never once
+    executed -- and a default changed from 100 to 2000 would pass the entire
+    suite.
+    """
+
+    #: The shipped default every model is entitled to have pinned. Read from the
+    #: strategy rather than the estimator, because it is the strategy's promise.
+    SHIPPED = {
+        "decision_tree_classifier": {"random_state": 42},
+        "dummy_classifier": {"strategy": "prior", "random_state": 42},
+        "extra_trees_classifier": {"n_estimators": 100, "random_state": 42},
+        "gaussian_nb": {"var_smoothing": 1e-9},
+        "gradient_boosting_classifier": {"n_estimators": 100, "random_state": 42},
+        "hist_gradient_boosting_classifier": {
+            "max_iter": 100,
+            "early_stopping": "auto",
+            "random_state": 42,
+        },
+        "knn_classifier": {"n_neighbors": 5},
+        "logistic_regression": {"max_iter": 1000, "random_state": 42},
+        "random_forest_classifier": {"n_estimators": 100, "random_state": 42},
+    }
+
+    @pytest.mark.parametrize("entry", REGISTRATIONS, ids=_identify)
+    def test_the_shipped_defaults_are_exactly_these(self, entry):
+        assert entry.strategy_type().default_params() == self.SHIPPED[entry.canonical_name]
+
+    @pytest.mark.parametrize("entry", REGISTRATIONS, ids=_identify)
+    def test_the_model_fits_at_its_shipped_defaults(self, entry, binary):
+        """No shrinking. A default nothing ever runs is a default nobody checked."""
+        features, target = binary
+        estimator = entry.strategy_type().build()
+        assert estimator.fit(features, target).predict(features).shape == target.shape
+
+
+class TestGaussianNBScalingClaimTracksItsParameter:
+    """``requires_scaling=True`` for GaussianNB rests entirely on one number.
+
+    The model is scale-invariant in theory; scikit-learn makes it scale-sensitive
+    by flooring every feature variance at ``var_smoothing * max(variance over all
+    features)``. If that default ever moved to 0 the declaration would become
+    false, so the dependency is asserted rather than described.
+    """
+
+    @staticmethod
+    def _disagreement(var_smoothing):
+        from sklearn.naive_bayes import GaussianNB
+        from sklearn.preprocessing import StandardScaler
+
+        rng = np.random.default_rng(3)
+        n = 300
+        a, b, c = (rng.normal(0, 1, n) for _ in range(3))
+        target = ((a + b + c) > 0).astype(int)
+        features = np.column_stack([a * 1e-3, b * 1.0, c * 1e5])
+        raw = GaussianNB(var_smoothing=var_smoothing).fit(features, target).predict(features)
+        scaled_features = StandardScaler().fit_transform(features)
+        scaled = (
+            GaussianNB(var_smoothing=var_smoothing)
+            .fit(scaled_features, target)
+            .predict(scaled_features)
+        )
+        return float((raw != scaled).mean())
+
+    def test_the_shipped_smoothing_really_does_make_it_scale_sensitive(self):
+        assert self._disagreement(1e-9) > 0.1
+
+    def test_and_without_that_smoothing_it_is_invariant_as_the_theory_says(self):
+        assert self._disagreement(0.0) == 0.0
+
+    def test_the_strategy_ships_the_value_the_claim_depends_on(self):
+        from aidatasetkit.models import default_registry
+
+        entry = default_registry().resolve("gaussian_nb")
+        assert entry.strategy_type().default_params()["var_smoothing"] == 1e-9
+        assert entry.capabilities.requires_scaling
+
+
+@pytest.mark.parametrize("entry", CLASSIFIERS, ids=_identify)
+class TestSparseDeclarationsAreAboutDeliveredData:
+    """A tree declines sparse without being unable to take one.
+
+    ``supports_sparse_input`` answers "would this model accept the sparse matrix
+    preprocessing would build for it", and for a natively-missing-aware model
+    that matrix carries NaN. So a declaration of ``False`` does not imply the
+    estimator rejects a *clean* ``csr_matrix``, and this records which of the two
+    reasons applies to each model rather than leaving it to be inferred.
+    """
+
+    def test_a_declining_model_rejects_either_the_clean_or_the_gapped_matrix(
+        self, entry, binary
+    ):
+        if entry.capabilities.supports_sparse_input:
+            pytest.skip("model accepts sparse")
+        features, target = binary
+        clean = csr_matrix(np.abs(features))
+        try:
+            _build(entry).fit(clean, target)
+        except (TypeError, ValueError):
+            return  # refuses sparse outright
+        # It takes a clean sparse matrix, so the declaration must be explained by
+        # the gaps it would actually be given.
+        assert entry.capabilities.handles_missing_values, (
+            f"{entry.canonical_name} accepts clean sparse input and declares no "
+            "native NaN support, so supports_sparse_input=False is unexplained"
+        )
+        assert not sparse_and_nan_ok(entry, features, target)
+
+
+def sparse_and_nan_ok(entry, features, target) -> bool:
+    """Whether this estimator survives a sparse matrix that still holds gaps."""
+    values = np.abs(features).copy()
+    values[0, 0] = np.nan
+    try:
+        _build(entry).fit(csr_matrix(values), target)
+    except (TypeError, ValueError):
+        return False
+    return True
