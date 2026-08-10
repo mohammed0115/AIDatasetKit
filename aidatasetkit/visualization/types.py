@@ -155,15 +155,23 @@ class ChartSpec:
         """The chart's score, or zero when it has not been ranked."""
         return 0.0 if self.score is None else self.score.total
 
-    def identity(self) -> tuple[str, tuple[str, ...]]:
+    def identity(self) -> tuple[str, tuple[tuple[str, str], ...]]:
         """A comparable key for duplicate detection.
 
         Column order is normalised so that a scatter of ``(a, b)`` and one of
         ``(b, a)`` are recognised as the same request.
+
+        Each label carries its type. Keying on the string alone would make the
+        integer label ``1`` and the string label ``"1"`` -- which can coexist in
+        one frame -- indistinguishable, so a chart of the second would be dropped
+        as a duplicate of the first, with a suppression reason claiming an
+        identical chart was already included. A wrong explanation is worse than a
+        missing one.
         """
+        labels = tuple((type(column).__name__, str(column)) for column in self.columns)
         if self.chart_type is ChartType.SCATTER:
-            return (self.chart_type.value, tuple(sorted(str(c) for c in self.columns)))
-        return (self.chart_type.value, tuple(str(c) for c in self.columns))
+            labels = tuple(sorted(labels))
+        return (self.chart_type.value, labels)
 
     def with_score(self, score: ChartScore) -> ChartSpec:
         """Return a copy carrying ``score``."""

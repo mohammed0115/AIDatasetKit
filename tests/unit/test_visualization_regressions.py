@@ -387,6 +387,44 @@ class TestAutomaticBarDisclosesMissingValues:
         assert sum(prepared.data["counts"]) == int(frame["segment"].notna().sum())
 
 
+class TestIdentityDistinguishesLabelTypes:
+    """A frame can hold both the integer 1 and the string "1" as labels."""
+
+    @pytest.fixture
+    def mixed_labels(self) -> pd.DataFrame:
+        index = np.arange(200)
+        return pd.DataFrame(
+            {
+                1: ((index * 977) % 313).astype("float64"),
+                "1": ((index * 461) % 271).astype("float64"),
+                "z": ((index * 131) % 197).astype("float64"),
+            }
+        )
+
+    def test_two_labels_that_stringify_alike_are_not_one_chart(self):
+        reason = VisualizationReason(code="t", message="t")
+        integer = ChartSpec(ChartType.HISTOGRAM, (1,), "t", reason)
+        text = ChartSpec(ChartType.HISTOGRAM, ("1",), "t", reason)
+        assert integer.identity() != text.identity()
+
+    def test_both_columns_get_their_own_chart(self, service, mixed_labels):
+        plan = service.recommend(mixed_labels)
+        charted = {chart.columns[0] for chart in plan.of_type(ChartType.HISTOGRAM)}
+        assert 1 in charted and "1" in charted
+
+    def test_no_chart_is_suppressed_with_a_false_duplicate_reason(
+        self, service, mixed_labels
+    ):
+        plan = service.recommend(mixed_labels)
+        assert not [e for e in plan.suppressed if e.reason.code == "duplicate_chart"]
+
+    def test_genuine_duplicates_are_still_recognised(self):
+        reason = VisualizationReason(code="t", message="t")
+        first = ChartSpec(ChartType.SCATTER, ("a", "b"), "t", reason)
+        second = ChartSpec(ChartType.SCATTER, ("b", "a"), "t", reason)
+        assert first.identity() == second.identity()
+
+
 class TestShowDoesNotLeakFigures:
     def test_rendering_a_plan_opens_no_pyplot_figure(self, service, binary_frame):
         pyplot = pytest.importorskip("matplotlib.pyplot")
