@@ -30,8 +30,9 @@ dependencies = [
 # always visible in the catalog, but raises MissingDependencyError on create().
 [project.optional-dependencies]
 boosting = ["xgboost>=2.0", "lightgbm>=4.0", "catboost>=1.2"]
+viz = ["matplotlib>=3.9"]
 dev = ["pytest>=8.0"]
-all = ["aidatasetkit[boosting,dev]"]
+all = ["aidatasetkit[boosting,viz,dev]"]
 
 [tool.setuptools.packages.find]
 include = ["aidatasetkit*"]

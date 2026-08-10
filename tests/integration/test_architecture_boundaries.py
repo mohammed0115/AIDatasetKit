@@ -45,6 +45,7 @@ LAYERS: dict[str, int] = {
     "profiling": 2,
     "preprocessing": 3,
     "models": 3,
+    "visualization": 3,
     "training": 4,
     "evaluation": 4,
     "prediction": 4,
@@ -63,6 +64,12 @@ FORBIDDEN_PAIRS: frozenset[tuple[str, str]] = frozenset(
         ("models", "profiling"),
         ("models", "statistics"),
         ("preprocessing", "profiling"),
+        # Exploratory analysis must stay useful before any model exists, so the
+        # visualization layer knows nothing about models or preprocessing.
+        ("visualization", "models"),
+        ("visualization", "preprocessing"),
+        ("models", "visualization"),
+        ("preprocessing", "visualization"),
     }
 )
 

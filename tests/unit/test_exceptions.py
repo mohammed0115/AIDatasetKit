@@ -60,7 +60,6 @@ def test_everything_derives_from_the_library_base(error_type):
         (IncompatibleModelError, TaskError),
         (UnknownModelError, ModelError),
         (AmbiguousModelAliasError, ModelError),
-        (MissingDependencyError, ModelError),
     ],
     ids=lambda value: getattr(value, "__name__", value),
 )
@@ -68,6 +67,12 @@ def test_categories_can_be_caught_as_a_group(error_type, parent):
     assert issubclass(error_type, parent)
     with pytest.raises(parent):
         raise error_type("boom")
+
+
+def test_a_missing_optional_package_is_not_a_model_failure():
+    """It is raised for an absent plotting library too, so it hangs off the base."""
+    assert issubclass(MissingDependencyError, AIDatasetKitError)
+    assert not issubclass(MissingDependencyError, ModelError)
 
 
 def test_the_library_base_does_not_swallow_unrelated_errors():

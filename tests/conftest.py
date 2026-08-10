@@ -128,6 +128,124 @@ def clean_frame() -> pd.DataFrame:
     )
 
 
+#: Golden datasets for the visualization layer. Each isolates one situation the
+#: recommendation rules have to get right, and every value is deterministic.
+
+
+@pytest.fixture
+def binary_frame() -> pd.DataFrame:
+    """Numeric and categorical features against a binary classification target."""
+    index = np.arange(300)
+    return pd.DataFrame(
+        {
+            "age": (20 + index % 45).astype("int64"),
+            "income": (30_000 + (index % 71) * 900).astype("float64"),
+            "segment": [["A", "B", "C"][value % 3] for value in index],
+            "churn": (index % 7 == 0).astype("int64"),
+        }
+    )
+
+
+@pytest.fixture
+def multiclass_frame() -> pd.DataFrame:
+    """A three-class target with a numeric and a categorical feature."""
+    index = np.arange(300)
+    return pd.DataFrame(
+        {
+            "score": (index % 53).astype("float64"),
+            "region": [["north", "south", "east"][value % 3] for value in index],
+            "grade": [["low", "medium", "high"][value % 3] for value in index],
+        }
+    )
+
+
+@pytest.fixture
+def regression_frame() -> pd.DataFrame:
+    """A continuous target with two numeric features."""
+    index = np.arange(300)
+    return pd.DataFrame(
+        {
+            "rooms": (1 + index % 6).astype("int64"),
+            "area": (40.0 + (index % 97) * 2.5),
+            "price": (100_000.0 + (index % 89) * 3_137.0),
+        }
+    )
+
+
+@pytest.fixture
+def high_cardinality_frame() -> pd.DataFrame:
+    """A legitimate categorical feature with far more levels than any chart wants."""
+    index = np.arange(2_000)
+    return pd.DataFrame(
+        {
+            "city": [f"city_{value % 500}" for value in index],
+            "amount": (index % 37).astype("float64"),
+        }
+    )
+
+
+@pytest.fixture
+def missing_heavy_frame() -> pd.DataFrame:
+    """Two columns riddled with gaps, and one without any."""
+    index = np.arange(200)
+    sparse = np.where(index % 3 == 0, np.nan, index.astype("float64"))
+    sparser = np.where(index % 2 == 0, np.nan, index.astype("float64"))
+    return pd.DataFrame(
+        {"complete": index.astype("float64"), "gappy": sparse, "gappier": sparser}
+    )
+
+
+@pytest.fixture
+def outlier_frame() -> pd.DataFrame:
+    """A numeric column with values far outside the Tukey fences."""
+    index = np.arange(200)
+    values = (index % 40).astype("float64")
+    values[5] = 5_000.0
+    values[150] = -4_000.0
+    return pd.DataFrame({"measurement": values, "steady": (index % 11).astype("float64")})
+
+
+@pytest.fixture
+def constant_frame() -> pd.DataFrame:
+    """One constant column, one near-constant, one ordinary."""
+    index = np.arange(200)
+    near = ["basic"] * 199 + ["pro"]
+    return pd.DataFrame(
+        {
+            "country": ["SA"] * 200,
+            "plan": near,
+            "age": (20 + index % 40).astype("int64"),
+        }
+    )
+
+
+@pytest.fixture
+def identifier_frame() -> pd.DataFrame:
+    """Numeric and textual identifiers beside a genuine measurement."""
+    index = np.arange(300)
+    return pd.DataFrame(
+        {
+            "row_id": index.astype("int64"),
+            "customer_id": [f"CUST-{value:05d}" for value in index],
+            "temperature": 15.0 + index * 0.137,
+        }
+    )
+
+
+@pytest.fixture
+def wide_frame() -> pd.DataFrame:
+    """Two hundred numeric columns: the pairwise-explosion case."""
+    index = np.arange(200)
+    return pd.DataFrame(
+        {
+            f"f{position:03d}": ((index * (position + 1)) % (37 + position)).astype(
+                "float64"
+            )
+            for position in range(200)
+        }
+    )
+
+
 @pytest.fixture
 def mixed_frame() -> pd.DataFrame:
     """A frame containing one column of every structural kind."""

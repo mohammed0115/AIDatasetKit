@@ -30,6 +30,9 @@ __all__ = [
     "InvalidModelParameterError",
     "AmbiguousModelAliasError",
     "MissingDependencyError",
+    "VisualizationError",
+    "InvalidVisualizationRequest",
+    "UnsupportedChartError",
     "WorkflowStateError",
     "PredictionValidationError",
 ]
@@ -143,13 +146,41 @@ class AmbiguousModelAliasError(ModelError):
     """A short alias matched more than one model and no task narrowed it down."""
 
 
-class MissingDependencyError(ModelError):
-    """A model requires an optional package that is not installed."""
+# --------------------------------------------------------------------------- #
+# Optional dependencies
+# --------------------------------------------------------------------------- #
+
+
+class MissingDependencyError(AIDatasetKitError):
+    """An optional package this feature needs is not installed.
+
+    Raised by the model registry for an absent backend and by the renderer
+    registry for an absent plotting library. It hangs directly off the base
+    error rather than under :class:`ModelError`, because a missing plotting
+    library is not a model failure and ``except ModelError`` should not swallow
+    it.
+    """
 
 
 # --------------------------------------------------------------------------- #
 # Workflow and output
 # --------------------------------------------------------------------------- #
+
+
+class VisualizationError(AIDatasetKitError):
+    """Base class for visualization planning and rendering failures."""
+
+
+class InvalidVisualizationRequest(VisualizationError):
+    """A manually requested chart does not suit the data it was given.
+
+    Raised instead of letting the plotting library fail deep inside its own
+    stack, where the message names an array shape rather than the column.
+    """
+
+
+class UnsupportedChartError(VisualizationError):
+    """The requested chart type is not implemented by the selected renderer."""
 
 
 class WorkflowStateError(AIDatasetKitError):
