@@ -1,5 +1,55 @@
 # AIDatasetKit — Architecture Overview
 
+> ## Status — public alpha `0.1.0a1`
+>
+> **AIDatasetKit is the safety and audit layer for tabular machine learning.**
+> *Prove what happened between your data and your model.*
+>
+> This document is the original design, kept as written. The status block below
+> records what has actually been built against it, so a reader can tell the plan
+> from the delivery. Sections further down that describe `facade.py`,
+> `datasets.py`, training, evaluation, or prediction are **design, not code** —
+> they are planned, not shipped.
+>
+> ### Delivered and verified
+>
+> | Stage | Package | State |
+> |---|---|---|
+> | S0 Foundation | `core/` | done |
+> | S1 Statistics | `statistics/` | done |
+> | S2 Profiling + data quality | `profiling/` | done |
+> | S2.5 Smart visualization | `visualization/` | done |
+> | S3 Model architecture | `models/` | done |
+> | S4 Intelligent preprocessing | `preprocessing/` | verified done |
+> | S5 Classification algorithms | `models/classification/` | verified done |
+> | S5.5 Evidence and provenance | `evidence/`, `cli/` | verified done |
+>
+> ### The layer added after this document was written
+>
+> `evidence/` aggregates what every other layer established into one canonical,
+> versioned, deterministic audit artifact, and `cli/` exposes it as
+> `aidatasetkit audit`. Evidence recomputes nothing, and **nothing depends on
+> evidence** — the import direction is enforced by
+> `tests/integration/test_architecture_boundaries.py`:
+>
+> ```
+> core → statistics → profiling → preprocessing / models / visualization
+>                                          ↓
+>                                      evidence → cli
+> ```
+>
+> ### Still planned
+>
+> S6 regression · S7 training and evaluation · S8 the `AIDataFacade` this
+> document opens with · S9 clustering · S10 anomaly detection and dimensionality
+> reduction · external model backends · deep learning.
+>
+> None of these are cancelled. The order changed: an audit layer real users try is
+> worth more now than a larger catalogue nobody has.
+
+---
+
+
 ## الفكرة العامة
 
 الهيكل المقترح للمشروع هو: **مكتبة واحدة من الخارج، لكن داخليًا مقسمة إلى محركات مستقلة**.

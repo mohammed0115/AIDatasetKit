@@ -46,6 +46,14 @@ step names the capability that asked for it.
 | `--include-values` | Turn redaction **off everywhere**: the most frequent value of each column and every value quoted in a finding are written in plain text. Off by default. |
 | `--debug` | Show the full traceback instead of one clear line. |
 
+## Before you share an artifact
+
+An audit artifact is designed to travel — into a repository, a CI run, an email.
+By default it carries no cell values, but it is not free of information: column
+names, class labels, numeric minima and maxima, one-hot category names, and any
+ordering you supplied are all in it. Read [privacy.md](privacy.md) before
+publishing one, and never pass `--include-values` on data you would not publish.
+
 ## Exit codes
 
 | Code | Meaning |

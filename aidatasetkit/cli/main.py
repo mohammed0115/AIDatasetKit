@@ -77,19 +77,46 @@ _FAIL_ON_CHOICES: tuple[str, ...] = ("never", "warning", "review", "error")
 
 def build_parser() -> argparse.ArgumentParser:
     """Return the argument parser. Separate so tests can inspect the contract."""
+    from aidatasetkit import __version__
+
     parser = argparse.ArgumentParser(
         prog="aidatasetkit",
         description=(
-            "Audit a tabular dataset before training: profile it, check it for "
-            "quality and leakage problems, record what preprocessing would do to "
-            "it, and write the evidence to disk."
+            "The safety and audit layer for tabular machine learning. Inspect a "
+            "dataset before you train on it: profile every column, check for "
+            "leakage and quality problems, record what preprocessing would do "
+            "and why, and write the evidence to disk."
         ),
+        epilog=(
+            "Exit codes: 0 the verdict is below your --fail-on threshold; "
+            "1 the command could not run; 2 the verdict met the threshold and is "
+            "not blocked; 3 the verdict is blocked. Nothing is ever trained."
+        ),
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"aidatasetkit {__version__}",
+        help="Show the installed version and exit.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     audit = subparsers.add_parser(
         "audit",
         help="Inspect a CSV file and write audit.json, lineage.json, and report.html.",
+        description=(
+            "Audit one CSV file. Writes three artifacts: audit.json (the canonical "
+            "machine-readable record), lineage.json (each input column and what it "
+            "became), and report.html (the same evidence rendered for a person). "
+            "Nothing is trained, and your data is never modified."
+        ),
+        epilog=(
+            "Exit codes: 0 below the --fail-on threshold; 1 the command could not "
+            "run; 2 the threshold was met and the verdict is not blocked; 3 the "
+            "verdict is blocked. Artifacts contain counts, column names and "
+            "digests rather than your data -- read docs/privacy.md before sharing "
+            "one outside your team."
+        ),
     )
     audit.add_argument("path", type=Path, help="Path to a CSV file.")
     audit.add_argument(

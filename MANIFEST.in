@@ -1,0 +1,18 @@
+# What travels in the source distribution beyond the package itself.
+#
+# A wheel carries the importable code and nothing else, which is right. An sdist
+# is the thing somebody rebuilds and re-verifies from, so it carries the tests
+# that prove the build and the documentation the README points at -- a reader who
+# downloads the sdist should not find dead links where the docs were promised.
+include README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md
+include RELEASE_NOTES_*.md
+include AIDatasetKit_ARCHITECTURE_OVERVIEW.md
+recursive-include docs *.md
+recursive-include tests *.py
+recursive-include examples *.py *.csv *.md *.json
+
+# Never shipped: build leftovers, caches, and the local virtual environment.
+prune .venv
+prune dist
+prune build
+global-exclude *.py[cod] __pycache__/* .DS_Store

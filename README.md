@@ -91,11 +91,32 @@ aidatasetkit audit examples/audit_churn/train.csv \
 Open `aidk-audit/report.html` in a browser. Commit `aidk-audit/audit.json` to
 your repository and the next run will diff against it.
 
-In CI:
+In CI — the exit code gates the build:
 
 ```yaml
-- run: aidatasetkit audit data/train.csv --target Churn
+- name: Audit the training data
+  run: aidatasetkit audit data/train.csv --target Churn --fail-on review
+
+- name: Keep the evidence
+  if: always()
+  uses: actions/upload-artifact@v4
+  with:
+    name: dataset-audit
+    path: aidk-audit/
 ```
+
+Or in any shell-based pipeline:
+
+```bash
+aidatasetkit audit train.csv --target Churn --fail-on review || exit $?
+```
+
+`--fail-on review` stops the build when something needs a human decision;
+`--fail-on error` only when something is certainly wrong.
+
+> **Before sharing an artifact.** It contains no cell values by default, but it
+> does contain column names, class labels, numeric minima and maxima, and
+> one-hot category names. See `docs/privacy.md`.
 
 ## From Python
 
@@ -178,30 +199,50 @@ The full list travels inside every artifact, so a reader always has it.
 
 ## Roadmap
 
-Next, and shaped by what alpha users report: regression readiness, richer
-leakage evidence, artifact diffing across runs, SARIF output for code-scanning
-integrations. Model training and evaluation are deliberately later — the value
-here is what happens *before* a model exists.
+Nothing below is cancelled. The order changed deliberately: an audit layer real
+people use is worth more right now than a larger catalogue nobody has tried.
+
+**Current alpha (`0.1.0a1`)** — foundation · statistics · profiling and data
+quality · visualization planning · capability-driven preprocessing · nine
+classifiers · evidence and provenance · the CLI.
+
+**Next, after alpha feedback** — regression readiness · training and evaluation
+orchestration · a unified facade over the layers.
+
+**Planned expansion** — clustering · anomaly detection and dimensionality
+reduction · external model backends (XGBoost, LightGBM, CatBoost) · deep
+learning · richer leakage evidence · artifact diffing across runs · SARIF output
+for code-scanning integrations.
+
+What ships next is shaped by what alpha users report, not by this list's order.
 
 ## Release blockers
 
 **This alpha is not ready to publish.** One item is outstanding:
 
 - **LICENSE DECISION REQUIRED.** `pyproject.toml` has declared MIT since the
-  first commit, but there is no `LICENSE` file in the repository. That
-  declaration was left exactly as found: choosing a licence, and removing one,
-  are both decisions for the owner rather than for a tool. Add a `LICENSE` file
-  that matches the declaration, or change the declaration, before publishing.
+  first commit, but there is no `LICENSE` file in the repository. A package index
+  would show "MIT" from the metadata while the repository grants nothing in
+  writing — worse than either choosing a licence or declaring none. The
+  declaration was left exactly as found: choosing one, and removing one, are both
+  decisions for the owner. [`docs/LICENSE_DECISION.md`](docs/LICENSE_DECISION.md)
+  sets out the exact change each option needs.
 
 ## Documentation
 
-- [Getting started](docs/getting-started.md)
-- [The audit artifact](docs/audit-artifact.md)
-- [Feature lineage](docs/lineage.md)
-- [Safety model](docs/safety-model.md)
-- [Privacy](docs/privacy.md)
-- [Limitations](docs/limitations.md)
-- [Contributing](CONTRIBUTING.md)
+The full documentation ships with the source distribution, under `docs/`:
+
+| File | What it covers |
+|---|---|
+| `docs/getting-started.md` | Install, first audit, every CLI argument, CI usage |
+| `docs/audit-artifact.md` | Every field of `audit.json`, and what each one means |
+| `docs/lineage.md` | What happened to each column, and how to read it |
+| `docs/safety-model.md` | What the verdict claims, and what it does not |
+| `docs/privacy.md` | Exactly what an artifact does and does not reveal |
+| `docs/limitations.md` | What this release cannot do |
+| `CONTRIBUTING.md` | Setup, tests, architecture boundaries, extension points |
+
+Read `docs/privacy.md` before sharing an artifact outside your team.
 
 ## Status
 

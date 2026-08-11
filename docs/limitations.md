@@ -1,7 +1,9 @@
 # Limitations
 
-The list below travels inside every artifact, so a reader always has it. This
-page adds the detail that does not fit in a JSON field.
+**This page is the canonical list.** Every limitation the library states anywhere
+— in an artifact's `known_limitations`, in the README, in the release notes —
+appears here, and a test asserts that the artifact's list is a subset of this
+page. If two documents ever disagree, this one is right.
 
 ## Scope
 
@@ -42,6 +44,19 @@ treats a feature as constant when its spread falls below an absolute threshold o
 1e-7 after a float32 cast. A quantity recorded in units so small that the whole
 column spans less than a ten-millionth is silently dropped by the tree family.
 Standardising rescues it.
+
+## What the artifact records
+
+**A preprocessing decision is a proposal, not a receipt.** The artifact records
+what *would* be done to each column and why. It does not prove that any of it was
+executed, nor that a model was trained on the data described.
+
+**Configuration you supplied is recorded verbatim.** Ordinal orders and explicit
+mappings are your values, and redaction does not touch them — hiding them would
+stop the artifact showing which ordering was applied, and would make two
+different orderings indistinguishable to the config fingerprint. If those
+category names are sensitive, the artifact is sensitive. See
+[privacy.md](privacy.md).
 
 ## The artifact
 

@@ -131,13 +131,29 @@ def _imported_modules(path: Path) -> set[str]:
             if node.module == PACKAGE_NAME:
                 # `from aidatasetkit import models` reaches a sibling component
                 # just as surely as importing its module path, but records only
-                # the root as the module. The names carry the components.
+                # the root as the module, so the names carry the components.
+                #
+                # `from aidatasetkit import __version__` is a different thing: a
+                # string constant, not a layer. Only names that are really
+                # modules count, which is what separates a cross-layer import
+                # from reading a symbol off the package root.
                 for alias in node.names:
-                    imported.add(f"{PACKAGE_NAME}.{alias.name}")
+                    if _is_submodule(alias.name):
+                        imported.add(f"{PACKAGE_NAME}.{alias.name}")
             elif node.module and node.module.startswith(f"{PACKAGE_NAME}."):
                 imported.add(node.module)
 
     return imported
+
+
+def _is_submodule(name: str) -> bool:
+    """Whether ``name`` is a module or package inside ``aidatasetkit``.
+
+    Asked of the filesystem rather than guessed from the spelling: a private
+    name convention would be a rule about style, and this test is about
+    structure.
+    """
+    return (PACKAGE_ROOT / name).is_dir() or (PACKAGE_ROOT / f"{name}.py").is_file()
 
 
 def _component_from_module(module: str) -> str | None:
