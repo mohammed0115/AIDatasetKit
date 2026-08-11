@@ -10,6 +10,7 @@ include AIDatasetKit_ARCHITECTURE_OVERVIEW.md
 recursive-include docs *.md
 recursive-include tests *.py
 recursive-include examples *.py *.csv *.md *.json
+recursive-include scripts *.sh *.py
 
 # Never shipped: build leftovers, caches, and the local virtual environment.
 prune .venv

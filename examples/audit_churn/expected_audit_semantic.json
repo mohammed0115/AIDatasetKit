@@ -653,7 +653,7 @@
         "name": "HighCardinalityFeature"
       },
       "details": {
-        "distinct_feature_values": 220,
+        "distinct_feature_values": "sha256:e589170a6249ac945d3815d301fc59d7",
         "signals": [
           "deterministic_mapping"
         ],

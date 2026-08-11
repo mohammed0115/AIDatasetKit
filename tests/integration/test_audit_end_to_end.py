@@ -691,3 +691,94 @@ class TestExitCodeTwoMeansThresholdMet:
 
         docs = (Path(__file__).resolve().parents[2] / "docs" / "getting-started.md").read_text()
         assert "does not mean `review_required` specifically" in docs
+
+
+class TestUsageErrorsDoNotCollideWithPolicyCodes:
+    """argparse exits 2, and 2 is the code this tool documents as "threshold met".
+
+    A CI job seeing 2 could not tell a dataset needing review from a typo in the
+    command line, which makes the exit-code contract useless for the one job it
+    exists to do.
+    """
+
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ("audit", "--bogus-flag"),
+            ("audit",),
+            (),
+            ("--nope",),
+            ("nosuchcommand",),
+        ],
+    )
+    def test_a_usage_error_exits_one(self, args):
+        assert run_cli(*args).returncode == EXIT_CODES["usage"]
+
+    def test_version_still_exits_zero(self):
+        result = run_cli("--version")
+        assert result.returncode == 0
+        assert "aidatasetkit" in result.stdout
+
+    def test_help_still_exits_zero(self):
+        assert run_cli("--help").returncode == 0
+
+    def test_a_blocked_audit_still_exits_three(self, tmp_path):
+        result = run_cli(
+            "audit", str(EXAMPLE), "--target", "Churn", "--output", str(tmp_path / "o")
+        )
+        assert result.returncode == EXIT_CODES["blocked"]
+
+
+class TestArtifactsAreWrittenTogetherOrNotAtAll:
+    def test_all_three_appear(self, tmp_path):
+        run_cli("audit", str(EXAMPLE), "--target", "Churn", "--output", str(tmp_path / "o"))
+        written = sorted(p.name for p in (tmp_path / "o").iterdir())
+        assert written == ["audit.json", "lineage.json", "report.html"]
+
+    def test_rendering_happens_before_anything_is_written(self):
+        """A directory holding audit.json without the report is worse than one
+        holding nothing: a reader cannot tell a finished run from a half one."""
+        import inspect
+        import sys
+
+        import aidatasetkit.cli.main  # noqa: F401  -- registers the module
+
+        # By full name: the package re-exports the `main` function, which shadows
+        # the `main` submodule, so the plain import expression returns a function.
+        # See the note in aidatasetkit/cli/__init__.py.
+        module = sys.modules["aidatasetkit.cli.main"]
+        source = inspect.getsource(module._write)
+        render_at = source.index("rendered = {")
+        mkdir_at = source.index("output.mkdir")
+        assert render_at < mkdir_at
+
+    def test_rerunning_overwrites_cleanly(self, tmp_path):
+        output = tmp_path / "twice"
+        for _ in range(2):
+            run_cli("audit", str(EXAMPLE), "--target", "Churn", "--output", str(output))
+        assert sorted(p.name for p in output.iterdir()) == [
+            "audit.json",
+            "lineage.json",
+            "report.html",
+        ]
+
+
+class TestAnUnverifiedTaskSaysSo:
+    def test_regression_is_accepted_but_flagged(self, tmp_path):
+        output = tmp_path / "reg"
+        result = run_cli(
+            "audit", str(EXAMPLE), "--target", "Churn", "--task", "regression",
+            "--output", str(output),
+        )
+        assert "Note:" in result.stdout
+        artifact = json.loads((output / "audit.json").read_text())
+        assert any("regression" in w for w in artifact["warnings"])
+
+    def test_classification_carries_no_such_warning(self, tmp_path):
+        output = tmp_path / "cls"
+        run_cli(
+            "audit", str(EXAMPLE), "--target", "Churn", "--task", "classification",
+            "--output", str(output),
+        )
+        artifact = json.loads((output / "audit.json").read_text())
+        assert not any("not been verified" in w for w in artifact["warnings"])

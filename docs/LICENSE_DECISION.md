@@ -7,6 +7,18 @@
 `pyproject.toml` has declared `license = { text = "MIT" }` since the first
 commit (`559d085`). There is **no `LICENSE` file** in the repository.
 
+**The declaration also uses a form setuptools has deprecated.** Building today
+emits:
+
+> `SetuptoolsDeprecationWarning: project.license as a TOML table is deprecated.`
+> Please use a simple string containing a SPDX expression. **By 2027-Feb-18 you
+> need to update your project.**
+
+That is a second, independent reason to touch this field — but it is still not a
+reason for a tool to touch it unasked, because the modern form requires naming
+the licence, which is the decision itself. Both options below use the current
+(PEP 639) spelling.
+
 That combination is not a neutral state. A package index will display "MIT" from
 the metadata while the repository contains no licence text, which is worse than
 either choosing one or declaring none: a user reading the metadata believes they
@@ -36,8 +48,16 @@ with the code. No patent grant.
    ... (the unmodified OSI text)
    ```
 
-2. `pyproject.toml` — **no change needed**. `license = { text = "MIT" }` already
-   matches.
+2. `pyproject.toml` — move to the non-deprecated SPDX form:
+
+   ```diff
+   -license = { text = "MIT" }
+   +license = "MIT"
+   +license-files = ["LICENSE"]
+   ```
+
+   The meaning is unchanged; only the spelling is, and the current spelling is on
+   a removal schedule.
 
 3. Optionally add the trove classifier:
 
@@ -51,6 +71,10 @@ with the code. No patent grant.
 4. `MANIFEST.in` — no change; `LICENSE` is included in both distributions
    automatically by setuptools.
 
+5. Both distributions must be rebuilt afterwards, and `python -m build` should
+   then emit no `SetuptoolsDeprecationWarning`. That is the check that the change
+   landed.
+
 ## Option B — Apache-2.0
 
 Also permissive, and additionally grants patent rights and terminates them for a
@@ -61,11 +85,12 @@ users may hold patents.
 
 1. Add `LICENSE` containing the full, unmodified Apache License 2.0 text.
 
-2. `pyproject.toml` — change the declaration:
+2. `pyproject.toml` — change the declaration, using the non-deprecated form:
 
    ```diff
    -license = { text = "MIT" }
-   +license = { text = "Apache-2.0" }
+   +license = "Apache-2.0"
+   +license-files = ["LICENSE"]
    ```
 
 3. Optionally add the trove classifier:
@@ -92,6 +117,9 @@ leave metadata asserting a grant that no file makes:
 ```diff
 -license = { text = "MIT" }
 ```
+
+Note that this option also silences the deprecation warning, since the field
+disappears entirely.
 
 A package with no declared licence is legally "all rights reserved", which is a
 clear position. A package declaring MIT with no licence text is an unclear one.

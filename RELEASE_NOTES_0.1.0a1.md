@@ -77,8 +77,9 @@ nobody has tried.
 
 ## Known limitations
 
-`docs/limitations.md` is the canonical list, and it travels inside every artifact
-so a reader always has it. The most important one:
+`docs/limitations.md` is the canonical list. Every artifact carries a summary of
+it in `known_limitations`, so a reader always has the essentials without the file.
+The most important one:
 
 > Leakage detection is statistical. A feature that encodes the outcome for reasons
 > the numbers do not show will not be found here.

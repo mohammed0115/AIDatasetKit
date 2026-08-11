@@ -654,7 +654,7 @@
         "name": "HighCardinalityFeature"
       },
       "details": {
-        "distinct_feature_values": 220,
+        "distinct_feature_values": "sha256:e589170a6249ac945d3815d301fc59d7",
         "signals": [
           "deterministic_mapping"
         ],
@@ -885,7 +885,7 @@
       "scikit_learn": "1.9.0",
       "scipy": "1.18.0"
     },
-    "semantic_fingerprint": "97e84360be9509b289d26cc0a5c3cbc995bd08224fdcca77770f7c9c96470c18"
+    "semantic_fingerprint": "5664f398dc862abb7b6df3d6f580dab6f58b8b38d69bda83ae737a34cad7fe52"
   },
   "schema_version": "1.0",
   "stage": "prepared",

@@ -96,8 +96,16 @@ class TestTheConsoleCommand:
         assert "trained" in result.stdout.lower()
 
     def test_audit_help_warns_before_sharing_an_artifact(self):
-        result = self._run("audit", "--help")
-        assert "privacy" in result.stdout.lower()
+        """Checks the warning, not one word of it.
+
+        An earlier version asserted the word "privacy", which pointed installed
+        users at a docs file no wheel contains. The help now names what an
+        artifact holds instead, and the test asks whether a user is warned rather
+        than whether a particular noun survived.
+        """
+        text = self._run("audit", "--help").stdout.lower()
+        assert "sharing" in text
+        assert "column names" in text
 
 
 class TestDependenciesAreClassified:
@@ -304,3 +312,70 @@ class TestOneCanonicalListOfLimitations:
         for name in ("README.md", "RELEASE_NOTES_0.1.0a1.md"):
             text = (ROOT / name).read_text(encoding="utf-8").lower()
             assert "limitations.md" in text or "known limitations" in text, name
+
+
+class TestTheTypedClassifierIsHonest:
+    """The metadata claimed "Typing :: Typed" with no PEP 561 marker.
+
+    Without ``py.typed`` a type checker ignores every annotation in the installed
+    package, so the classifier advertised something the distribution did not
+    deliver. The library is annotated; it was the marker that was missing.
+    """
+
+    def test_the_marker_exists(self):
+        assert (ROOT / "aidatasetkit" / "py.typed").exists()
+
+    def test_it_is_declared_as_package_data(self, pyproject):
+        data = pyproject["tool"]["setuptools"]["package-data"]
+        assert "py.typed" in data["aidatasetkit"]
+
+    def test_the_classifier_is_still_claimed(self, pyproject):
+        assert "Typing :: Typed" in pyproject["project"]["classifiers"]
+
+    def test_the_library_really_is_annotated(self):
+        """The claim has to be true in substance, not only in metadata."""
+        modules = list((ROOT / "aidatasetkit").rglob("*.py"))
+        annotated = [
+            path
+            for path in modules
+            if "from __future__ import annotations" in path.read_text(encoding="utf-8")
+        ]
+        assert len(annotated) / len(modules) > 0.7
+
+
+class TestTheLongDescriptionRendersOnAPackageIndex:
+    """README is the PyPI long description, where a relative link is a dead link."""
+
+    @pytest.fixture(scope="class")
+    @staticmethod
+    def readme() -> str:
+        return (ROOT / "README.md").read_text(encoding="utf-8")
+
+    def test_no_relative_markdown_links(self, readme):
+        import re
+
+        relative = sorted(
+            {
+                target
+                for target in re.findall(r"\]\((?!https?://|#)([^)]+)\)", readme)
+            }
+        )
+        assert not relative, f"these become dead links on PyPI: {relative}"
+
+    def test_no_relative_images(self, readme):
+        import re
+
+        assert not re.findall(r"!\[[^\]]*\]\((?!https?://)([^)]+)\)", readme)
+
+    def test_no_raw_html_that_indexes_strip(self, readme):
+        import re
+
+        assert not re.search(r"<(div|img|table|details|br)\b", readme)
+
+    def test_the_content_type_is_declared(self, pyproject):
+        assert pyproject["project"]["readme"] == "README.md"
+
+    def test_documentation_is_still_reachable_by_path(self, readme):
+        """Dropping the links must not drop the reader's way to the docs."""
+        for path in ("docs/privacy.md", "docs/getting-started.md"):
+            assert path in readme

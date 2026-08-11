@@ -1170,3 +1170,69 @@ class TestTheSafeVocabularyListIsComplete:
         quality = DataQualityInspector().inspect(frame, profile=profile, target="label")
         artifact = AuditBuilder().build(frame, profile=profile, quality=quality)
         assert "ZZDATAZZ" not in canonical_json(artifact.to_dict())
+
+
+class TestNumbersCanBeValuesToo:
+    """The redactor hid text and let a salary through.
+
+    ``near_constant_column`` reports ``dominant_value: 987654.0`` beside
+    ``dominant_ratio: 0.9958``. Both are floats; only the key says which is a
+    measurement and which is somebody's pay. Redacting by type alone published
+    the second one.
+    """
+
+    @pytest.fixture
+    def salaries(self) -> pd.DataFrame:
+        index = np.arange(240)
+        return pd.DataFrame(
+            {"salary": [987654.0] * 239 + [1.0], "a": (index % 31) * 1.0, "label": (index % 2)}
+        )
+
+    def test_the_dominant_number_is_hidden(self, salaries):
+        profile = DataProfiler().profile(salaries)
+        quality = DataQualityInspector().inspect(salaries, profile=profile, target="label")
+        artifact = AuditBuilder().build(salaries, profile=profile, quality=quality)
+        finding = next(f for f in artifact.findings if f.code == "near_constant_column")
+        assert str(finding.details["dominant_value"]).startswith("sha256:")
+
+    def test_and_removed_from_the_message(self, salaries):
+        profile = DataProfiler().profile(salaries)
+        quality = DataQualityInspector().inspect(salaries, profile=profile, target="label")
+        artifact = AuditBuilder().build(salaries, profile=profile, quality=quality)
+        finding = next(f for f in artifact.findings if f.code == "near_constant_column")
+        assert "987654" not in finding.message
+
+    def test_the_measurement_beside_it_survives(self, salaries):
+        profile = DataProfiler().profile(salaries)
+        quality = DataQualityInspector().inspect(salaries, profile=profile, target="label")
+        artifact = AuditBuilder().build(salaries, profile=profile, quality=quality)
+        finding = next(f for f in artifact.findings if f.code == "near_constant_column")
+        assert finding.details["dominant_ratio"] > 0.99
+        assert finding.details["threshold"] == 0.98
+
+    @pytest.mark.parametrize(
+        "key,expected",
+        [
+            ("value", True),
+            ("dominant_value", True),
+            ("non_numeric_examples", True),
+            ("median_value", True),
+            ("top_samples", True),
+            ("count", False),
+            ("threshold", False),
+            ("dominant_ratio", False),
+            ("unique_count", False),
+        ],
+    )
+    def test_a_key_naming_a_value_is_recognised_by_pattern(self, key, expected):
+        """A pattern, so a check added later is covered without an edit."""
+        from aidatasetkit.evidence.builder import _names_a_data_value
+
+        assert _names_a_data_value(key) is expected
+
+    def test_the_documented_numeric_summary_is_still_present(self, salaries):
+        """Minima and maxima remain, because privacy.md says so explicitly."""
+        profile = DataProfiler().profile(salaries)
+        artifact = AuditBuilder().build(salaries, profile=profile)
+        column = next(c for c in artifact.columns if c.name.name == "salary")
+        assert column.numeric["maximum"] == 987654.0

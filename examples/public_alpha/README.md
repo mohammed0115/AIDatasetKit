@@ -25,6 +25,16 @@ aidk-audit/
 └── report.html     the same evidence, rendered for a person
 ```
 
+`lineage.json` is populated only when a preprocessing plan exists, which needs a
+model context. The command above has none, so it is written with an empty
+`features` list and `stage: inspected` — an honest "nothing was planned yet".
+Add `--model logistic_regression` to see the transformations:
+
+```bash
+aidatasetkit audit examples/public_alpha/sample.csv \
+    --target Churn --model logistic_regression --output ./aidk-audit/
+```
+
 `audit.json` is the record. `report.html` is a rendering of it — never the other
 way round, so the two cannot drift apart.
 
@@ -36,7 +46,7 @@ way round, so the two cannot drift apart.
 | `CustomerID` | **review** — identifier-like, 100% distinct | A key is not a feature. It is *reported*, never dropped: the check is a heuristic and the decision is yours. |
 | `SupportTicketID` | **warning** — 380 levels | One-hot encoding this produces 380 columns. It is held back for review rather than encoded. |
 | `Churn` | **warning** — the rarest class is 16.8% | Accuracy will look good while the model ignores the minority class. |
-| `TenureMonths` | recorded — 38 missing values | Not a finding. The plan says how they would be filled, and by what. |
+| `TenureMonths` | recorded — 39 missing values | Not a finding. The plan says how they would be filled, and by what. |
 
 Nothing in this list was fixed, filled, or dropped. The audit reports; you decide.
 

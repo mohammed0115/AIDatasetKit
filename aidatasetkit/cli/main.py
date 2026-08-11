@@ -75,11 +75,27 @@ _FAIL_ON: dict[str, Verdict] = {
 _FAIL_ON_CHOICES: tuple[str, ...] = ("never", "warning", "review", "error")
 
 
+class _Parser(argparse.ArgumentParser):
+    """An argument parser whose usage errors obey this command's exit codes.
+
+    ``argparse`` exits 2 on a bad flag, and 2 is the code this tool documents as
+    "the verdict met your threshold". A CI job seeing 2 could not tell a dataset
+    that needs review from a typo in the command line, which makes the whole
+    exit-code contract unusable for the job it exists for. Usage errors are
+    exit 1, like every other thing the command could not do.
+    """
+
+    def error(self, message: str) -> None:  # type: ignore[override]
+        self.print_usage(sys.stderr)
+        print(f"error: {message}", file=sys.stderr)
+        raise SystemExit(EXIT_CODES["usage"])
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Return the argument parser. Separate so tests can inspect the contract."""
     from aidatasetkit import __version__
 
-    parser = argparse.ArgumentParser(
+    parser = _Parser(
         prog="aidatasetkit",
         description=(
             "The safety and audit layer for tabular machine learning. Inspect a "
@@ -99,7 +115,7 @@ def build_parser() -> argparse.ArgumentParser:
         version=f"aidatasetkit {__version__}",
         help="Show the installed version and exit.",
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command", required=True, parser_class=_Parser)
 
     audit = subparsers.add_parser(
         "audit",
@@ -113,9 +129,10 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=(
             "Exit codes: 0 below the --fail-on threshold; 1 the command could not "
             "run; 2 the threshold was met and the verdict is not blocked; 3 the "
-            "verdict is blocked. Artifacts contain counts, column names and "
-            "digests rather than your data -- read docs/privacy.md before sharing "
-            "one outside your team."
+            "verdict is blocked. An artifact holds counts, ratios and digests "
+            "rather than your data, but it does hold column names, class labels, "
+            "numeric minima and maxima, and one-hot category names -- review one "
+            "before sharing it outside your team."
         ),
     )
     audit.add_argument("path", type=Path, help="Path to a CSV file.")
@@ -126,7 +143,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--task",
         default=None,
         choices=["classification", "regression"],
-        help="Task hint. Detected from the target when omitted.",
+        help=(
+            "Task hint. Detected from the target when omitted. Only "
+            "classification is verified in this release; 'regression' is "
+            "accepted and profiled, but its preprocessing and model evidence "
+            "are not yet verified, and the run says so."
+        ),
     )
     audit.add_argument(
         "--model",
@@ -303,6 +325,18 @@ def _audit(args: argparse.Namespace) -> int:
             warnings.append(blocked_reason)
             _logger.info("task detection failed", exc_info=True)
 
+    if target_profile is not None and target_profile.task_type.value == "regression":
+        # Accepted rather than refused: the profiling and quality evidence is
+        # just as useful for a regression target. But this release verified
+        # classification end to end and nothing else, and an artifact that did
+        # not say so would let a reader assume a guarantee that was never made.
+        warnings.append(
+            "This run was audited as a regression task. Only classification "
+            "readiness is verified in 0.1.0a1: the profiling and quality "
+            "evidence applies, but preprocessing and model-capability evidence "
+            "for regression has not been verified."
+        )
+
     if registration is not None and args.target is not None and blocked_reason is None:
         try:
             plan = PreprocessingPlanner().plan(
@@ -362,19 +396,25 @@ def _audit(args: argparse.Namespace) -> int:
 
 
 def _write(artifact: Any, output: Path) -> dict[str, Path]:
-    """Write the three artifacts. JSON first: it is the record, HTML renders it."""
-    output.mkdir(parents=True, exist_ok=True)
+    """Write the three artifacts, or leave the directory as it was found.
+
+    Everything is rendered into memory before anything reaches disk. Rendering is
+    where a failure is plausible -- a label that breaks an assumption, a value
+    that will not serialise -- and a directory holding audit.json without the
+    report is worse than one holding nothing: the next reader cannot tell a
+    finished run from a half-written one.
+    """
     payload = artifact.to_dict()
-    paths = {
-        "audit.json": output / "audit.json",
-        "lineage.json": output / "lineage.json",
-        "report.html": output / "report.html",
+    rendered = {
+        "audit.json": canonical_json(payload),
+        "lineage.json": canonical_json(artifact.lineage_dict()),
+        "report.html": render_report(payload),
     }
-    paths["audit.json"].write_text(canonical_json(payload), encoding="utf-8")
-    paths["lineage.json"].write_text(
-        canonical_json(artifact.lineage_dict()), encoding="utf-8"
-    )
-    paths["report.html"].write_text(render_report(payload), encoding="utf-8")
+
+    output.mkdir(parents=True, exist_ok=True)
+    paths = {name: output / name for name in rendered}
+    for name, text in rendered.items():
+        paths[name].write_text(text, encoding="utf-8")
     return paths
 
 
@@ -398,6 +438,10 @@ def _print_summary(artifact: Any, written: dict[str, Path]) -> None:
     print(f"          {dataset.row_count:,} rows x {dataset.column_count:,} columns")
     print(f"          fingerprint {dataset.fingerprint[:16]}")
     print()
+    for warning in artifact.warnings[:_SHOWN]:
+        print(f"Note:     {warning}")
+    if artifact.warnings:
+        print()
     print(f"Verdict:  {artifact.verdict.value.replace('_', ' ').upper()}")
     for reason in artifact.verdict_reasons[:_SHOWN]:
         print(f"          {reason}")

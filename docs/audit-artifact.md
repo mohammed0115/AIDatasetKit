@@ -138,6 +138,15 @@ differences = one.differs_from(two)
 Canonical JSON has sorted keys and fixed separators, so `git diff` on two audits
 shows what changed rather than reshuffled formatting.
 
+**Fingerprints are comparable within one environment, not across every
+environment.** The dataset digest is built on pandas' own row hasher, so a
+different pandas major version can produce a different digest for identical data.
+That is why every artifact records the versions that produced it, and why
+`differs_from` is meant for comparing runs of the same installation. Comparing
+across environments, check `schema_fingerprint` and the recorded environment
+first — a changed dataset fingerprint beside a changed pandas version is not
+evidence that the data changed.
+
 ## What is never in it
 
 No DataFrames, Series, or arrays. No estimator or transformer objects. No

@@ -5,12 +5,19 @@
 Every audit ends in one of four words. Each says what was *found*, not what is
 true of your data in general.
 
-| Verdict | Meaning | Exit code |
-|---|---|---|
-| `ready` | No finding above informational severity, nothing awaiting a person. | 0 |
-| `ready_with_warnings` | Warnings were raised. Nothing blocks proceeding. | 0 |
-| `review_required` | Something needs a human decision. | 2 (default) |
-| `blocked` | An error-severity finding, or the analysis could not complete. | 3 |
+| Verdict | Meaning |
+|---|---|
+| `ready` | No finding above informational severity, nothing awaiting a person. |
+| `ready_with_warnings` | Warnings were raised. Nothing blocks proceeding. |
+| `review_required` | Something needs a human decision. |
+| `blocked` | An error-severity finding, or the analysis could not complete. |
+
+The exit code is not a property of the verdict — it is the answer to *"did this
+meet the bar you set with `--fail-on`"*. Under the default (`--fail-on review`),
+`ready` and `ready_with_warnings` exit `0`, `review_required` exits `2`, and
+`blocked` exits `3`. Under `--fail-on warning`, `ready_with_warnings` exits `2`
+as well. Under `--fail-on never` everything exits `0`. See
+[getting-started.md](getting-started.md#exit-codes).
 
 `ready` claims only that **these checks found no blocker**. That is a much
 narrower statement than "safe", and the difference is the point.

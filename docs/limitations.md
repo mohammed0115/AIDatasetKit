@@ -64,6 +64,10 @@ category names are sensitive, the artifact is sensitive. See
 records what preprocessing *would* do. Connecting an artifact to a trained model
 is future work.
 
+**A dataset fingerprint is comparable within one environment.** It is built on
+pandas' row hasher, so a different pandas major version can change the digest for
+identical data. Every artifact records the versions that produced it.
+
 **A dataset fingerprint identifies content, not provenance.** It cannot show
 where the data came from, who collected it, or whether that was lawful.
 

@@ -168,7 +168,7 @@ them on each run rather than trusting a table.
 value of a column, a value quoted inside a finding — is hashed unless you pass
 `--include-values`. Some real observations do remain: numeric minima and maxima,
 target class labels, one-hot category names, and any ordering you supplied
-yourself. [docs/privacy.md](docs/privacy.md) lists all of them.
+yourself. `docs/privacy.md` lists all of them.
 
 **Bounded language.** No output says "safe", "compliant", or "leakage-free". It
 says *no known blocker found*, *review required*, *possible leakage*,
@@ -195,7 +195,8 @@ hyperparameter tuning, databases, cloud storage, Parquet, Excel.
   trained on the data it describes.
 - A dataset fingerprint identifies content, not provenance.
 
-The full list travels inside every artifact, so a reader always has it.
+`docs/limitations.md` is the canonical list. A summary of it travels inside
+every artifact, so a reader always has the essentials to hand.
 
 ## Roadmap
 
@@ -225,8 +226,8 @@ What ships next is shaped by what alpha users report, not by this list's order.
   would show "MIT" from the metadata while the repository grants nothing in
   writing — worse than either choosing a licence or declaring none. The
   declaration was left exactly as found: choosing one, and removing one, are both
-  decisions for the owner. [`docs/LICENSE_DECISION.md`](docs/LICENSE_DECISION.md)
-  sets out the exact change each option needs.
+  decisions for the owner. `docs/LICENSE_DECISION.md` sets out the exact change
+  each option needs.
 
 ## Documentation
 

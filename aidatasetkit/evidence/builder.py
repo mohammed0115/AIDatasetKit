@@ -346,7 +346,11 @@ class AuditBuilder:
             for key in sorted(details):
                 if key in _SAFE_TEXT_DETAIL_KEYS:
                     continue
-                redacted, removed = self._redact_detail(details[key])
+                # A key that names a value hides one whatever its type; every
+                # other key hides one only when it is text.
+                redacted, removed = self._redact_detail(
+                    details[key], numbers_too=_names_a_data_value(key)
+                )
                 if not removed:
                     continue
                 details[key] = redacted
@@ -380,28 +384,38 @@ class AuditBuilder:
                 details=dict(decision.details or {}),
             )
 
-    def _redact_detail(self, value: Any) -> tuple[Any, list[tuple[Any, str]]]:
-        """Replace any text in a detail with a digest, recursively.
+    def _redact_detail(
+        self, value: Any, *, numbers_too: bool = False
+    ) -> tuple[Any, list[tuple[Any, str]]]:
+        """Replace a value in a detail with a digest, recursively.
 
         Returns the redacted value and every (original, digest) pair replaced, so
         the finding's message can have the same values taken out of it.
-        Measurements -- numbers, booleans, ``None`` -- are returned untouched,
-        because a count is not a value anybody can be identified by.
+
+        Args:
+            value: The detail value.
+            numbers_too: Whether numbers are values rather than measurements. A
+                count of 240 describes a column; a most-frequent salary of
+                987654.0 *is* somebody's salary, and the two are both floats.
         """
-        if isinstance(value, str):
+        if isinstance(value, str) or (
+            numbers_too and isinstance(value, (int, float)) and not isinstance(value, bool)
+        ):
             digest = self._dominant(value)
             return digest, [(value, digest)]
         if isinstance(value, (list, tuple)):
             out, removed = [], []
             for item in value:
-                redacted, pairs = self._redact_detail(item)
+                redacted, pairs = self._redact_detail(item, numbers_too=numbers_too)
                 out.append(redacted)
                 removed.extend(pairs)
             return out, removed
         if isinstance(value, Mapping):
             out, removed = {}, []
             for key, item in value.items():
-                redacted, pairs = self._redact_detail(item)
+                redacted, pairs = self._redact_detail(
+                    item, numbers_too=numbers_too or _names_a_data_value(str(key))
+                )
                 out[key] = redacted
                 removed.extend(pairs)
             return out, removed
@@ -568,6 +582,23 @@ class AuditBuilder:
         if model is not None:
             resolved.setdefault("model", model.canonical_name)
         return resolved
+
+
+def _names_a_data_value(key: str) -> bool:
+    """Whether a details key holds a value read out of the dataset.
+
+    Text-versus-number is not the distinction that matters, and assuming it was
+    let a salary through: ``near_constant_column`` reports
+    ``dominant_value: 987654.0``, a number as identifying as any string, beside
+    ``dominant_ratio: 0.9958``, a measurement that must survive. Both are floats.
+    Only the key separates them.
+
+    A pattern rather than a list, so a check added later that reports
+    ``median_value`` or ``top_examples`` is covered without anyone remembering.
+    """
+    return key in {"value", "values", "example", "examples", "sample", "samples"} or key.endswith(
+        ("_value", "_values", "_example", "_examples", "_sample", "_samples")
+    )
 
 
 def _scrub(message: str, value: Any, replacement: str) -> str:
