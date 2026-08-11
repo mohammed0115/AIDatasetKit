@@ -62,7 +62,7 @@ Quality findings are preserved as structure, never flattened into prose:
   "column": { "name": "Churn_Copy", "label_type": "str" },
   "recommendation": "Remove it, or confirm ...",
   "requires_review": false,
-  "details": { "target": "Churn", "match_ratio": 1.0 },
+  "details": { "target": "Churn" },
   "source": "quality"
 }
 ```

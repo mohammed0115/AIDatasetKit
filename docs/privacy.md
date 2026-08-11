@@ -10,10 +10,14 @@ data.
 - The most frequent value of a column. This is the one profiling field that holds
   real data — for an email column it is somebody's address, for a free-text
   column a sentence out of your dataset — and it is replaced by a SHA-256 digest.
-- Values quoted inside a quality finding. Two checks (`constant_column` and
-  `near_constant_column`) name the value they are about. Evidence removes it from
-  both the `details` and the message text; a digest in one and the address in the
-  other would be no protection at all.
+- Values quoted inside a quality finding. `constant_column` and
+  `near_constant_column` name the value that dominates a column, and
+  `possible_numeric_stored_as_text` lists example cells that failed to parse.
+  Evidence removes them from both the `details` and the message text; a digest in
+  one and the address in the other would be no protection at all. This is not a
+  list of known offenders: **any** text in a finding's details is hashed unless
+  its key is a name this library defines, so a check added later is private
+  without anyone remembering to update anything.
 
 ## What *is* in an artifact
 
@@ -56,9 +60,10 @@ in the artifact. `--include-values` does not control this and never did.
 aidatasetkit audit train.csv --target Churn --include-values
 ```
 
-This puts the most frequent value of each column into the artifact in plain
-text. It is occasionally what you want when auditing your own non-sensitive data
-and it is never a safe default. The choice is recorded in the artifact's config
+This turns redaction **off everywhere**, not only for one field: the most
+frequent value of each column *and* every value quoted inside a quality finding
+are written in plain text. It is occasionally what you want when auditing your
+own non-sensitive data and it is never a safe default. The choice is recorded in the artifact's config
 section and changes the config fingerprint, so an artifact always says which mode
 produced it.
 

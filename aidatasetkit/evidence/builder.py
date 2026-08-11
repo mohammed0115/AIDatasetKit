@@ -103,8 +103,24 @@ KNOWN_LIMITATIONS: tuple[str, ...] = (
 #:
 #: Numbers and booleans in ``details`` are measurements and are always kept; only
 #: text is suspect, because only text carries a value somebody could read.
+#: Each entry is vocabulary this library defines, not text taken from a dataset:
+#: a column name, a detected kind, or the name of a signal that fired. Redacting
+#: them makes a finding unreadable without protecting anybody -- an early version
+#: hashed ``signals`` and turned "deterministic_mapping" into a digest.
+#: ``tests/unit/test_evidence_artifact.py`` pins the full set of text keys the
+#: checks actually emit, so this list cannot quietly go stale.
 _SAFE_TEXT_DETAIL_KEYS: frozenset[str] = frozenset(
-    {"target", "column", "other_column", "compared_with", "kind", "dtype", "code"}
+    {
+        "target",
+        "column",
+        "other_column",
+        "compared_with",
+        "kind",
+        "detected_kind",
+        "dtype",
+        "code",
+        "signals",
+    }
 )
 
 
@@ -438,11 +454,14 @@ class AuditBuilder:
             "robust_scaling",
         }:
             return f"{named}declares requires_scaling=true"
+        # Only the *numeric* fills follow from the capability. A categorical
+        # column is imputed whichever model is chosen -- the steps are identical
+        # for a model that takes NaN natively and one that does not -- so naming
+        # the capability there would invent a cause the plan never had.
         if not profile.handles_missing_values and steps & {
             "median_imputation",
             "mean_imputation",
             "constant_imputation",
-            "most_frequent_imputation",
         }:
             return f"{named}declares handles_missing_values=false"
         if profile.handles_missing_values and not steps & {

@@ -47,14 +47,19 @@ _logger = logging.getLogger(__name__)
 #: ==== ==============================================================
 #: Code Meaning
 #: ==== ==============================================================
-#: 0    The run completed and the verdict is below the failure threshold.
-#: 1    The command could not run: bad file, bad target, bad option.
-#: 2    The verdict reached ``REVIEW_REQUIRED`` and that meets the threshold.
-#: 3    The verdict reached ``BLOCKED`` and that meets the threshold.
+#: 0    The verdict is below the failure threshold.
+#: 1    The command could not run: bad file, bad option, unreadable output path.
+#: 2    The verdict met the threshold and is not ``BLOCKED``.
+#: 3    The verdict is ``BLOCKED`` and that meets the threshold.
 #: ==== ==============================================================
 #:
-#: Note that 2 and 3 are *policy* outcomes, not errors: the tool worked, and it
-#: is reporting what it found. Only 1 means the audit itself failed.
+#: 2 does not mean ``REVIEW_REQUIRED`` specifically. Under ``--fail-on warning``
+#: a ``READY_WITH_WARNINGS`` verdict also returns 2, because the code answers
+#: "did this meet the bar you set", not "which verdict was it" -- the verdict
+#: itself is in ``audit.json`` and in the summary above it.
+#:
+#: 2 and 3 are *policy* outcomes, not errors: the tool worked and is reporting
+#: what it found. Only 1 means the audit itself could not be produced.
 EXIT_CODES: dict[str, int] = {"ok": 0, "usage": 1, "review": 2, "blocked": 3}
 
 #: ``--fail-on`` values, mapped to the least serious verdict that trips them.
@@ -126,8 +131,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--include-values",
         action="store_true",
         help=(
-            "Record the most frequent value of each column in plain text. Off by "
-            "default: that value is real data and may identify a person."
+            "Turn OFF redaction everywhere: the most frequent value of each "
+            "column, and any value quoted inside a quality finding, are written "
+            "in plain text. Off by default, because those are real data."
         ),
     )
     audit.add_argument(
@@ -184,6 +190,13 @@ def _audit(args: argparse.Namespace) -> int:
         )
         return EXIT_CODES["usage"]
 
+    if args.output.exists() and not args.output.is_dir():
+        print(
+            f"error: --output must be a directory, and {args.output} is a file.",
+            file=sys.stderr,
+        )
+        return EXIT_CODES["usage"]
+
     import pandas as pd
 
     from aidatasetkit.core import KitConfig
@@ -192,6 +205,25 @@ def _audit(args: argparse.Namespace) -> int:
     from aidatasetkit.profiling import DataProfiler, DataQualityInspector, TaskDetector
 
     frame = pd.read_csv(path)
+    # pandas turns a repeated header into a.1, a.2 and carries on, so the raw
+    # header line is read separately to see what the file actually says.
+    raw_header = pd.read_csv(path, header=None, nrows=1)
+    names = [str(name) for name in raw_header.iloc[0]] if len(raw_header) else []
+    duplicated = sorted({name for name in names if names.count(name) > 1})
+    if duplicated:
+        # pandas turns a repeated header into a.1, a.2 and carries on. The audit
+        # would then describe columns the file does not contain, and its
+        # fingerprint would identify a frame nobody has.
+        print(
+            "error: the file has duplicate column headers "
+            f"({', '.join(duplicated)}), which pandas "
+            "renamed to make them unique. An audit of renamed columns would "
+            "describe a dataset that does not exist. Give each column its own "
+            "name first.",
+            file=sys.stderr,
+        )
+        return EXIT_CODES["usage"]
+
     if args.target is not None and args.target not in frame.columns:
         print(
             f"error: target {args.target!r} is not a column in {path.name}. "
@@ -201,8 +233,23 @@ def _audit(args: argparse.Namespace) -> int:
         )
         return EXIT_CODES["usage"]
 
+    plan = None
+    lineage = None
+    warnings: list[str] = []
+    blocked_reason: str | None = None
+
     registration = None
     if args.model is not None:
+        if args.target is None:
+            # The model context only shapes a preprocessing plan, and a plan
+            # needs a target. Recording the model while silently planning
+            # nothing would put a model in the artifact that influenced nothing.
+            print(
+                "error: --model needs --target. A model context only shapes the "
+                "preprocessing plan, and a plan needs to know the label column.",
+                file=sys.stderr,
+            )
+            return EXIT_CODES["usage"]
         registration = ModelFactory.registration(args.model, task=args.task)
         registration.require_available()
 
@@ -216,15 +263,20 @@ def _audit(args: argparse.Namespace) -> int:
     )
     target_profile = None
     if args.target is not None:
-        target_profile = TaskDetector(kit_config).detect(
-            frame[args.target], hint=args.task, target_name=args.target
-        )
+        try:
+            target_profile = TaskDetector(kit_config).detect(
+                frame[args.target], hint=args.task, target_name=args.target
+            )
+        except AIDatasetKitError as error:
+            # A target nobody can type is exactly the case an audit should
+            # explain rather than abort on. The profiling evidence is already in
+            # hand, and it is more useful with the reason attached than not at
+            # all.
+            blocked_reason = f"the target could not be typed: {error}"
+            warnings.append(blocked_reason)
+            _logger.info("task detection failed", exc_info=True)
 
-    plan = None
-    lineage = None
-    warnings: list[str] = []
-    blocked_reason = None
-    if registration is not None and args.target is not None:
+    if registration is not None and args.target is not None and blocked_reason is None:
         try:
             plan = PreprocessingPlanner().plan(
                 frame,
@@ -299,8 +351,18 @@ def _write(artifact: Any, output: Path) -> dict[str, Path]:
     return paths
 
 
+#: How many items the summary shows before saying how many it left out. A screen
+#: of five is readable; twenty is a wall nobody reads.
+_SHOWN = 5
+
+
 def _print_summary(artifact: Any, written: dict[str, Path]) -> None:
-    """One screen, not one thousand lines."""
+    """One screen, and honest about what it left off it.
+
+    Every list here is truncated, and every truncation says so. A summary that
+    showed five of twenty issues without a word would be read as "there are
+    five" -- the same silent narrowing this library refuses to do to data.
+    """
     counts = artifact.findings_by_severity
     dataset = artifact.dataset
     print("AIDatasetKit audit")
@@ -310,30 +372,47 @@ def _print_summary(artifact: Any, written: dict[str, Path]) -> None:
     print(f"          fingerprint {dataset.fingerprint[:16]}")
     print()
     print(f"Verdict:  {artifact.verdict.value.replace('_', ' ').upper()}")
+    for reason in artifact.verdict_reasons[:_SHOWN]:
+        print(f"          {reason}")
+    _print_remainder(len(artifact.verdict_reasons), _SHOWN)
     print()
     print(
         f"Findings: {counts['error']} error, {counts['warning']} warning, "
         f"{counts['info']} info"
     )
-    highlights = [
-        finding
-        for finding in artifact.findings
-        if finding.severity.value in {"error", "warning"}
-    ][:5]
+
+    # Most serious first, so a truncated list can never hide the finding that
+    # decided the verdict.
+    rank = {"error": 0, "warning": 1, "info": 2}
+    highlights = sorted(
+        (f for f in artifact.findings if f.severity.value in {"error", "warning"}),
+        key=lambda f: (rank.get(f.severity.value, 9), f.code),
+    )
     if highlights:
         print()
         print("Key issues:")
-        for finding in highlights:
+        for finding in highlights[:_SHOWN]:
             where = f"{finding.column.name}: " if finding.column else ""
             print(f"  - {where}{finding.message}")
+        _print_remainder(len(highlights), _SHOWN, indent="  ")
     if artifact.review_items:
         print()
-        print(f"Needs review: {', '.join(artifact.review_items[:5])}")
+        shown = ", ".join(artifact.review_items[:_SHOWN])
+        remaining = len(artifact.review_items) - _SHOWN
+        more = f", and {remaining} more" if remaining > 0 else ""
+        print(f"Needs review: {shown}{more}")
     print()
     print("Artifacts:")
     for path in written.values():
         print(f"  {path}")
     print()
+
+
+def _print_remainder(total: int, shown: int, indent: str = "          ") -> None:
+    """Say how many items were left out, or nothing when none were."""
+    remaining = total - shown
+    if remaining > 0:
+        print(f"{indent}... and {remaining} more, in audit.json")
 
 
 def _exit_code(verdict: Verdict, fail_on: str) -> int:

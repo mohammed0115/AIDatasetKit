@@ -1092,3 +1092,81 @@ class TestTheDigestIsNotClaimedToBeProtection:
 
         source = Path(module.__file__).read_text(encoding="utf-8")
         assert "not salted and not a privacy guarantee" in source
+
+
+class TestTheSafeVocabularyListIsComplete:
+    """Pins the text keys the quality checks actually emit.
+
+    Redaction denies by default, so a key missing from the vocabulary list is
+    merely over-cautious rather than a leak -- but over-caution has a cost that
+    was measured: hashing ``signals`` turned "deterministic_mapping" into a
+    digest and made the leakage finding unreadable. This enumerates what the
+    checks emit so neither mistake can be made quietly.
+    """
+
+    @pytest.fixture(scope="class")
+    @staticmethod
+    def text_detail_keys() -> dict[str, set[str]]:
+        """Every details key whose value is text, across a frame that fires everything."""
+        index = np.arange(300)
+        frame = pd.DataFrame(
+            {
+                "rid": [f"R{v:05d}" for v in index],
+                "k": ["same"] * 300,
+                "nc": ["common"] * 299 + ["rare"],
+                "txt": [f"x{v % 97}" if v % 13 else str(v % 97) for v in index],
+                "hc": [f"lvl{v % 120}" for v in index],
+                "num": (index % 53) * 1.1,
+                "dup": (index % 2),
+                "label": (index % 2),
+            }
+        )
+        frame.loc[frame.index[:80], "num"] = np.nan
+        profile = DataProfiler().profile(frame)
+        quality = DataQualityInspector().inspect(frame, profile=profile, target="label")
+        found: dict[str, set[str]] = {}
+        for issue in quality.issues:
+            for key, value in (issue.details or {}).items():
+                is_text = isinstance(value, str) or (
+                    isinstance(value, (list, tuple))
+                    and any(isinstance(item, str) for item in value)
+                )
+                if is_text:
+                    found.setdefault(key, set()).add(issue.code)
+        return found
+
+    def test_the_frame_fires_a_broad_set_of_checks(self, text_detail_keys):
+        assert len(text_detail_keys) >= 5
+
+    def test_every_text_key_is_either_vocabulary_or_redacted(self, text_detail_keys):
+        """No third category: a key is a name we define, or it is treated as data."""
+        from aidatasetkit.evidence.builder import _SAFE_TEXT_DETAIL_KEYS
+
+        data_keys = {"value", "dominant_value", "non_numeric_examples"}
+        for key in text_detail_keys:
+            assert key in _SAFE_TEXT_DETAIL_KEYS or key in data_keys, (
+                f"{key!r} is a new text detail key; decide whether it is a name "
+                "(add it to _SAFE_TEXT_DETAIL_KEYS) or data (leave it redacted)"
+            )
+
+    def test_the_diagnostic_vocabulary_survives_into_the_artifact(self):
+        """Hashing a signal name protects nobody and hides the reason."""
+        index = np.arange(300)
+        frame = pd.DataFrame(
+            {"a": (index % 53) * 1.1, "dup": (index % 2), "label": (index % 2)}
+        )
+        profile = DataProfiler().profile(frame)
+        quality = DataQualityInspector().inspect(frame, profile=profile, target="label")
+        artifact = AuditBuilder().build(frame, profile=profile, quality=quality)
+        text = canonical_json(artifact.to_dict())
+        assert "deterministic_mapping" in text or "label" in text
+
+    def test_and_the_data_keys_are_still_hashed(self):
+        index = np.arange(240)
+        frame = pd.DataFrame(
+            {"k": ["ZZDATAZZ"] * 240, "n": (index % 31) * 1.0, "label": (index % 2)}
+        )
+        profile = DataProfiler().profile(frame)
+        quality = DataQualityInspector().inspect(frame, profile=profile, target="label")
+        artifact = AuditBuilder().build(frame, profile=profile, quality=quality)
+        assert "ZZDATAZZ" not in canonical_json(artifact.to_dict())

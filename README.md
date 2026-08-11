@@ -21,16 +21,18 @@ Dataset:  train.csv
           fingerprint 8135be14ca667643
 
 Verdict:  BLOCKED
+          error finding target_leakage_exact_duplicate on Churn_Copy
 
 Findings: 1 error, 4 warning, 1 info
 
 Key issues:
-  - Churn_Copy: Column 'Churn_Copy' is exactly equal to the target 'Churn' in
-    every row. Training on it would measure nothing.
-  - CustomerID: Column 'CustomerID' may be a record identifier: 100.0% of its
-    values are distinct. This is a heuristic and needs review.
+  - Churn_Copy: Column 'Churn_Copy' is exactly equal to the target 'Churn' in every row. Training on it would measure nothing.
+  - CustomerID: Column 'CustomerID' has 600 distinct values, above the configured threshold of 50.
+  - HighCardinalityFeature: Column 'HighCardinalityFeature' has 220 distinct values, above the configured threshold of 50.
+  - CustomerID: Column 'CustomerID' may be a record identifier: 100.0% of its values are distinct and its name or value structure resembles an identifier. This is a heuristic and needs review.
+  - HighCardinalityFeature: Column 'HighCardinalityFeature' may contain information about the target 'Churn' that would not be available at prediction time (signals: deterministic_mapping). This is a heuristic and needs review.
 
-Needs review: possible_id_like (CustomerID), high_cardinality (HighCardinalityFeature)
+Needs review: possible_id_like (CustomerID), possible_target_leakage (HighCardinalityFeature), high_cardinality (HighCardinalityFeature)
 
 Artifacts:
   ./aidk-audit/audit.json
@@ -70,7 +72,7 @@ Optional extras:
 
 ```bash
 pip install -e ".[viz]"        # matplotlib, for chart rendering
-pip install -e ".[boosting]"   # xgboost / lightgbm / catboost model contexts
+pip install -e ".[boosting]"   # reserved for future boosting backends; no model uses it yet
 pip install -e ".[dev]"        # pytest
 ```
 
@@ -111,7 +113,7 @@ artifact = AuditBuilder(dataset_name="train.csv").build(
     frame, profile=profile, quality=quality
 )
 
-print(artifact.verdict)                 # Verdict.REVIEW_REQUIRED
+print(artifact.verdict.value)           # blocked -- Churn_Copy duplicates the target
 print(artifact.review_items)            # what a person still has to decide
 open("audit.json", "w").write(canonical_json(artifact.to_dict()))
 ```
@@ -141,10 +143,11 @@ text are never quietly parsed.
 declares was verified by running the estimator, and the contract tests re-verify
 them on each run rather than trusting a table.
 
-**Privacy by default.** An audit artifact contains counts, ratios, column names,
-dtypes, and digests — not your data. The one profiling field that holds a real
-value is hashed unless you explicitly ask otherwise. See
-[docs/privacy.md](docs/privacy.md) for what an artifact *does* still reveal.
+**Privacy by default.** Text that comes out of your data — the most frequent
+value of a column, a value quoted inside a finding — is hashed unless you pass
+`--include-values`. Some real observations do remain: numeric minima and maxima,
+target class labels, one-hot category names, and any ordering you supplied
+yourself. [docs/privacy.md](docs/privacy.md) lists all of them.
 
 **Bounded language.** No output says "safe", "compliant", or "leakage-free". It
 says *no known blocker found*, *review required*, *possible leakage*,

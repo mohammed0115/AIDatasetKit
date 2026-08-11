@@ -3,6 +3,11 @@
 `lineage.json` answers one question for every column you started with: *what
 happened to it?*
 
+It is only populated when a preprocessing plan exists, which means when you pass
+`--model` together with `--target`. Without a model there is nothing to plan for,
+so the file is written with an empty `features` list and a `stage` of
+`inspected` — an honest "nothing was decided yet" rather than a missing file.
+
 ```json
 {
   "schema_version": "1.0",

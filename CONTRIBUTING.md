@@ -58,10 +58,13 @@ Two rules carry most of the weight:
    certain, not heuristic. Anything inferred should set `requires_review`.
 4. Put the numbers in `details` — a count, a ratio, the threshold crossed. A
    finding reduced to prose cannot be acted on programmatically.
-5. **If your check quotes a data value**, add its `details` key to
-   `_REDACTED_DETAIL_KEYS` in `aidatasetkit/evidence/builder.py`. The privacy
-   sweep in `tests/integration/test_audit_end_to_end.py` will catch you if you
-   forget, which is why that test exists.
+5. **Text in `details` is redacted by default.** You do not have to do anything
+   to keep a data value out of an audit artifact — evidence hashes every string
+   whose key is not on the short vocabulary list `_SAFE_TEXT_DETAIL_KEYS` in
+   `aidatasetkit/evidence/builder.py`. If your check reports a *name* rather
+   than data (a column, a detected kind, the name of a signal that fired), add
+   that key to the list, and extend the test that pins the full set. Numbers and
+   booleans are never touched.
 6. Add tests for both the positive case and a case that must *not* fire.
 
 ## Adding a model strategy

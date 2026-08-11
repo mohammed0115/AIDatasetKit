@@ -9,6 +9,7 @@ public alpha has to make.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -528,3 +529,165 @@ class TestTheGoldenSemanticArtifact:
 
         payload = json.loads(EXAMPLE.with_name("audit.json").read_text())
         assert render_report(payload) == EXAMPLE.with_name("report.html").read_text()
+
+
+class TestTheSummaryNeverUnderstatesTheArtifact:
+    """Five of twenty issues, printed with no ellipsis, reads as "there are five".
+
+    This is the same silent narrowing the library refuses to do to data, in the
+    one place a user looks first.
+    """
+
+    @pytest.fixture(scope="class")
+    @staticmethod
+    def crowded(tmp_path_factory):
+        directory = tmp_path_factory.mktemp("crowded")
+        path = directory / "lots.csv"
+        index = np.arange(300)
+        columns = {"label": (index % 2)}
+        for n in range(8):
+            columns[f"id{n}"] = [f"{n}-{v:05d}" for v in index]
+        for n in range(4):
+            columns[f"k{n}"] = ["same"] * 300
+        pd.DataFrame(columns).to_csv(path, index=False)
+        output = directory / "out"
+        result = run_cli("audit", str(path), "--target", "label", "--output", str(output))
+        return result, json.loads((output / "audit.json").read_text())
+
+    def test_the_dataset_really_does_overflow_the_summary(self, crowded):
+        _, artifact = crowded
+        serious = [f for f in artifact["findings"] if f["severity"] in {"error", "warning"}]
+        assert len(serious) > 5
+
+    def test_the_summary_says_how_many_it_left_out(self, crowded):
+        result, _ = crowded
+        assert "and 15 more" in result.stdout
+
+    def test_the_review_list_says_so_too(self, crowded):
+        result, _ = crowded
+        assert re.search(r"Needs review:.*and \d+ more", result.stdout)
+
+    def test_the_most_serious_finding_is_never_truncated_away(self, tmp_path):
+        """An error decided the verdict; the summary must not hide it behind warnings."""
+        index = np.arange(300)
+        columns = {"label": (index % 2), "dup": (index % 2)}
+        for n in range(8):
+            columns[f"k{n}"] = ["same"] * 300
+        path = tmp_path / "error_last.csv"
+        pd.DataFrame(columns).to_csv(path, index=False)
+        result = run_cli(
+            "audit", str(path), "--target", "label", "--output", str(tmp_path / "o")
+        )
+        assert "exactly equal to the target" in result.stdout
+
+    def test_the_verdict_reasons_are_printed(self, crowded):
+        result, artifact = crowded
+        assert artifact["verdict_reasons"][0] in result.stdout
+
+
+class TestEveryFailureStillProducesAnArtifact:
+    """The promise in the module docstring, tested against distinct causes."""
+
+    @pytest.mark.parametrize(
+        "name,columns,target",
+        [
+            ("untypeable_target", {"a": [1.0, 2.0] * 100, "label": [None] * 200}, "label"),
+            (
+                "infinite",
+                {"r": [float("inf")] + [1.0] * 199, "c": ["x", "y"] * 100, "label": [0, 1] * 100},
+                "label",
+            ),
+        ],
+    )
+    def test_artifacts_exist_and_the_verdict_is_blocked(
+        self, tmp_path, name, columns, target
+    ):
+        path = tmp_path / f"{name}.csv"
+        pd.DataFrame(columns).to_csv(path, index=False)
+        output = tmp_path / name
+        result = run_cli(
+            "audit", str(path), "--target", target, "--model", "logistic_regression",
+            "--output", str(output),
+        )
+        assert "Traceback" not in result.stderr
+        for artifact_name in ("audit.json", "lineage.json", "report.html"):
+            assert (output / artifact_name).exists(), f"{name}: {artifact_name}"
+        artifact = json.loads((output / "audit.json").read_text())
+        assert artifact["verdict"] == "blocked"
+        assert artifact["verdict_reasons"]
+
+    def test_the_profiling_evidence_survives(self, tmp_path):
+        path = tmp_path / "untypeable.csv"
+        pd.DataFrame({"a": [1.0, 2.0] * 100, "label": [None] * 200}).to_csv(path, index=False)
+        output = tmp_path / "o"
+        run_cli("audit", str(path), "--target", "label", "--output", str(output))
+        artifact = json.loads((output / "audit.json").read_text())
+        assert len(artifact["columns"]) == 2
+
+
+class TestInputsTheAuditMustRefuse:
+    def test_duplicate_headers_are_refused_rather_than_renamed(self, tmp_path):
+        """pandas turns a,a into a,a.1 and the artifact would describe a file nobody has."""
+        path = tmp_path / "dup.csv"
+        path.write_text("a,a,label\n1,2,0\n3,4,1\n")
+        result = run_cli("audit", str(path), "--target", "label", "--output", str(tmp_path / "o"))
+        assert result.returncode == EXIT_CODES["usage"]
+        assert "duplicate column headers" in result.stderr
+        assert not (tmp_path / "o" / "audit.json").exists()
+
+    def test_output_pointing_at_a_file_is_refused_before_the_work(self, tmp_path):
+        existing = tmp_path / "not_a_dir"
+        existing.write_text("x")
+        result = run_cli("audit", str(EXAMPLE), "--output", str(existing))
+        assert result.returncode == EXIT_CODES["usage"]
+        assert "must be a directory" in result.stderr
+
+    def test_a_model_without_a_target_is_refused_rather_than_ignored(self, tmp_path):
+        result = run_cli(
+            "audit", str(EXAMPLE), "--model", "logistic_regression",
+            "--output", str(tmp_path / "o"),
+        )
+        assert result.returncode == EXIT_CODES["usage"]
+        assert "--model needs --target" in result.stderr
+
+    def test_none_of_these_show_a_traceback(self, tmp_path):
+        path = tmp_path / "dup.csv"
+        path.write_text("a,a,label\n1,2,0\n3,4,1\n")
+        for args in (
+            ("audit", str(path), "--target", "label", "--output", str(tmp_path / "a")),
+            ("audit", str(EXAMPLE), "--model", "knn", "--output", str(tmp_path / "b")),
+        ):
+            assert "Traceback" not in run_cli(*args).stderr
+
+
+class TestExitCodeTwoMeansThresholdMet:
+    def test_warnings_trip_the_warning_threshold(self, tmp_path):
+        path = tmp_path / "warn.csv"
+        index = np.arange(240)
+        pd.DataFrame(
+            {"a": (index % 37) * 1.5, "k": ["same"] * 240, "label": (index % 2)}
+        ).to_csv(path, index=False)
+        strict = run_cli(
+            "audit", str(path), "--target", "label", "--fail-on", "warning",
+            "--output", str(tmp_path / "a"),
+        )
+        assert strict.returncode == EXIT_CODES["review"]
+
+    def test_and_the_verdict_itself_says_which_it_was(self, tmp_path):
+        path = tmp_path / "warn.csv"
+        index = np.arange(240)
+        pd.DataFrame(
+            {"a": (index % 37) * 1.5, "k": ["same"] * 240, "label": (index % 2)}
+        ).to_csv(path, index=False)
+        run_cli(
+            "audit", str(path), "--target", "label", "--fail-on", "warning",
+            "--output", str(tmp_path / "b"),
+        )
+        artifact = json.loads((tmp_path / "b" / "audit.json").read_text())
+        assert artifact["verdict"] == "ready_with_warnings"
+
+    def test_the_documented_table_matches_the_code(self):
+        from pathlib import Path
+
+        docs = (Path(__file__).resolve().parents[2] / "docs" / "getting-started.md").read_text()
+        assert "does not mean `review_required` specifically" in docs

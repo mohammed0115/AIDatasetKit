@@ -40,10 +40,10 @@ step names the capability that asked for it.
 | `path` | A CSV file. The only format the alpha reads. |
 | `--target` | The label column. Without it you get dataset evidence only. |
 | `--task` | `classification` or `regression`. Detected from the target if omitted. |
-| `--model` | A model name or alias. Adds capability-driven preprocessing evidence. **Nothing is trained.** |
+| `--model` | A model name or alias. Adds capability-driven preprocessing evidence. **Requires `--target`.** Nothing is trained. |
 | `--output` | Where the artifacts go. Defaults to `./aidk-audit`. |
 | `--fail-on` | `never`, `warning`, `review`, `error`. Default `review`. |
-| `--include-values` | Put the most frequent value of each column in the artifact **in plain text**. Off by default. |
+| `--include-values` | Turn redaction **off everywhere**: the most frequent value of each column and every value quoted in a finding are written in plain text. Off by default. |
 | `--debug` | Show the full traceback instead of one clear line. |
 
 ## Exit codes
@@ -51,9 +51,14 @@ step names the capability that asked for it.
 | Code | Meaning |
 |---|---|
 | `0` | The verdict is below your `--fail-on` threshold (default: below `review_required`). |
-| `1` | The command could not run: missing file, unknown target, bad option. |
-| `2` | Verdict reached `REVIEW_REQUIRED` and that met the threshold. |
-| `3` | Verdict reached `BLOCKED` and that met the threshold. |
+| `1` | The command could not run: missing file, unknown target, duplicate headers, bad option. |
+| `2` | The verdict met the threshold and is not `blocked`. |
+| `3` | The verdict is `blocked` and that met the threshold. |
+
+`2` does not mean `review_required` specifically — under `--fail-on warning` a
+`ready_with_warnings` verdict returns `2` as well. The code answers *"did this
+meet the bar you set"*; which verdict it was is in `audit.json` and in the
+summary printed above it.
 
 `2` and `3` are policy outcomes, not errors — the tool worked and is telling you
 what it found. Only `1` means the audit itself failed.

@@ -449,7 +449,7 @@
       },
       "fit_scope": "training_only",
       "input_kind": "categorical",
-      "model_requirement": "model 'logistic_regression' declares handles_missing_values=false",
+      "model_requirement": null,
       "outputs": [],
       "reason": "Included because 'City' is a label with no inherent order with 3 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
       "reason_code": "nominal_feature",
@@ -474,7 +474,7 @@
       },
       "fit_scope": "training_only",
       "input_kind": "categorical",
-      "model_requirement": "model 'logistic_regression' declares handles_missing_values=false",
+      "model_requirement": null,
       "outputs": [],
       "reason": "Included because 'ContractType' is a label with no inherent order with 3 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
       "reason_code": "nominal_feature",
@@ -499,7 +499,7 @@
       },
       "fit_scope": "training_only",
       "input_kind": "categorical",
-      "model_requirement": "model 'logistic_regression' declares handles_missing_values=false",
+      "model_requirement": null,
       "outputs": [],
       "reason": "Included because 'Education' is a label with no inherent order with 3 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
       "reason_code": "nominal_feature",
@@ -524,7 +524,7 @@
       },
       "fit_scope": "training_only",
       "input_kind": "boolean",
-      "model_requirement": "model 'logistic_regression' declares handles_missing_values=false",
+      "model_requirement": null,
       "outputs": [],
       "reason": "Included because 'IsActive' is a two-valued label with 2 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
       "reason_code": "binary_categorical",
@@ -636,7 +636,7 @@
         "name": "CustomerID"
       },
       "details": {
-        "detected_kind": "sha256:d75b01a0cde37bee5ffddc49c44f9dab",
+        "detected_kind": "categorical",
         "threshold": 0.95,
         "unique_count": 600,
         "unique_ratio": 1.0
@@ -656,11 +656,11 @@
       "details": {
         "distinct_feature_values": 220,
         "signals": [
-          "sha256:8b7e5402ebdbc192e5ff51947f220a6f"
+          "deterministic_mapping"
         ],
         "target": "Churn"
       },
-      "message": "Column 'HighCardinalityFeature' may contain information about the target 'Churn' that would not be available at prediction time (signals: sha256:8b7e5402ebdbc192e5ff51947f220a6f). This is a heuristic and needs review.",
+      "message": "Column 'HighCardinalityFeature' may contain information about the target 'Churn' that would not be available at prediction time (signals: deterministic_mapping). This is a heuristic and needs review.",
       "recommendation": "Ask whether this value is known before the outcome occurs. If it is recorded afterwards, it inflates validation scores and the model will fail in production. Nothing has been removed.",
       "requires_review": true,
       "severity": "warning",
@@ -885,7 +885,7 @@
       "scikit_learn": "1.9.0",
       "scipy": "1.18.0"
     },
-    "semantic_fingerprint": "8e5501c9dcdbfdc2327311aa576020a3d159cb3d4d4ce28b4d2fe5f913bd6a36"
+    "semantic_fingerprint": "97e84360be9509b289d26cc0a5c3cbc995bd08224fdcca77770f7c9c96470c18"
   },
   "schema_version": "1.0",
   "stage": "prepared",
