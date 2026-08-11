@@ -28,13 +28,27 @@ Be clear-eyed about this. An artifact still reveals:
   all.
 - **One-hot output names**, which contain the *categories* of encoded columns:
   `City_Riyadh`, `City_Jeddah`.
+- **Anything you supplied as configuration.** An ordinal order
+  (`["remission", "stage_1", "stage_4"]`) and an explicit mapping
+  (`{"M": 1, "F": 0}`) are recorded verbatim under `config.settings.preprocessing`.
+- **Quality thresholds** you configured, recorded under `config.settings.thresholds`.
 
-That last one deserves a note. Feature lineage exists to tell you what a column
-became, and for a one-hot encoding those names *are* the categories. The exposure
-is bounded: only low-cardinality columns are encoded by default, because a column
+Two of those deserve a note.
+
+**One-hot output names.** Feature lineage exists to tell you what a column became,
+and for a one-hot encoding those names *are* the categories. The exposure is
+bounded: only low-cardinality columns are encoded by default, because a column
 above the cardinality threshold is held back for review rather than encoded. If
 your low-cardinality categories are themselves sensitive, do not share the
 artifact.
+
+**Configuration you supplied.** Ordinal orders and explicit mappings are *your*
+values, not values the tool discovered in the data, which is why they are not
+redacted: an audit that hid them could not show that the order you supplied was
+the order that was applied, and the config fingerprint could not tell two
+different orderings apart. But they are still category names. If you wrote
+`ordinal_orders={"stage": ["remission", "stage_4_metastatic"]}`, those strings are
+in the artifact. `--include-values` does not control this and never did.
 
 ## Opting in to raw values
 

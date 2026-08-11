@@ -258,7 +258,7 @@
     }
   ],
   "config": {
-    "fingerprint": "178e38a3b0d6635df1495c0b226e8008d9a0dcec23fdc72c38e4a2b52edb0fe5",
+    "fingerprint": "8171fb67203c5661d6a6ec491c897398af73549f535ac43ab9d663a805aa1b15",
     "settings": {
       "categorical_sentinel": "__missing__",
       "model": "logistic_regression",
@@ -285,10 +285,30 @@
       },
       "preprocessing_profile": "scaling=1,sparse=1,native_nan=0",
       "redact_values": true,
-      "source_file": "train.csv",
       "target": "str:Churn",
       "task": "classification",
-      "task_hint": null
+      "task_hint": null,
+      "thresholds": {
+        "cv_folds": 5,
+        "dense_encoding_warning_categories": 1000,
+        "high_cardinality_threshold": 50,
+        "id_uniqueness_threshold": 0.95,
+        "imbalance_threshold": 0.2,
+        "leakage_correlation_threshold": 0.98,
+        "missing_warning_threshold": 0.2,
+        "near_constant_threshold": 0.98,
+        "numeric_text_ratio_threshold": 0.75,
+        "outlier_iqr_multiplier": 1.5,
+        "outlier_zscore_threshold": 3.0,
+        "predicted_class_column": "predicted_class",
+        "prediction_column": "prediction",
+        "probability_column": "predicted_probability",
+        "random_state": 42,
+        "shuffle": true,
+        "task_detection_max_classes": 20,
+        "task_detection_unique_ratio": 0.05,
+        "validation_size": 0.2
+      }
     }
   },
   "dataset": {
@@ -338,7 +358,6 @@
     ],
     "duplicate_row_count": 0,
     "fingerprint": "8135be14ca667643b0782e42924942e87a659b27c519e72b01dacb57f1b16ec2",
-    "name": "train.csv",
     "row_count": 600,
     "schema_fingerprint": "0eea20c4ff0ce51284984518bd45bc7c1014991c2e48a8e431b7bde9deebe156",
     "total_missing_count": 55
@@ -616,7 +635,7 @@
         "name": "CustomerID"
       },
       "details": {
-        "detected_kind": "categorical",
+        "detected_kind": "sha256:d75b01a0cde37bee5ffddc49c44f9dab",
         "threshold": 0.95,
         "unique_count": 600,
         "unique_ratio": 1.0
@@ -636,11 +655,11 @@
       "details": {
         "distinct_feature_values": 220,
         "signals": [
-          "deterministic_mapping"
+          "sha256:8b7e5402ebdbc192e5ff51947f220a6f"
         ],
         "target": "Churn"
       },
-      "message": "Column 'HighCardinalityFeature' may contain information about the target 'Churn' that would not be available at prediction time (signals: deterministic_mapping). This is a heuristic and needs review.",
+      "message": "Column 'HighCardinalityFeature' may contain information about the target 'Churn' that would not be available at prediction time (signals: sha256:8b7e5402ebdbc192e5ff51947f220a6f). This is a heuristic and needs review.",
       "recommendation": "Ask whether this value is known before the outcome occurs. If it is recorded afterwards, it inflates validation scores and the model will fail in production. Nothing has been removed.",
       "requires_review": true,
       "severity": "warning",
@@ -668,7 +687,8 @@
     "Datetime columns are profiled but never turned into features automatically; any calendar engineering is the analyst's decision.",
     "Preprocessing decisions are proposals recorded as evidence. This artifact does not prove a model was trained on the data it describes.",
     "A dataset fingerprint identifies content, not provenance. It cannot show where the data came from or whether it was collected lawfully.",
-    "Numeric values beyond the float32 range are unsupported by several estimators and are not rejected at profiling time."
+    "Numeric values beyond the float32 range are unsupported by several estimators and are not rejected at profiling time.",
+    "Values the analyst supplied as configuration -- ordinal orders, explicit mappings -- are recorded verbatim, because an audit that hid them could not show which ordering was applied. Redaction covers values read from the data, not values handed to the tool."
   ],
   "lineage": [
     {

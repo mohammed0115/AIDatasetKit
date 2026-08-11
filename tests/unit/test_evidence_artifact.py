@@ -162,19 +162,19 @@ class TestNothingIsRecomputed:
         quality = DataQualityInspector().inspect(frame, profile=profile, target="churn")
         assert [f.code for f in full.findings] == [i.code for i in quality.issues]
 
-    def test_finding_details_are_carried_through_except_raw_values(self, frame, full):
-        """Measurements survive verbatim; the two keys holding data do not."""
-        from aidatasetkit.evidence.builder import _REDACTED_DETAIL_KEYS
+    def test_measurements_are_carried_through_but_text_is_not(self, frame, full):
+        """Numbers survive verbatim; text is a value until proven a name."""
+        from aidatasetkit.evidence.builder import _SAFE_TEXT_DETAIL_KEYS
 
         profile = DataProfiler().profile(frame)
         quality = DataQualityInspector().inspect(frame, profile=profile, target="churn")
         original = {i.code: dict(i.details or {}) for i in quality.issues}
         for finding in full.findings:
             for key, value in finding.details.items():
-                if key in _REDACTED_DETAIL_KEYS:
-                    assert str(value).startswith("sha256:")
-                else:
+                if isinstance(value, (int, float, bool)) or value is None:
                     assert value == original[finding.code][key]
+                elif key not in _SAFE_TEXT_DETAIL_KEYS:
+                    assert "sha256:" in str(value)
 
     def test_a_finding_that_quotes_a_value_has_it_scrubbed_from_the_message(self, full):
         constant = [f for f in full.findings if f.code == "constant_column"]
@@ -183,14 +183,15 @@ class TestNothingIsRecomputed:
             assert SENSITIVE not in finding.message
             assert "sha256:" in finding.message
 
-    def test_every_other_finding_message_is_untouched(self, frame, full):
-        from aidatasetkit.evidence.builder import _REDACTED_DETAIL_KEYS
-
+    def test_a_message_with_no_text_detail_is_untouched(self, frame, full):
         profile = DataProfiler().profile(frame)
         quality = DataQualityInspector().inspect(frame, profile=profile, target="churn")
         by_code = {i.code: i.message for i in quality.issues}
         for finding in full.findings:
-            if not set(finding.details) & _REDACTED_DETAIL_KEYS:
+            has_text = any(
+                isinstance(v, (str, list, tuple)) for v in finding.details.values()
+            )
+            if not has_text:
                 assert finding.message == by_code[finding.code]
 
     def test_decisions_come_from_the_plan(self, frame, full):
@@ -662,3 +663,432 @@ class TestEvidenceLibraryDoesNotPrint:
         AuditBuilder().build(frame, profile=profile)
         captured = capsys.readouterr()
         assert captured.out == ""
+
+
+class TestThresholdsReachTheConfigFingerprint:
+    """Found by attacking the config fingerprint: it answered "same settings"
+    when the settings had changed.
+
+    ``KitConfig`` decides what counts as high cardinality, as an identifier, as
+    leakage. Change ``high_cardinality_threshold`` and a column starts being
+    reported. The evidence fingerprint moved, because the findings moved -- but
+    the *config* fingerprint, whose entire job is to answer "were the same
+    settings in force?", did not. It said yes when the answer was no.
+    """
+
+    @staticmethod
+    def _frame() -> pd.DataFrame:
+        index = np.arange(300)
+        return pd.DataFrame(
+            {
+                "a": (index % 53) * 1.1,
+                "city": [f"c{value % 30}" for value in index],
+                "label": (index % 3 == 0).astype("int64"),
+            }
+        )
+
+    @staticmethod
+    def _build(frame, kit):
+        profile = DataProfiler(kit).profile(frame)
+        quality = DataQualityInspector(kit).inspect(frame, profile=profile, target="label")
+        return AuditBuilder().build(
+            frame, profile=profile, quality=quality, kit_config=kit, created_at="T"
+        )
+
+    def test_a_changed_threshold_really_changes_the_findings(self):
+        from aidatasetkit.core import KitConfig
+
+        frame = self._frame()
+        assert len(self._build(frame, KitConfig()).findings) != len(
+            self._build(frame, KitConfig(high_cardinality_threshold=5)).findings
+        )
+
+    def test_and_therefore_changes_the_config_fingerprint(self):
+        from aidatasetkit.core import KitConfig
+
+        frame = self._frame()
+        assert (
+            self._build(frame, KitConfig()).config.fingerprint
+            != self._build(frame, KitConfig(high_cardinality_threshold=5)).config.fingerprint
+        )
+
+    @pytest.mark.parametrize(
+        "field,value",
+        [
+            ("missing_warning_threshold", 0.9),
+            ("near_constant_threshold", 0.5),
+            ("id_uniqueness_threshold", 0.1),
+            ("leakage_correlation_threshold", 0.99),
+            ("random_state", 7),
+        ],
+    )
+    def test_every_threshold_is_part_of_the_identity(self, field, value):
+        """Not only the one that was found. Each is checked on its own."""
+        from aidatasetkit.core import KitConfig
+
+        frame = self._frame()
+        base = self._build(frame, KitConfig())
+        changed = self._build(frame, KitConfig(**{field: value}))
+        assert base.config.fingerprint != changed.config.fingerprint
+
+    def test_the_thresholds_are_visible_not_just_hashed(self):
+        from aidatasetkit.core import KitConfig
+
+        artifact = self._build(self._frame(), KitConfig())
+        assert artifact.config.settings["thresholds"]["high_cardinality_threshold"]
+
+    def test_omitting_them_records_that_they_are_unknown(self):
+        """Assuming the defaults would put a wrong answer in the one field whose
+        job is to say what was in force."""
+        frame = self._frame()
+        artifact = AuditBuilder().build(
+            frame, profile=DataProfiler().profile(frame), created_at="T"
+        )
+        assert artifact.config.settings["thresholds"] is None
+
+    def test_and_that_is_distinguishable_from_declared_defaults(self):
+        from aidatasetkit.core import KitConfig
+
+        frame = self._frame()
+        silent = AuditBuilder().build(
+            frame, profile=DataProfiler().profile(frame), created_at="T"
+        )
+        declared = AuditBuilder().build(
+            frame,
+            profile=DataProfiler().profile(frame),
+            kit_config=KitConfig(),
+            created_at="T",
+        )
+        assert silent.config.fingerprint != declared.config.fingerprint
+
+
+class TestAnalystSuppliedValuesAreRecordedAndDocumented:
+    """Ordinal orders and explicit mappings appear verbatim, on purpose.
+
+    They are the analyst's own values rather than something read out of the
+    data, and hiding them would stop the artifact showing which ordering was
+    applied. That is a defensible choice and an undocumented one is not, so the
+    documentation is asserted here rather than trusted.
+    """
+
+    SECRET = "ZZ_STAGE_4_METASTATIC_ZZ"
+
+    @pytest.fixture
+    def mapped(self):
+        from aidatasetkit.preprocessing import PreprocessingConfig
+
+        index = np.arange(240)
+        frame = pd.DataFrame(
+            {
+                "stage": [
+                    [self.SECRET, "ZZ_REMISSION_ZZ", "ZZ_STAGE_1_ZZ"][value % 3]
+                    for value in index
+                ],
+                "amount": (index % 47) * 1.3,
+                "label": (index % 4 == 0).astype("int64"),
+            }
+        )
+        config = PreprocessingConfig(
+            ordinal_orders={
+                "stage": ["ZZ_REMISSION_ZZ", "ZZ_STAGE_1_ZZ", self.SECRET]
+            }
+        )
+        return frame, config
+
+    def test_the_supplied_order_is_recorded_verbatim(self, mapped):
+        from aidatasetkit.preprocessing import PreprocessingPlanner
+
+        frame, config = mapped
+        profile = DataProfiler().profile(frame)
+        plan = PreprocessingPlanner(config).plan(
+            frame,
+            profile,
+            PreprocessingProfile(False, False, False),
+            target="label",
+        )
+        artifact = AuditBuilder().build(frame, profile=profile, plan=plan, created_at="T")
+        assert self.SECRET in canonical_json(artifact.to_dict())
+
+    def test_the_artifact_says_so_in_its_own_limitations(self):
+        from aidatasetkit.evidence import KNOWN_LIMITATIONS
+
+        text = " ".join(KNOWN_LIMITATIONS).lower()
+        assert "ordinal orders" in text and "explicit mappings" in text
+
+    def test_the_privacy_document_says_so_too(self):
+        from pathlib import Path
+
+        privacy = (
+            Path(__file__).resolve().parents[2] / "docs" / "privacy.md"
+        ).read_text(encoding="utf-8")
+        assert "ordinal order" in privacy.lower()
+        assert "explicit mapping" in privacy.lower()
+
+    def test_and_does_not_promise_include_values_controls_it(self):
+        from pathlib import Path
+
+        privacy = (
+            Path(__file__).resolve().parents[2] / "docs" / "privacy.md"
+        ).read_text(encoding="utf-8")
+        assert "--include-values` does not control this" in privacy
+
+
+class TestRedactionDeniesByDefault:
+    """The allowlist was the wrong direction, and a real leak walked past it.
+
+    ``possible_numeric_stored_as_text`` reports ``non_numeric_examples`` -- a list
+    of raw cells -- under a key the redactor had never heard of, and those cells
+    reached ``audit.json`` while the documentation promised they could not. The
+    privacy sweep passed because its fixture had no numeric-stored-as-text column,
+    which is the "guard nobody watched fail" pattern this project exists to avoid.
+    """
+
+    LEAK = "ZZLEAKZZ"
+
+    @pytest.fixture
+    def text_numeric(self) -> pd.DataFrame:
+        index = np.arange(240)
+        return pd.DataFrame(
+            {
+                "amount_text": [
+                    f"{self.LEAK}{value % 97}" if value % 13 == 0 else str(value % 97)
+                    for value in index
+                ],
+                "ok": (index % 31) * 1.0,
+                "label": (index % 4 == 0).astype("int64"),
+            }
+        )
+
+    def test_the_check_that_leaked_actually_fires(self, text_numeric):
+        """Otherwise the assertion below passes by finding nothing."""
+        profile = DataProfiler().profile(text_numeric)
+        quality = DataQualityInspector().inspect(
+            text_numeric, profile=profile, target="label"
+        )
+        assert "possible_numeric_stored_as_text" in {i.code for i in quality.issues}
+
+    def test_and_its_examples_no_longer_reach_the_artifact(self, text_numeric):
+        profile = DataProfiler().profile(text_numeric)
+        quality = DataQualityInspector().inspect(
+            text_numeric, profile=profile, target="label"
+        )
+        artifact = AuditBuilder().build(text_numeric, profile=profile, quality=quality)
+        assert self.LEAK not in canonical_json(artifact.to_dict())
+
+    def test_the_measurements_beside_them_survive(self, text_numeric):
+        profile = DataProfiler().profile(text_numeric)
+        quality = DataQualityInspector().inspect(
+            text_numeric, profile=profile, target="label"
+        )
+        artifact = AuditBuilder().build(text_numeric, profile=profile, quality=quality)
+        finding = next(
+            f for f in artifact.findings if f.code == "possible_numeric_stored_as_text"
+        )
+        assert finding.details["threshold"] == 0.75
+        assert isinstance(finding.details["numeric_ratio"], float)
+
+    def test_a_column_name_in_details_is_kept_because_it_is_a_name(self):
+        """Redacting the target's name would make a leakage finding unreadable."""
+        index = np.arange(200)
+        frame = pd.DataFrame(
+            {"a": (index % 53) * 1.1, "dup": (index % 2), "label": (index % 2)}
+        )
+        profile = DataProfiler().profile(frame)
+        quality = DataQualityInspector().inspect(frame, profile=profile, target="label")
+        artifact = AuditBuilder().build(frame, profile=profile, quality=quality)
+        duplicate = next(
+            f for f in artifact.findings if f.code == "target_leakage_exact_duplicate"
+        )
+        assert duplicate.details.get("target") == "label"
+
+    def test_an_unknown_future_detail_key_is_private_by_default(self):
+        """The property the allowlist could not give: safe without being updated."""
+        from aidatasetkit.core.types import QualityIssue, Severity
+
+        issue = QualityIssue(
+            code="invented_check",
+            severity=Severity.WARNING,
+            message="Column 'x' looks like ZZFUTUREZZ.",
+            column="x",
+            details={"brand_new_key": "ZZFUTUREZZ", "count": 3},
+        )
+        recorded = AuditBuilder()._finding_evidence(issue)
+        assert "ZZFUTUREZZ" not in canonical_json(recorded.to_dict())
+        assert recorded.details["count"] == 3
+
+
+class TestScrubbingDoesNotDestroyTheMessage:
+    """A one-character value made the second pass rewrite the whole sentence."""
+
+    @pytest.fixture
+    def single_letter(self) -> pd.DataFrame:
+        index = np.arange(200)
+        return pd.DataFrame(
+            {"k": ["a"] * 200, "n": (index % 17) * 1.0, "label": (index % 2)}
+        )
+
+    def test_the_message_survives_intact(self, single_letter):
+        profile = DataProfiler().profile(single_letter)
+        quality = DataQualityInspector().inspect(
+            single_letter, profile=profile, target="label"
+        )
+        artifact = AuditBuilder().build(single_letter, profile=profile, quality=quality)
+        finding = next(f for f in artifact.findings if f.code == "constant_column")
+        assert finding.message.startswith("Column 'k' holds the single value ")
+        assert finding.message.endswith("carries no information.")
+
+    def test_the_value_is_still_gone(self, single_letter):
+        profile = DataProfiler().profile(single_letter)
+        quality = DataQualityInspector().inspect(
+            single_letter, profile=profile, target="label"
+        )
+        artifact = AuditBuilder().build(single_letter, profile=profile, quality=quality)
+        finding = next(f for f in artifact.findings if f.code == "constant_column")
+        assert "'a'" not in finding.message
+        assert "sha256:" in finding.message
+
+    def test_the_digest_appears_exactly_once(self, single_letter):
+        profile = DataProfiler().profile(single_letter)
+        quality = DataQualityInspector().inspect(
+            single_letter, profile=profile, target="label"
+        )
+        artifact = AuditBuilder().build(single_letter, profile=profile, quality=quality)
+        finding = next(f for f in artifact.findings if f.code == "constant_column")
+        assert finding.message.count("sha256:") == 1
+
+
+class TestObjectColumnsKeepTheirValueTypes:
+    """pandas hashes an object column by text, so 1 and "1" collided."""
+
+    @pytest.mark.parametrize(
+        "left,right",
+        [
+            ([1, 2, 3], ["1", "2", "3"]),
+            ([True, False], ["True", "False"]),
+            ([1.0, 2.0], ["1.0", "2.0"]),
+        ],
+    )
+    def test_a_value_and_its_text_form_are_different_data(self, left, right):
+        from aidatasetkit.evidence import dataset_fingerprint
+
+        a = pd.DataFrame({"c": pd.Series(left * 40, dtype=object)})
+        b = pd.DataFrame({"c": pd.Series(right * 40, dtype=object)})
+        assert dataset_fingerprint(a) != dataset_fingerprint(b)
+
+    def test_the_same_object_column_still_agrees_with_itself(self):
+        from aidatasetkit.evidence import dataset_fingerprint
+
+        frame = pd.DataFrame({"c": pd.Series([1, "b", 3.0] * 40, dtype=object)})
+        assert dataset_fingerprint(frame) == dataset_fingerprint(frame.copy(deep=True))
+
+
+class TestTheDatasetLabelIsMetadataNotEvidence:
+    """Renaming a file changed the evidence fingerprint, which is a false alarm."""
+
+    @staticmethod
+    def _frame() -> pd.DataFrame:
+        index = np.arange(120)
+        return pd.DataFrame(
+            {"a": (index % 13) * 1.0, "b": [["p", "q", "r"][v % 3] for v in index]}
+        )
+
+    def test_renaming_the_file_changes_nothing_about_the_evidence(self):
+        frame = self._frame()
+        profile = DataProfiler().profile(frame)
+        one = AuditBuilder(dataset_name="train.csv").build(
+            frame, profile=profile, created_at="T"
+        )
+        two = AuditBuilder(dataset_name="train_copy.csv").build(
+            frame, profile=profile, created_at="T"
+        )
+        assert one.semantic_fingerprint == two.semantic_fingerprint
+
+    def test_but_the_name_is_still_recorded(self):
+        frame = self._frame()
+        artifact = AuditBuilder(dataset_name="train.csv").build(
+            frame, profile=DataProfiler().profile(frame)
+        )
+        assert artifact.to_dict()["dataset"]["name"] == "train.csv"
+
+    def test_and_differs_from_reports_no_difference(self):
+        frame = self._frame()
+        profile = DataProfiler().profile(frame)
+        one = AuditBuilder(dataset_name="a.csv").build(frame, profile=profile, created_at="T")
+        two = AuditBuilder(dataset_name="b.csv").build(frame, profile=profile, created_at="T")
+        assert not any(one.differs_from(two).values())
+
+
+class TestModelRequirementIsAccurate:
+    def test_the_dense_output_branch_uses_the_step_name_that_exists(self):
+        """It tested for "one_hot_encoding"; the planner emits "onehot_encoding"."""
+        from aidatasetkit.models import ModelFactory
+        from aidatasetkit.preprocessing import PreprocessingPlanner
+
+        index = np.arange(300)
+        frame = pd.DataFrame(
+            {
+                "city": [["a", "b", "c"][v % 3] for v in index],
+                "n": (index % 41) * 1.0,
+                "label": (index % 5 == 0).astype("int64"),
+            }
+        )
+        # A model that is dense-only AND takes NaN natively, so the earlier
+        # missing-value branch cannot claim the explanation first.
+        entry = ModelFactory.registration("hist_gradient_boosting_classifier")
+        assert not entry.capabilities.supports_sparse_input
+        assert entry.capabilities.handles_missing_values
+        profile = DataProfiler().profile(frame)
+        plan = PreprocessingPlanner().plan(
+            frame,
+            profile,
+            entry.capabilities.preprocessing_profile(),
+            target="label",
+        )
+        artifact = AuditBuilder().build(
+            frame, profile=profile, plan=plan, model=entry
+        )
+        city = next(d for d in artifact.decisions if d.feature.name == "city")
+        assert "supports_sparse_input=false" in (city.model_requirement or "")
+
+    def test_gaps_are_kept_is_never_said_about_an_imputed_feature(self):
+        from aidatasetkit.models import ModelFactory
+        from aidatasetkit.preprocessing import PreprocessingPlanner
+
+        index = np.arange(300)
+        frame = pd.DataFrame(
+            {
+                "city": [["a", "b", "c"][v % 3] for v in index],
+                "n": (index % 41) * 1.0,
+                "label": (index % 5 == 0).astype("int64"),
+            }
+        )
+        frame.loc[frame.index[:20], "city"] = None
+        entry = ModelFactory.registration("random_forest_classifier")
+        profile = DataProfiler().profile(frame)
+        plan = PreprocessingPlanner().plan(
+            frame, profile, entry.capabilities.preprocessing_profile(), target="label"
+        )
+        artifact = AuditBuilder().build(frame, profile=profile, plan=plan, model=entry)
+        for decision in artifact.decisions:
+            if "gaps are kept" in (decision.model_requirement or ""):
+                assert not any("imputation" in step for step in decision.steps), (
+                    f"{decision.feature.name} claims gaps are kept but imputes them"
+                )
+
+
+class TestTheDigestIsNotClaimedToBeProtection:
+    def test_the_module_does_not_call_it_salted(self):
+        from pathlib import Path
+
+        import aidatasetkit.evidence.builder as module
+
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "salted digest" not in source
+
+    def test_it_says_plainly_that_it_is_reversible(self):
+        from pathlib import Path
+
+        import aidatasetkit.evidence.builder as module
+
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "not salted and not a privacy guarantee" in source

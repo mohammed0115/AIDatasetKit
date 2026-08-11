@@ -13,6 +13,8 @@ Change                     Same fingerprint?
 =========================  ==========================================
 A cell value               **No**
 A dtype, values unchanged  **No** -- ``1`` and ``1.0`` are not the same
+A value's *type* inside
+an ``object`` column       **No** -- ``1`` and ``"1"`` are not the same
 Column order               **No**
 Row order                  **No**
 A column label             **No**
@@ -110,6 +112,7 @@ def dataset_fingerprint(frame: pd.DataFrame) -> str:
     row_count = len(frame)
     for label in frame.columns:
         column = frame[label]
+        is_object = column.dtype == object
         digest.update(b"\x00")
         digest.update(label_token(label).encode("utf-8"))
         digest.update(b"\x00")
@@ -121,6 +124,16 @@ def dataset_fingerprint(frame: pd.DataFrame) -> str:
             # the same file with and without index_col would change identity.
             hashed = pd.util.hash_pandas_object(chunk, index=False)
             digest.update(hashed.to_numpy(dtype="uint64").tobytes())
+            if is_object:
+                # pandas hashes an object column by each value's text, so the
+                # integer 1 and the string "1" land on the same digest -- and so
+                # do True and "True". They are different data and a fingerprint
+                # that conflates them answers the one question it exists for
+                # wrongly. Hashing the per-element type names alongside the
+                # values separates them, and costs nothing on the typed columns
+                # that make up almost every frame.
+                types = "\x1f".join(type(value).__name__ for value in chunk)
+                digest.update(types.encode("utf-8"))
     return digest.hexdigest()
 
 

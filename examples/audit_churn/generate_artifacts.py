@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from aidatasetkit.core import KitConfig
 from aidatasetkit.evidence import AuditBuilder, canonical_json, render_report
 from aidatasetkit.models import ModelFactory
 from aidatasetkit.preprocessing import PreprocessingPlanner, PreprocessorBuilder
@@ -35,9 +36,12 @@ FIXED_TIMESTAMP = "2025-02-01T00:00:00Z"
 
 def build_artifact(frame: pd.DataFrame):
     """Run the real pipeline. Nothing here is specific to the example."""
-    profile = DataProfiler().profile(frame)
-    quality = DataQualityInspector().inspect(frame, profile=profile, target=TARGET)
-    detected = TaskDetector().detect(frame[TARGET], target_name=TARGET)
+    kit_config = KitConfig()
+    profile = DataProfiler(kit_config).profile(frame)
+    quality = DataQualityInspector(kit_config).inspect(
+        frame, profile=profile, target=TARGET
+    )
+    detected = TaskDetector(kit_config).detect(frame[TARGET], target_name=TARGET)
     registration = ModelFactory.registration(MODEL)
 
     plan = PreprocessingPlanner().plan(
@@ -59,7 +63,8 @@ def build_artifact(frame: pd.DataFrame):
         plan=plan,
         lineage=preprocessor.lineage(),
         model=registration,
-        settings={"source_file": "train.csv", "task_hint": None},
+        kit_config=kit_config,
+        settings={"task_hint": None},
         created_at=FIXED_TIMESTAMP,
     )
 

@@ -186,6 +186,7 @@ def _audit(args: argparse.Namespace) -> int:
 
     import pandas as pd
 
+    from aidatasetkit.core import KitConfig
     from aidatasetkit.models import ModelFactory
     from aidatasetkit.preprocessing import PreprocessingPlanner, PreprocessorBuilder
     from aidatasetkit.profiling import DataProfiler, DataQualityInspector, TaskDetector
@@ -206,11 +207,16 @@ def _audit(args: argparse.Namespace) -> int:
         registration.require_available()
 
     # --- established facts, each from the layer that owns it ---------------
-    profile = DataProfiler().profile(frame)
-    quality = DataQualityInspector().inspect(frame, profile=profile, target=args.target)
+    # One configuration, used by every layer and recorded in the artifact. Every
+    # finding below depends on these thresholds, so the audit has to carry them.
+    kit_config = KitConfig()
+    profile = DataProfiler(kit_config).profile(frame)
+    quality = DataQualityInspector(kit_config).inspect(
+        frame, profile=profile, target=args.target
+    )
     target_profile = None
     if args.target is not None:
-        target_profile = TaskDetector().detect(
+        target_profile = TaskDetector(kit_config).detect(
             frame[args.target], hint=args.task, target_name=args.target
         )
 
@@ -259,11 +265,14 @@ def _audit(args: argparse.Namespace) -> int:
         plan=plan,
         lineage=lineage,
         model=registration,
+        kit_config=kit_config,
         # Deliberately excludes --fail-on: it decides this process's exit code
         # and changes nothing about what was found. Two audits that differ only
         # in that flag are the same audit, and the config fingerprint has to say
         # so.
-        settings={"task_hint": args.task, "source_file": path.name},
+        # source_file is deliberately absent for the same reason --fail-on is:
+        # a file name changes nothing about what was found.
+        settings={"task_hint": args.task},
         warnings=warnings,
         blocked_reason=blocked_reason,
     )

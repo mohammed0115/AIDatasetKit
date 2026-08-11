@@ -12,9 +12,14 @@ invisible.
 **Privacy is a default, not an option.** One field on the profiling side holds a
 raw dataset value: ``ColumnProfile.dominant_value``, the most frequent entry in a
 column. For an email column that is somebody's address; for a free-text column it
-is a sentence out of the data. It is replaced by a salted digest unless the
-caller explicitly asks otherwise, so an artifact can still answer "is the most
-common value the same as last week" without ever carrying the value itself.
+is a sentence out of the data. It is replaced by a plain SHA-256 digest unless
+the caller explicitly asks otherwise, so an artifact can still answer "is the
+most common value the same as last week" without carrying the value itself.
+
+The digest is **not salted and not a privacy guarantee**. A value drawn from a
+small or guessable domain -- a boolean, a country code, a category from a known
+list -- can be recovered by hashing candidates. It is an identifier for a value,
+not a way of hiding one, and ``docs/privacy.md`` says so in those words.
 """
 
 from __future__ import annotations
@@ -22,11 +27,13 @@ from __future__ import annotations
 import datetime as _datetime
 import hashlib
 import logging
+import re
 from collections.abc import Hashable, Mapping, Sequence
 from typing import Any
 
 import pandas as pd
 
+from aidatasetkit.core.config import KitConfig
 from aidatasetkit.core.provenance import EnvironmentVersions, capture_environment
 from aidatasetkit.core.types import (
     DatasetProfile,
@@ -79,16 +86,26 @@ KNOWN_LIMITATIONS: tuple[str, ...] = (
     "where the data came from or whether it was collected lawfully.",
     "Numeric values beyond the float32 range are unsupported by several "
     "estimators and are not rejected at profiling time.",
+    "Values the analyst supplied as configuration -- ordinal orders, explicit "
+    "mappings -- are recorded verbatim, because an audit that hid them could not "
+    "show which ordering was applied. Redaction covers values read from the "
+    "data, not values handed to the tool.",
 )
 
-#: Finding detail keys that hold a raw dataset value rather than a measurement.
+#: Detail keys whose *text* is a name rather than data, and may be kept.
 #:
-#: Two quality checks report the value they are about -- ``constant_column`` and
-#: ``near_constant_column`` both name the value that dominates a column -- and
-#: for a column of email addresses that value is somebody's address. The keys are
-#: listed rather than guessed, and a behavioural test sweeps every check against
-#: a frame of marked values so a new one cannot introduce a leak unnoticed.
-_REDACTED_DETAIL_KEYS: frozenset[str] = frozenset({"value", "dominant_value"})
+#: This is an allowlist, and the direction matters. An earlier version listed the
+#: keys known to hold values and redacted those, which is safe only for the
+#: checks that existed when the list was written: ``possible_numeric_stored_as_text``
+#: reports ``non_numeric_examples``, a list of raw cells, and walked straight
+#: past it into ``audit.json``. Denying by default means a check added tomorrow
+#: is private until somebody deliberately says otherwise.
+#:
+#: Numbers and booleans in ``details`` are measurements and are always kept; only
+#: text is suspect, because only text carries a value somebody could read.
+_SAFE_TEXT_DETAIL_KEYS: frozenset[str] = frozenset(
+    {"target", "column", "other_column", "compared_with", "kind", "dtype", "code"}
+)
 
 
 #: Steps that take something from the data they are fitted on.
@@ -167,6 +184,7 @@ class AuditBuilder:
         plan: Any | None = None,
         lineage: Mapping[Hashable, Sequence[str]] | None = None,
         model: Any | None = None,
+        kit_config: KitConfig | None = None,
         settings: Mapping[str, Any] | None = None,
         warnings: Sequence[str] = (),
         blocked_reason: str | None = None,
@@ -185,7 +203,14 @@ class AuditBuilder:
             lineage: The preprocessing layer's own ``lineage()`` output, when a
                 preprocessor was fitted. Never re-derived from output names.
             model: A ``ModelRegistration`` giving the model context, if any.
-            settings: Everything that steered the run, for the config fingerprint.
+            kit_config: The thresholds the profiler and the quality inspector ran
+                under. Every finding in this artifact depends on them -- change
+                ``high_cardinality_threshold`` and a column starts or stops being
+                reported -- so without it the config fingerprint would answer
+                "were the same settings in force?" with a confident yes when it
+                could not know. Left out, the artifact records that it was not
+                supplied rather than assuming the defaults.
+            settings: Everything else that steered the run.
             warnings: Non-fatal problems encountered while producing the run.
             blocked_reason: Set when the analysis could not complete, which makes
                 the verdict ``BLOCKED`` while still producing an artifact.
@@ -216,7 +241,7 @@ class AuditBuilder:
             columns=tuple(LabelRef.of(label) for label in frame.columns),
             name=self._dataset_name,
         )
-        resolved_settings = self._settings(settings, plan, model, target)
+        resolved_settings = self._settings(settings, plan, model, target, kit_config)
 
         return AuditArtifact(
             schema_version=ARTIFACT_SCHEMA_VERSION,
@@ -302,11 +327,15 @@ class AuditBuilder:
         details = dict(issue.details or {})
         message = issue.message
         if self._redact:
-            for key in sorted(set(details) & _REDACTED_DETAIL_KEYS):
-                raw = details[key]
-                digest = self._dominant(raw)
-                details[key] = digest
-                message = _scrub(message, raw, digest)
+            for key in sorted(details):
+                if key in _SAFE_TEXT_DETAIL_KEYS:
+                    continue
+                redacted, removed = self._redact_detail(details[key])
+                if not removed:
+                    continue
+                details[key] = redacted
+                for raw, digest in removed:
+                    message = _scrub(message, raw, digest)
         return FindingEvidence(
             code=issue.code,
             severity=issue.severity,
@@ -334,6 +363,33 @@ class AuditBuilder:
                 model_requirement=self._model_requirement(decision, plan, model),
                 details=dict(decision.details or {}),
             )
+
+    def _redact_detail(self, value: Any) -> tuple[Any, list[tuple[Any, str]]]:
+        """Replace any text in a detail with a digest, recursively.
+
+        Returns the redacted value and every (original, digest) pair replaced, so
+        the finding's message can have the same values taken out of it.
+        Measurements -- numbers, booleans, ``None`` -- are returned untouched,
+        because a count is not a value anybody can be identified by.
+        """
+        if isinstance(value, str):
+            digest = self._dominant(value)
+            return digest, [(value, digest)]
+        if isinstance(value, (list, tuple)):
+            out, removed = [], []
+            for item in value:
+                redacted, pairs = self._redact_detail(item)
+                out.append(redacted)
+                removed.extend(pairs)
+            return out, removed
+        if isinstance(value, Mapping):
+            out, removed = {}, []
+            for key, item in value.items():
+                redacted, pairs = self._redact_detail(item)
+                out[key] = redacted
+                removed.extend(pairs)
+            return out, removed
+        return value, []
 
     @staticmethod
     def _fit_scope(decision: Any) -> FitScope:
@@ -393,9 +449,11 @@ class AuditBuilder:
             "median_imputation",
             "mean_imputation",
             "constant_imputation",
+            "most_frequent_imputation",
+            "sentinel_imputation",
         }:
             return f"{named}declares handles_missing_values=true, so gaps are kept"
-        if not profile.supports_sparse_input and "one_hot_encoding" in steps:
+        if not profile.supports_sparse_input and "onehot_encoding" in steps:
             return f"{named}declares supports_sparse_input=false, so the output is dense"
         return None
 
@@ -466,6 +524,7 @@ class AuditBuilder:
         plan: Any | None,
         model: Any | None,
         target: TargetProfile | None,
+        kit_config: KitConfig | None,
     ) -> dict[str, Any]:
         """Gather everything that could have changed the run into one mapping.
 
@@ -474,6 +533,12 @@ class AuditBuilder:
         """
         resolved: dict[str, Any] = dict(settings or {})
         resolved.setdefault("redact_values", self._redact)
+        # Recorded as null rather than as the defaults when it was not supplied.
+        # Claiming defaults we were never shown would put a wrong answer in the
+        # one field whose whole job is to say what was in force.
+        resolved.setdefault(
+            "thresholds", kit_config.to_dict() if kit_config is not None else None
+        )
         if target is not None and target.target_name is not None:
             resolved.setdefault("target", LabelRef.of(target.target_name).token)
             resolved.setdefault("task", target.task_type.value)
@@ -487,17 +552,27 @@ class AuditBuilder:
 
 
 def _scrub(message: str, value: Any, replacement: str) -> str:
-    """Remove one raw value from a message, however it was interpolated.
+    """Remove one raw value from a message, without rewriting the rest of it.
 
-    Both spellings are tried because a check may use ``{value!r}`` or ``{value}``,
-    and a scrub that handled only one would leave the other in place.
+    The quoted form is tried first and, if it matched, nothing else is tried. An
+    earlier version applied both spellings unconditionally: for a column whose
+    dominant value is ``"a"``, the second pass replaced every letter "a" in the
+    sentence -- including the ones inside the digest the first pass had just
+    inserted -- and turned the message into rubble.
+
+    The bare form is only replaced on word boundaries, so a one-character value
+    can no longer eat the prose around it.
     """
     if value is None:
         return message
-    for rendering in (repr(value), str(value)):
-        if rendering and rendering in message:
-            message = message.replace(rendering, replacement)
-    return message
+    quoted = repr(value)
+    if quoted and quoted in message:
+        return message.replace(quoted, replacement)
+
+    bare = str(value)
+    if not bare:
+        return message
+    return re.sub(rf"(?<!\w){re.escape(bare)}(?!\w)", replacement, message)
 
 
 def _now() -> str:

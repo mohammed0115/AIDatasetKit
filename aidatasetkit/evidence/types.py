@@ -379,8 +379,17 @@ class DatasetIdentity:
     columns: tuple[LabelRef, ...] = ()
     name: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
+    def to_dict(self, *, include_name: bool = True) -> dict[str, Any]:
+        """Return the identity.
+
+        Args:
+            include_name: Whether the caller-supplied label is included. It is
+                excluded from the semantic view: renaming ``train.csv`` to
+                ``train_copy.csv`` changes nothing about what was found, and an
+                evidence fingerprint that moved when a file was renamed would
+                report a difference where there is none.
+        """
+        payload = {
             "fingerprint": self.fingerprint,
             "schema_fingerprint": self.schema_fingerprint,
             "algorithm": self.algorithm,
@@ -389,8 +398,10 @@ class DatasetIdentity:
             "duplicate_row_count": self.duplicate_row_count,
             "total_missing_count": self.total_missing_count,
             "columns": [column.to_dict() for column in self.columns],
-            "name": self.name,
         }
+        if include_name:
+            payload["name"] = self.name
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -451,6 +462,9 @@ class AuditArtifact:
     def to_dict(self) -> dict[str, Any]:
         """Return the canonical mapping. This is the artifact's real format."""
         payload = self.semantic_dict()
+        # The label is metadata, so it travels with the timestamp and the
+        # environment rather than with the evidence.
+        payload["dataset"] = self.dataset.to_dict(include_name=True)
         payload["provenance"] = {
             "created_at": self.created_at,
             "environment": self.environment.to_dict(),
@@ -471,7 +485,7 @@ class AuditArtifact:
             "stage": self.stage.value,
             "verdict": self.verdict.value,
             "verdict_reasons": list(self.verdict_reasons),
-            "dataset": self.dataset.to_dict(),
+            "dataset": self.dataset.to_dict(include_name=False),
             "config": self.config.to_dict(),
             "target": self.target.to_dict() if self.target else None,
             "model": self.model.to_dict() if self.model else None,
