@@ -1,69 +1,209 @@
 # AIDatasetKit
 
-A toolkit that takes tabular data from a raw frame to a model-ready dataset:
-profiling, statistics, quality checks, capability-driven preprocessing, baselines,
-and model comparison.
+**Prove what happened between your data and your model.**
 
-It is **not** an AutoML system. It measures, warns, prepares, and ranks. It never
-edits your data and never picks a model for you — those decisions stay with the
-analyst.
+AIDatasetKit audits a tabular dataset *before* you train on it. It profiles every
+column, checks for the problems that quietly ruin a model — leakage, identifiers,
+constants, missing values — records exactly what preprocessing would do and why,
+and writes the whole thing to a machine-readable audit artifact you can commit,
+diff, and fail a CI build on.
 
-## Status
+```
+pip install -e .
+aidatasetkit audit train.csv --target Churn --model logistic_regression
+```
 
-Phase 1 is under construction and this README grows with it. The full guide
-(quick start, statistics, profiling, comparison, prediction, and how to add a
-model strategy) lands at the end of Phase 1.
+```
+AIDatasetKit audit
 
-| Step | Scope | State |
-| --- | --- | --- |
-| S0 | Foundation: vocabulary, configuration, validation, provenance | Done, tested |
-| S1 | Statistics engine | Not started |
-| S2 | Profiling, quality inspection, task detection | Not started |
-| S3–S8 | Models, preprocessing, training, evaluation, prediction, facade | Not started |
-| S9–S11 | Regression models, optional backends, docs and examples | Not started |
+Dataset:  train.csv
+          600 rows x 10 columns
+          fingerprint 8135be14ca667643
+
+Verdict:  BLOCKED
+
+Findings: 1 error, 4 warning, 1 info
+
+Key issues:
+  - Churn_Copy: Column 'Churn_Copy' is exactly equal to the target 'Churn' in
+    every row. Training on it would measure nothing.
+  - CustomerID: Column 'CustomerID' may be a record identifier: 100.0% of its
+    values are distinct. This is a heuristic and needs review.
+
+Needs review: possible_id_like (CustomerID), high_cardinality (HighCardinalityFeature)
+
+Artifacts:
+  ./aidk-audit/audit.json
+  ./aidk-audit/lineage.json
+  ./aidk-audit/report.html
+```
+
+Exit code `3`. Your CI job just caught a target leak before anyone trained on it.
+
+---
+
+## What this is not
+
+Being clear about this saves you time:
+
+- **Not an AutoML tool.** It never picks a model, tunes a parameter, or decides
+  a threshold for you.
+- **Not a cleaning tool.** It does not fill, drop, encode, or fix anything. It
+  tells you what it would do and why, and you decide.
+- **Not a compliance product.** It produces evidence. It does not certify
+  anything, and no output of it should be read as a guarantee.
+- **Not a training framework.** Nothing here fits a model. The `--model` flag
+  selects a *capability context* so the audit can explain why a scaler is in the
+  plan; no estimator is ever constructed.
 
 ## Install
 
-```bash
-python -m venv .venv
-.venv/bin/python -m pip install -e ".[dev]"
-```
-
-Optional model backends are never required:
+Requires Python 3.11 or newer.
 
 ```bash
-.venv/bin/python -m pip install -e ".[boosting]"   # adds xgboost
+git clone <this repository>
+cd aidatasetkit
+pip install -e .
 ```
 
-## Run the tests
+Optional extras:
 
 ```bash
-.venv/bin/python -m pytest
+pip install -e ".[viz]"        # matplotlib, for chart rendering
+pip install -e ".[boosting]"   # xgboost / lightgbm / catboost model contexts
+pip install -e ".[dev]"        # pytest
 ```
 
-## Architecture in one paragraph
+## 60 seconds
 
-The library is built as strictly ordered layers. `core` defines the shared
-vocabulary and depends on nothing internal; `statistics` and `profiling` measure;
-`preprocessing` and `models` prepare; `training`, `evaluation`, and `prediction`
-run the workflow; `facade` composes them and contains no logic of its own. A
-module may only import from a lower layer, and that rule is enforced by a test
-rather than by convention — see
-[tests/integration/test_architecture_boundaries.py](tests/integration/test_architecture_boundaries.py).
+Generate the example dataset and audit it:
 
-Two decisions shape everything else:
+```bash
+python examples/audit_churn/make_dataset.py
+aidatasetkit audit examples/audit_churn/train.csv \
+    --target Churn \
+    --model logistic_regression \
+    --output ./aidk-audit/
+```
 
-- **Preprocessing follows model capabilities, not model names.** Each model
-  declares whether it needs scaling, accepts sparse input, and handles missing
-  values natively. Those three flags form a `PreprocessingProfile`, and the
-  profile — not the model — is the cache key. Sixteen Phase 1 models collapse into
-  four distinct preprocessors, so preparation stays reusable while still adapting
-  to each algorithm.
-- **The estimator contract is backend-agnostic.** Model strategies return anything
-  satisfying the `Estimator` protocol (`fit`, `predict`, `get_params`,
-  `set_params`), not `sklearn.base.BaseEstimator`. scikit-learn is today's
-  implementation, not the abstraction.
+Open `aidk-audit/report.html` in a browser. Commit `aidk-audit/audit.json` to
+your repository and the next run will diff against it.
 
-## Licence
+In CI:
 
-MIT.
+```yaml
+- run: aidatasetkit audit data/train.csv --target Churn
+```
+
+## From Python
+
+```python
+import pandas as pd
+
+from aidatasetkit.evidence import AuditBuilder, canonical_json
+from aidatasetkit.profiling import DataProfiler, DataQualityInspector
+
+frame = pd.read_csv("train.csv")
+profile = DataProfiler().profile(frame)
+quality = DataQualityInspector().inspect(frame, profile=profile, target="Churn")
+
+artifact = AuditBuilder(dataset_name="train.csv").build(
+    frame, profile=profile, quality=quality
+)
+
+print(artifact.verdict)                 # Verdict.REVIEW_REQUIRED
+print(artifact.review_items)            # what a person still has to decide
+open("audit.json", "w").write(canonical_json(artifact.to_dict()))
+```
+
+Every layer is usable on its own: profiling without quality checks, quality
+checks without preprocessing, preprocessing without a model.
+
+## What you get
+
+| File | What it is |
+|---|---|
+| `audit.json` | The artifact. Canonical, versioned, deterministic, diffable. |
+| `lineage.json` | Every input column and what it became. |
+| `report.html` | The same evidence for a human. No server, no network. |
+
+`audit.json` is the record; the HTML is a rendering of it. They cannot disagree.
+
+## The safety philosophy
+
+**Detect, explain, recommend — never silently modify.** Every version of this
+library has been built on one rule: it does not change your data behind your
+back. A column that looks like an identifier is *held back and reported*, not
+dropped. An ordinal order is never guessed from the alphabet. Numbers stored as
+text are never quietly parsed.
+
+**Metadata that lies is worse than no metadata.** Every capability a model
+declares was verified by running the estimator, and the contract tests re-verify
+them on each run rather than trusting a table.
+
+**Privacy by default.** An audit artifact contains counts, ratios, column names,
+dtypes, and digests — not your data. The one profiling field that holds a real
+value is hashed unless you explicitly ask otherwise. See
+[docs/privacy.md](docs/privacy.md) for what an artifact *does* still reveal.
+
+**Bounded language.** No output says "safe", "compliant", or "leakage-free". It
+says *no known blocker found*, *review required*, *possible leakage*,
+*verified train-only fit*.
+
+## Scope of this alpha
+
+Supported: pandas DataFrames and CSV files · tabular data · binary and multiclass
+classification readiness · scikit-learn model contexts · profiling · quality and
+leakage diagnostics · capability-driven preprocessing plans · feature lineage ·
+audit artifacts.
+
+Not supported yet: regression, clustering, anomaly detection, dimensionality
+reduction, time series, text, images, model training, model comparison,
+hyperparameter tuning, databases, cloud storage, Parquet, Excel.
+
+## Known limitations
+
+- Leakage detection is statistical. A feature that encodes the outcome for
+  reasons the numbers do not show will not be found.
+- Only tabular supervised classification has been verified end to end.
+- Datetime columns are profiled but never turned into features automatically.
+- An audit records what preprocessing *would* do. It does not prove a model was
+  trained on the data it describes.
+- A dataset fingerprint identifies content, not provenance.
+
+The full list travels inside every artifact, so a reader always has it.
+
+## Roadmap
+
+Next, and shaped by what alpha users report: regression readiness, richer
+leakage evidence, artifact diffing across runs, SARIF output for code-scanning
+integrations. Model training and evaluation are deliberately later — the value
+here is what happens *before* a model exists.
+
+## Release blockers
+
+**This alpha is not ready to publish.** One item is outstanding:
+
+- **LICENSE DECISION REQUIRED.** `pyproject.toml` has declared MIT since the
+  first commit, but there is no `LICENSE` file in the repository. That
+  declaration was left exactly as found: choosing a licence, and removing one,
+  are both decisions for the owner rather than for a tool. Add a `LICENSE` file
+  that matches the declaration, or change the declaration, before publishing.
+
+## Documentation
+
+- [Getting started](docs/getting-started.md)
+- [The audit artifact](docs/audit-artifact.md)
+- [Feature lineage](docs/lineage.md)
+- [Safety model](docs/safety-model.md)
+- [Privacy](docs/privacy.md)
+- [Limitations](docs/limitations.md)
+- [Contributing](CONTRIBUTING.md)
+
+## Status
+
+Public alpha (`0.1.0a1`). The artifact schema is versioned independently of the
+package (`1.0`) so that stored artifacts stay readable as the library changes.
+Interfaces may still move. Feedback on the audit artifact — what is missing, what
+is unclear, what you would want to fail a build on — is the most useful thing you
+can send.

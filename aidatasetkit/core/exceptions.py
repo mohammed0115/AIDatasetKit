@@ -37,6 +37,8 @@ __all__ = [
     "VisualizationError",
     "InvalidVisualizationRequest",
     "UnsupportedChartError",
+    "EvidenceError",
+    "SerializationError",
     "WorkflowStateError",
     "PredictionValidationError",
 ]
@@ -210,6 +212,19 @@ class InvalidVisualizationRequest(VisualizationError):
 
 class UnsupportedChartError(VisualizationError):
     """The requested chart type is not implemented by the selected renderer."""
+
+
+class EvidenceError(AIDatasetKitError):
+    """Raised when an audit artifact cannot be built or recorded truthfully."""
+
+
+class SerializationError(EvidenceError):
+    """Raised when a value has no honest canonical form in an artifact.
+
+    Almost always an object that should never have reached the artifact at all --
+    an estimator, a DataFrame, an array. Coercing it to text would put something
+    that looks like a record into a document whose whole purpose is to be one.
+    """
 
 
 class WorkflowStateError(AIDatasetKitError):

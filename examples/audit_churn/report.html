@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIDatasetKit audit — train.csv</title>
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 2rem 1.25rem 4rem; font: 15px/1.6 -apple-system,
+  BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: #fbfbfc; color: #16181d; }
+main { max-width: 60rem; margin: 0 auto; }
+h1 { font-size: 1.6rem; margin: 0 0 .25rem; letter-spacing: -.01em; }
+h2 { font-size: 1.05rem; margin: 2.5rem 0 .75rem; padding-bottom: .4rem;
+  border-bottom: 1px solid #e3e5ea; letter-spacing: .01em; }
+.sub { color: #61656e; margin: 0 0 1.5rem; }
+.verdict { display: inline-block; padding: .35rem .8rem; border-radius: 999px;
+  font-weight: 600; font-size: .85rem; letter-spacing: .02em; }
+.ready { background: #e6f4ea; color: #16643b; }
+.ready_with_warnings { background: #fdf3d8; color: #7a5b00; }
+.review_required { background: #fde8d7; color: #8a3d00; }
+.blocked { background: #fbe0e0; color: #8a1c1c; }
+table { width: 100%; border-collapse: collapse; margin: .5rem 0 1rem; font-size: .88rem; }
+th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #eceef2;
+  vertical-align: top; }
+th { font-weight: 600; color: #4a4e57; font-size: .78rem; text-transform: uppercase;
+  letter-spacing: .04em; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; }
+.sev { font-weight: 600; font-size: .75rem; letter-spacing: .03em; }
+.sev-error { color: #a11; } .sev-warning { color: #8a5b00; } .sev-info { color: #4a4e57; }
+ul { margin: .4rem 0 1rem; padding-left: 1.2rem; }
+li { margin: .2rem 0; }
+.cards { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0 0; }
+.card { flex: 1 1 8rem; background: #fff; border: 1px solid #e3e5ea; border-radius: 8px;
+  padding: .7rem .85rem; }
+.card .k { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #61656e; }
+.card .v { font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.muted { color: #61656e; }
+.arrow { color: #8b9098; padding: 0 .3rem; }
+footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e3e5ea;
+  color: #61656e; font-size: .82rem; }
+@media (prefers-color-scheme: dark) {
+  body { background: #14161a; color: #e6e8ec; }
+  h2 { border-color: #2a2e36; } .sub, .muted, .card .k, th { color: #9aa0aa; }
+  td, th { border-color: #23262d; } .card { background: #191c21; border-color: #2a2e36; }
+  .ready { background: #113724; color: #7fd8a4; }
+  .ready_with_warnings { background: #3a2f0d; color: #e6c65c; }
+  .review_required { background: #402512; color: #f0a563; }
+  .blocked { background: #3d1717; color: #f08a8a; }
+  .sev-error { color: #f08a8a; } .sev-warning { color: #e6c65c; } .sev-info { color: #9aa0aa; }
+}
+</style>
+</head>
+<body>
+<main>
+<h1>AIDatasetKit audit</h1>
+<p class="sub">train.csv <span class="arrow">·</span> task: classification <span class="arrow">·</span> target: <code>Churn</code> <span class="arrow">·</span> stage: prepared</p>
+<p><span class="verdict blocked">BLOCKED</span></p>
+<ul><li>error finding target_leakage_exact_duplicate on Churn_Copy</li></ul>
+<div class="cards"><div class="card"><div class="k">rows</div><div class="v">600</div></div><div class="card"><div class="k">columns</div><div class="v">10</div></div><div class="card"><div class="k">errors</div><div class="v">1</div></div><div class="card"><div class="k">warnings</div><div class="v">4</div></div><div class="card"><div class="k">info</div><div class="v">1</div></div><div class="card"><div class="k">review items</div><div class="v">4</div></div></div>
+
+<h2>Dataset identity</h2>
+<table><tr><th>dataset fingerprint</th><td class="mono">8135be14ca667643b0782e42924942e87a659b27c519e72b01dacb57f1b16ec2</td></tr><tr><th>schema fingerprint</th><td class="mono">0eea20c4ff0ce51284984518bd45bc7c1014991c2e48a8e431b7bde9deebe156</td></tr><tr><th>config fingerprint</th><td class="mono">178e38a3b0d6635df1495c0b226e8008d9a0dcec23fdc72c38e4a2b52edb0fe5</td></tr><tr><th>plan fingerprint</th><td class="mono">90b978c9c9dc745a9a9d0d0f8f0143ca</td></tr><tr><th>evidence fingerprint</th><td class="mono">a16e92a5d21b5cef18cff588089dc71a3a9fab997bdc59165da9d50c46475412</td></tr><tr><th>algorithm</th><td class="mono">sha256/pandas-hash-v1</td></tr><tr><th>duplicate rows</th><td class="mono">0</td></tr><tr><th>missing cells</th><td class="mono">55</td></tr></table>
+
+<h2>Columns</h2>
+<table><tr><th>column</th><th>kind</th><th>dtype</th><th>missing</th><th>missing %</th><th>distinct</th><th>flags</th></tr><tr><td><code>CustomerID</code></td><td>categorical</td><td class="mono">str</td><td class="num">0</td><td class="num">0.0%</td><td class="num">600</td><td>high cardinality, identifier-like</td></tr><tr><td><code>Age</code></td><td>numeric</td><td class="mono">float64</td><td class="num">55</td><td class="num">9.2%</td><td class="num">47</td><td>—</td></tr><tr><td><code>MonthlyCharges</code></td><td>numeric</td><td class="mono">float64</td><td class="num">0</td><td class="num">0.0%</td><td class="num">83</td><td>—</td></tr><tr><td><code>City</code></td><td>categorical</td><td class="mono">str</td><td class="num">0</td><td class="num">0.0%</td><td class="num">3</td><td>—</td></tr><tr><td><code>ContractType</code></td><td>categorical</td><td class="mono">str</td><td class="num">0</td><td class="num">0.0%</td><td class="num">3</td><td>—</td></tr><tr><td><code>Education</code></td><td>categorical</td><td class="mono">str</td><td class="num">0</td><td class="num">0.0%</td><td class="num">3</td><td>—</td></tr><tr><td><code>IsActive</code></td><td>boolean</td><td class="mono">bool</td><td class="num">0</td><td class="num">0.0%</td><td class="num">2</td><td>—</td></tr><tr><td><code>HighCardinalityFeature</code></td><td>categorical</td><td class="mono">str</td><td class="num">0</td><td class="num">0.0%</td><td class="num">220</td><td>high cardinality</td></tr><tr><td><code>Churn</code></td><td>numeric</td><td class="mono">int64</td><td class="num">0</td><td class="num">0.0%</td><td class="num">2</td><td>—</td></tr><tr><td><code>Churn_Copy</code></td><td>numeric</td><td class="mono">int64</td><td class="num">0</td><td class="num">0.0%</td><td class="num">2</td><td>—</td></tr></table>
+<p class="muted">Counts and ratios only. The most frequent value of each column is recorded as a digest, never in plain text.</p>
+
+<h2>Safety findings</h2>
+<table><tr><th>severity</th><th>code</th><th>column</th><th>finding</th><th>review</th></tr><tr><td><span class="sev sev-error">ERROR</span></td><td><code>target_leakage_exact_duplicate</code></td><td>Churn_Copy</td><td>Column &#x27;Churn_Copy&#x27; is exactly equal to the target &#x27;Churn&#x27; in every row. Training on it would measure nothing.<br><span class="muted">Remove this column from the feature set yourself, or confirm it is a duplicate export of the label.</span></td><td></td></tr><tr><td><span class="sev sev-warning">WARNING</span></td><td><code>high_cardinality</code></td><td>CustomerID</td><td>Column &#x27;CustomerID&#x27; has 600 distinct values, above the configured threshold of 50.<br><span class="muted">One-hot encoding would add one column per distinct value. Consider grouping rare categories or a different encoding.</span></td><td></td></tr><tr><td><span class="sev sev-warning">WARNING</span></td><td><code>high_cardinality</code></td><td>HighCardinalityFeature</td><td>Column &#x27;HighCardinalityFeature&#x27; has 220 distinct values, above the configured threshold of 50.<br><span class="muted">One-hot encoding would add one column per distinct value. Consider grouping rare categories or a different encoding.</span></td><td></td></tr><tr><td><span class="sev sev-warning">WARNING</span></td><td><code>possible_id_like</code></td><td>CustomerID</td><td>Column &#x27;CustomerID&#x27; may be a record identifier: 100.0% of its values are distinct and its name or value structure resembles an identifier. This is a heuristic and needs review.<br><span class="muted">An identifier used as a feature lets a model memorise rows. If this is an identifier, declare it as the id column rather than a feature.</span></td><td>yes</td></tr><tr><td><span class="sev sev-warning">WARNING</span></td><td><code>possible_target_leakage</code></td><td>HighCardinalityFeature</td><td>Column &#x27;HighCardinalityFeature&#x27; may contain information about the target &#x27;Churn&#x27; that would not be available at prediction time (signals: deterministic_mapping). This is a heuristic and needs review.<br><span class="muted">Ask whether this value is known before the outcome occurs. If it is recorded afterwards, it inflates validation scores and the model will fail in production. Nothing has been removed.</span></td><td>yes</td></tr><tr><td><span class="sev sev-info">INFO</span></td><td><code>missing_values</code></td><td>Age</td><td>Column &#x27;Age&#x27; has 55 missing value(s) (9.2% of rows).<br><span class="muted">Decide on an imputation strategy, or confirm the values are missing by design before modelling.</span></td><td></td></tr></table>
+
+<h2>Preprocessing plan</h2>
+<table><tr><th>feature</th><th>role</th><th>action</th><th>steps</th><th>fit scope</th><th>reason</th></tr><tr><td><code>CustomerID</code></td><td>id_like</td><td>review</td><td>—</td><td>not_applicable</td><td>Held back because &#x27;CustomerID&#x27; looks like a record identifier (600 distinct values). This is a heuristic from the quality inspector; add it to force_include to use it anyway, or to confirmed_id_columns to settle the matter.</td></tr><tr><td><code>Age</code></td><td>numeric</td><td>include</td><td>median_imputation → standard_scaling</td><td>training_only</td><td>Included because &#x27;Age&#x27; is numeric; gaps are filled by median; the model requires scaling, so standard scaling is applied.<br><span class="muted">model &#x27;logistic_regression&#x27; declares requires_scaling=true</span></td></tr><tr><td><code>MonthlyCharges</code></td><td>numeric</td><td>include</td><td>median_imputation → standard_scaling</td><td>training_only</td><td>Included because &#x27;MonthlyCharges&#x27; is numeric; gaps are filled by median; the model requires scaling, so standard scaling is applied.<br><span class="muted">model &#x27;logistic_regression&#x27; declares requires_scaling=true</span></td></tr><tr><td><code>City</code></td><td>nominal</td><td>include</td><td>most_frequent_imputation → onehot_encoding</td><td>training_only</td><td>Included because &#x27;City&#x27; is a label with no inherent order with 3 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.<br><span class="muted">model &#x27;logistic_regression&#x27; declares handles_missing_values=false</span></td></tr><tr><td><code>ContractType</code></td><td>nominal</td><td>include</td><td>most_frequent_imputation → onehot_encoding</td><td>training_only</td><td>Included because &#x27;ContractType&#x27; is a label with no inherent order with 3 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.<br><span class="muted">model &#x27;logistic_regression&#x27; declares handles_missing_values=false</span></td></tr><tr><td><code>Education</code></td><td>nominal</td><td>include</td><td>most_frequent_imputation → onehot_encoding</td><td>training_only</td><td>Included because &#x27;Education&#x27; is a label with no inherent order with 3 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.<br><span class="muted">model &#x27;logistic_regression&#x27; declares handles_missing_values=false</span></td></tr><tr><td><code>IsActive</code></td><td>binary_categorical</td><td>include</td><td>most_frequent_imputation → onehot_encoding</td><td>training_only</td><td>Included because &#x27;IsActive&#x27; is a two-valued label with 2 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.<br><span class="muted">model &#x27;logistic_regression&#x27; declares handles_missing_values=false</span></td></tr><tr><td><code>HighCardinalityFeature</code></td><td>nominal</td><td>review</td><td>—</td><td>not_applicable</td><td>Held back because &#x27;HighCardinalityFeature&#x27; has 220 distinct values. One-hot encoding would add one column per value; set high_cardinality_policy=&quot;onehot&quot; to do it anyway.</td></tr><tr><td><code>Churn_Copy</code></td><td>numeric</td><td>exclude</td><td>—</td><td>not_applicable</td><td>Excluded because &#x27;Churn_Copy&#x27; was proved equal to the target in every row. Training on it would measure nothing.</td></tr></table>
+
+<h2>Feature lineage</h2>
+<table><tr><th>source</th><th>action</th><th>steps</th><th>outputs</th><th>basis</th></tr><tr><td><code>CustomerID</code></td><td>review</td><td>—</td><td>—</td><td>planned</td></tr><tr><td><code>Age</code></td><td>include</td><td>median_imputation → standard_scaling</td><td>Age</td><td>observed</td></tr><tr><td><code>MonthlyCharges</code></td><td>include</td><td>median_imputation → standard_scaling</td><td>MonthlyCharges</td><td>observed</td></tr><tr><td><code>City</code></td><td>include</td><td>most_frequent_imputation → onehot_encoding</td><td>City_Dammam, City_Jeddah, City_Riyadh</td><td>observed</td></tr><tr><td><code>ContractType</code></td><td>include</td><td>most_frequent_imputation → onehot_encoding</td><td>ContractType_annual, ContractType_monthly, ContractType_two_year</td><td>observed</td></tr><tr><td><code>Education</code></td><td>include</td><td>most_frequent_imputation → onehot_encoding</td><td>Education_primary, Education_secondary, Education_tertiary</td><td>observed</td></tr><tr><td><code>IsActive</code></td><td>include</td><td>most_frequent_imputation → onehot_encoding</td><td>IsActive_False, IsActive_True</td><td>observed</td></tr><tr><td><code>HighCardinalityFeature</code></td><td>review</td><td>—</td><td>—</td><td>planned</td></tr><tr><td><code>Churn_Copy</code></td><td>exclude</td><td>—</td><td>—</td><td>planned</td></tr></table>
+
+<h2>Model compatibility</h2>
+<p><code>logistic_regression</code> <span class="muted">(sklearn, profile <code>scaling=1,sparse=1,native_nan=0</code>)</span></p>
+<table><tr><th>backend</th><td>sklearn</td></tr><tr><th>handles_missing_values</th><td>False</td></tr><tr><th>interpretability_level</th><td>high</td></tr><tr><th>is_baseline</th><td>False</td></tr><tr><th>preprocessing_profile</th><td>scaling=1,sparse=1,native_nan=0</td></tr><tr><th>requires_scaling</th><td>True</td></tr><tr><th>supports_multiclass</th><td>True</td></tr><tr><th>supports_predict_proba</th><td>True</td></tr><tr><th>supports_sparse_input</th><td>True</td></tr><tr><th>task_type</th><td>classification</td></tr></table>
+<p class="muted">No estimator was constructed and nothing was trained. These are declared capabilities, recorded because they shaped the plan above.</p>
+
+<h2>Known limitations</h2>
+<ul><li>Leakage detection is statistical. A feature that encodes the outcome for reasons the numbers do not show will not be found here.</li><li>Only tabular supervised classification has been verified end to end. Regression, clustering, time series, text, and images are out of scope.</li><li>Datetime columns are profiled but never turned into features automatically; any calendar engineering is the analyst&#x27;s decision.</li><li>Preprocessing decisions are proposals recorded as evidence. This artifact does not prove a model was trained on the data it describes.</li><li>A dataset fingerprint identifies content, not provenance. It cannot show where the data came from or whether it was collected lawfully.</li><li>Numeric values beyond the float32 range are unsupported by several estimators and are not rejected at profiling time.</li></ul>
+
+<h2>Provenance</h2>
+<table><tr><th>created at</th><td class="mono">2025-02-01T00:00:00Z</td></tr><tr><th>aidatasetkit</th><td class="mono">0.1.0a1</td></tr><tr><th>numpy</th><td class="mono">2.5.2</td></tr><tr><th>pandas</th><td class="mono">3.0.5</td></tr><tr><th>python</th><td class="mono">3.12.3</td></tr><tr><th>scikit_learn</th><td class="mono">1.9.0</td></tr><tr><th>scipy</th><td class="mono">1.18.0</td></tr></table>
+<footer>Artifact schema 1.0. This page is rendered from the same canonical record as <code>audit.json</code>; the JSON is the artifact.</footer>
+
+</main>
+</body>
+</html>

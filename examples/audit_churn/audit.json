@@ -1,0 +1,899 @@
+{
+  "columns": [
+    {
+      "count": 600,
+      "detected_kind": "categorical",
+      "dominant_ratio": 0.0016666666666666668,
+      "dominant_value_digest": "sha256:33da28196a2df143222e8b26571ce4d3",
+      "infinite_count": 0,
+      "is_constant": false,
+      "is_high_cardinality": true,
+      "is_id_like": true,
+      "is_near_constant": false,
+      "missing_count": 0,
+      "missing_ratio": 0.0,
+      "name": {
+        "label_type": "str",
+        "name": "CustomerID"
+      },
+      "numeric": null,
+      "pandas_dtype": "str",
+      "source": "profiling",
+      "unique_count": 600,
+      "unique_ratio": 1.0
+    },
+    {
+      "count": 545,
+      "detected_kind": "numeric",
+      "dominant_ratio": 0.022018348623853212,
+      "dominant_value_digest": "sha256:4c37b87aa9a45cf0398162e8b18c3d00",
+      "infinite_count": 0,
+      "is_constant": false,
+      "is_high_cardinality": false,
+      "is_id_like": false,
+      "is_near_constant": false,
+      "missing_count": 55,
+      "missing_ratio": 0.09166666666666666,
+      "name": {
+        "label_type": "str",
+        "name": "Age"
+      },
+      "numeric": {
+        "iqr": 23.0,
+        "maximum": 68.0,
+        "mean": 44.66788990825688,
+        "median": 45.0,
+        "minimum": 22.0,
+        "q25": 33.0,
+        "q75": 56.0,
+        "std": 13.458602655143437
+      },
+      "pandas_dtype": "float64",
+      "source": "profiling",
+      "unique_count": 47,
+      "unique_ratio": 0.08623853211009175
+    },
+    {
+      "count": 600,
+      "detected_kind": "numeric",
+      "dominant_ratio": 0.013333333333333334,
+      "dominant_value_digest": "sha256:e773f0d9270c2cf882f6bafafec2de95",
+      "infinite_count": 0,
+      "is_constant": false,
+      "is_high_cardinality": false,
+      "is_id_like": false,
+      "is_near_constant": false,
+      "missing_count": 0,
+      "missing_ratio": 0.0,
+      "name": {
+        "label_type": "str",
+        "name": "MonthlyCharges"
+      },
+      "numeric": {
+        "iqr": 58.91,
+        "maximum": 142.34,
+        "mean": 84.78173333333334,
+        "median": 84.8,
+        "minimum": 30.0,
+        "q25": 54.66,
+        "q75": 113.57,
+        "std": 33.25334826671044
+      },
+      "pandas_dtype": "float64",
+      "source": "profiling",
+      "unique_count": 83,
+      "unique_ratio": 0.13833333333333334
+    },
+    {
+      "count": 600,
+      "detected_kind": "categorical",
+      "dominant_ratio": 0.3333333333333333,
+      "dominant_value_digest": "sha256:afa18044c5d5faf705b6f60ecebb1c77",
+      "infinite_count": 0,
+      "is_constant": false,
+      "is_high_cardinality": false,
+      "is_id_like": false,
+      "is_near_constant": false,
+      "missing_count": 0,
+      "missing_ratio": 0.0,
+      "name": {
+        "label_type": "str",
+        "name": "City"
+      },
+      "numeric": null,
+      "pandas_dtype": "str",
+      "source": "profiling",
+      "unique_count": 3,
+      "unique_ratio": 0.005
+    },
+    {
+      "count": 600,
+      "detected_kind": "categorical",
+      "dominant_ratio": 0.3333333333333333,
+      "dominant_value_digest": "sha256:5fa62369700f37add4e2fa20b5a5dfbf",
+      "infinite_count": 0,
+      "is_constant": false,
+      "is_high_cardinality": false,
+      "is_id_like": false,
+      "is_near_constant": false,
+      "missing_count": 0,
+      "missing_ratio": 0.0,
+      "name": {
+        "label_type": "str",
+        "name": "ContractType"
+      },
+      "numeric": null,
+      "pandas_dtype": "str",
+      "source": "profiling",
+      "unique_count": 3,
+      "unique_ratio": 0.005
+    },
+    {
+      "count": 600,
+      "detected_kind": "categorical",
+      "dominant_ratio": 0.3333333333333333,
+      "dominant_value_digest": "sha256:2bfdab50237964577c75eea969cc67d0",
+      "infinite_count": 0,
+      "is_constant": false,
+      "is_high_cardinality": false,
+      "is_id_like": false,
+      "is_near_constant": false,
+      "missing_count": 0,
+      "missing_ratio": 0.0,
+      "name": {
+        "label_type": "str",
+        "name": "Education"
+      },
+      "numeric": null,
+      "pandas_dtype": "str",
+      "source": "profiling",
+      "unique_count": 3,
+      "unique_ratio": 0.005
+    },
+    {
+      "count": 600,
+      "detected_kind": "boolean",
+      "dominant_ratio": 0.5,
+      "dominant_value_digest": "sha256:cbc78c2f695cf0a5b3b61d178907a93e",
+      "infinite_count": 0,
+      "is_constant": false,
+      "is_high_cardinality": false,
+      "is_id_like": false,
+      "is_near_constant": false,
+      "missing_count": 0,
+      "missing_ratio": 0.0,
+      "name": {
+        "label_type": "str",
+        "name": "IsActive"
+      },
+      "numeric": null,
+      "pandas_dtype": "bool",
+      "source": "profiling",
+      "unique_count": 2,
+      "unique_ratio": 0.0033333333333333335
+    },
+    {
+      "count": 600,
+      "detected_kind": "categorical",
+      "dominant_ratio": 0.005,
+      "dominant_value_digest": "sha256:789e4f9983d481afcdf43b3383b9e9c2",
+      "infinite_count": 0,
+      "is_constant": false,
+      "is_high_cardinality": true,
+      "is_id_like": false,
+      "is_near_constant": false,
+      "missing_count": 0,
+      "missing_ratio": 0.0,
+      "name": {
+        "label_type": "str",
+        "name": "HighCardinalityFeature"
+      },
+      "numeric": null,
+      "pandas_dtype": "str",
+      "source": "profiling",
+      "unique_count": 220,
+      "unique_ratio": 0.36666666666666664
+    },
+    {
+      "count": 600,
+      "detected_kind": "numeric",
+      "dominant_ratio": 0.8,
+      "dominant_value_digest": "sha256:669b4c24c93570eb1df6701e382789cb",
+      "infinite_count": 0,
+      "is_constant": false,
+      "is_high_cardinality": false,
+      "is_id_like": false,
+      "is_near_constant": false,
+      "missing_count": 0,
+      "missing_ratio": 0.0,
+      "name": {
+        "label_type": "str",
+        "name": "Churn"
+      },
+      "numeric": {
+        "iqr": 0.0,
+        "maximum": 1.0,
+        "mean": 0.2,
+        "median": 0.0,
+        "minimum": 0.0,
+        "q25": 0.0,
+        "q75": 0.0,
+        "std": 0.400333750579549
+      },
+      "pandas_dtype": "int64",
+      "source": "profiling",
+      "unique_count": 2,
+      "unique_ratio": 0.0033333333333333335
+    },
+    {
+      "count": 600,
+      "detected_kind": "numeric",
+      "dominant_ratio": 0.8,
+      "dominant_value_digest": "sha256:669b4c24c93570eb1df6701e382789cb",
+      "infinite_count": 0,
+      "is_constant": false,
+      "is_high_cardinality": false,
+      "is_id_like": false,
+      "is_near_constant": false,
+      "missing_count": 0,
+      "missing_ratio": 0.0,
+      "name": {
+        "label_type": "str",
+        "name": "Churn_Copy"
+      },
+      "numeric": {
+        "iqr": 0.0,
+        "maximum": 1.0,
+        "mean": 0.2,
+        "median": 0.0,
+        "minimum": 0.0,
+        "q25": 0.0,
+        "q75": 0.0,
+        "std": 0.400333750579549
+      },
+      "pandas_dtype": "int64",
+      "source": "profiling",
+      "unique_count": 2,
+      "unique_ratio": 0.0033333333333333335
+    }
+  ],
+  "config": {
+    "fingerprint": "178e38a3b0d6635df1495c0b226e8008d9a0dcec23fdc72c38e4a2b52edb0fe5",
+    "settings": {
+      "categorical_sentinel": "__missing__",
+      "model": "logistic_regression",
+      "preprocessing": {
+        "categorical_fill_value": "__missing__",
+        "categorical_imputation": "most_frequent",
+        "confirmed_id_columns": [],
+        "drop_exact_target_duplicates": true,
+        "explicit_mapping_unknown_value": null,
+        "explicit_mappings": {},
+        "force_exclude": [],
+        "force_include": [],
+        "high_cardinality_policy": "review",
+        "nominal_features": [],
+        "numeric_features": [],
+        "numeric_fill_value": 0.0,
+        "numeric_imputation": "median",
+        "numeric_scaler": "standard",
+        "numeric_text_policy": "review",
+        "ordinal_features": [],
+        "ordinal_orders": {},
+        "unknown_ordinal_policy": "error",
+        "unknown_ordinal_value": -1
+      },
+      "preprocessing_profile": "scaling=1,sparse=1,native_nan=0",
+      "redact_values": true,
+      "source_file": "train.csv",
+      "target": "str:Churn",
+      "task": "classification",
+      "task_hint": null
+    }
+  },
+  "dataset": {
+    "algorithm": "sha256/pandas-hash-v1",
+    "column_count": 10,
+    "columns": [
+      {
+        "label_type": "str",
+        "name": "CustomerID"
+      },
+      {
+        "label_type": "str",
+        "name": "Age"
+      },
+      {
+        "label_type": "str",
+        "name": "MonthlyCharges"
+      },
+      {
+        "label_type": "str",
+        "name": "City"
+      },
+      {
+        "label_type": "str",
+        "name": "ContractType"
+      },
+      {
+        "label_type": "str",
+        "name": "Education"
+      },
+      {
+        "label_type": "str",
+        "name": "IsActive"
+      },
+      {
+        "label_type": "str",
+        "name": "HighCardinalityFeature"
+      },
+      {
+        "label_type": "str",
+        "name": "Churn"
+      },
+      {
+        "label_type": "str",
+        "name": "Churn_Copy"
+      }
+    ],
+    "duplicate_row_count": 0,
+    "fingerprint": "8135be14ca667643b0782e42924942e87a659b27c519e72b01dacb57f1b16ec2",
+    "name": "train.csv",
+    "row_count": 600,
+    "schema_fingerprint": "0eea20c4ff0ce51284984518bd45bc7c1014991c2e48a8e431b7bde9deebe156",
+    "total_missing_count": 55
+  },
+  "decisions": [
+    {
+      "action": "review",
+      "details": {
+        "unique_values": 600
+      },
+      "feature": {
+        "label_type": "str",
+        "name": "CustomerID"
+      },
+      "fit_scope": "not_applicable",
+      "input_kind": "categorical",
+      "model_requirement": null,
+      "outputs": [],
+      "reason": "Held back because 'CustomerID' looks like a record identifier (600 distinct values). This is a heuristic from the quality inspector; add it to force_include to use it anyway, or to confirmed_id_columns to settle the matter.",
+      "reason_code": "possible_id_like",
+      "requires_review": true,
+      "role": "id_like",
+      "source": "preprocessing",
+      "steps": []
+    },
+    {
+      "action": "include",
+      "details": {
+        "handles_missing_values": false,
+        "is_near_constant": false,
+        "missing_count": 55,
+        "requires_scaling": true
+      },
+      "feature": {
+        "label_type": "str",
+        "name": "Age"
+      },
+      "fit_scope": "training_only",
+      "input_kind": "numeric",
+      "model_requirement": "model 'logistic_regression' declares requires_scaling=true",
+      "outputs": [],
+      "reason": "Included because 'Age' is numeric; gaps are filled by median; the model requires scaling, so standard scaling is applied.",
+      "reason_code": "numeric_feature",
+      "requires_review": false,
+      "role": "numeric",
+      "source": "preprocessing",
+      "steps": [
+        "median_imputation",
+        "standard_scaling"
+      ]
+    },
+    {
+      "action": "include",
+      "details": {
+        "handles_missing_values": false,
+        "is_near_constant": false,
+        "missing_count": 0,
+        "requires_scaling": true
+      },
+      "feature": {
+        "label_type": "str",
+        "name": "MonthlyCharges"
+      },
+      "fit_scope": "training_only",
+      "input_kind": "numeric",
+      "model_requirement": "model 'logistic_regression' declares requires_scaling=true",
+      "outputs": [],
+      "reason": "Included because 'MonthlyCharges' is numeric; gaps are filled by median; the model requires scaling, so standard scaling is applied.",
+      "reason_code": "numeric_feature",
+      "requires_review": false,
+      "role": "numeric",
+      "source": "preprocessing",
+      "steps": [
+        "median_imputation",
+        "standard_scaling"
+      ]
+    },
+    {
+      "action": "include",
+      "details": {
+        "cardinality": 3,
+        "missing_count": 0,
+        "sparse_output": true
+      },
+      "feature": {
+        "label_type": "str",
+        "name": "City"
+      },
+      "fit_scope": "training_only",
+      "input_kind": "categorical",
+      "model_requirement": "model 'logistic_regression' declares handles_missing_values=false",
+      "outputs": [],
+      "reason": "Included because 'City' is a label with no inherent order with 3 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
+      "reason_code": "nominal_feature",
+      "requires_review": false,
+      "role": "nominal",
+      "source": "preprocessing",
+      "steps": [
+        "most_frequent_imputation",
+        "onehot_encoding"
+      ]
+    },
+    {
+      "action": "include",
+      "details": {
+        "cardinality": 3,
+        "missing_count": 0,
+        "sparse_output": true
+      },
+      "feature": {
+        "label_type": "str",
+        "name": "ContractType"
+      },
+      "fit_scope": "training_only",
+      "input_kind": "categorical",
+      "model_requirement": "model 'logistic_regression' declares handles_missing_values=false",
+      "outputs": [],
+      "reason": "Included because 'ContractType' is a label with no inherent order with 3 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
+      "reason_code": "nominal_feature",
+      "requires_review": false,
+      "role": "nominal",
+      "source": "preprocessing",
+      "steps": [
+        "most_frequent_imputation",
+        "onehot_encoding"
+      ]
+    },
+    {
+      "action": "include",
+      "details": {
+        "cardinality": 3,
+        "missing_count": 0,
+        "sparse_output": true
+      },
+      "feature": {
+        "label_type": "str",
+        "name": "Education"
+      },
+      "fit_scope": "training_only",
+      "input_kind": "categorical",
+      "model_requirement": "model 'logistic_regression' declares handles_missing_values=false",
+      "outputs": [],
+      "reason": "Included because 'Education' is a label with no inherent order with 3 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
+      "reason_code": "nominal_feature",
+      "requires_review": false,
+      "role": "nominal",
+      "source": "preprocessing",
+      "steps": [
+        "most_frequent_imputation",
+        "onehot_encoding"
+      ]
+    },
+    {
+      "action": "include",
+      "details": {
+        "cardinality": 2,
+        "missing_count": 0,
+        "sparse_output": true
+      },
+      "feature": {
+        "label_type": "str",
+        "name": "IsActive"
+      },
+      "fit_scope": "training_only",
+      "input_kind": "boolean",
+      "model_requirement": "model 'logistic_regression' declares handles_missing_values=false",
+      "outputs": [],
+      "reason": "Included because 'IsActive' is a two-valued label with 2 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
+      "reason_code": "binary_categorical",
+      "requires_review": false,
+      "role": "binary_categorical",
+      "source": "preprocessing",
+      "steps": [
+        "most_frequent_imputation",
+        "onehot_encoding"
+      ]
+    },
+    {
+      "action": "review",
+      "details": {
+        "cardinality": 220
+      },
+      "feature": {
+        "label_type": "str",
+        "name": "HighCardinalityFeature"
+      },
+      "fit_scope": "not_applicable",
+      "input_kind": "categorical",
+      "model_requirement": null,
+      "outputs": [],
+      "reason": "Held back because 'HighCardinalityFeature' has 220 distinct values. One-hot encoding would add one column per value; set high_cardinality_policy=\"onehot\" to do it anyway.",
+      "reason_code": "high_cardinality",
+      "requires_review": true,
+      "role": "nominal",
+      "source": "preprocessing",
+      "steps": []
+    },
+    {
+      "action": "exclude",
+      "details": {},
+      "feature": {
+        "label_type": "str",
+        "name": "Churn_Copy"
+      },
+      "fit_scope": "not_applicable",
+      "input_kind": "numeric",
+      "model_requirement": null,
+      "outputs": [],
+      "reason": "Excluded because 'Churn_Copy' was proved equal to the target in every row. Training on it would measure nothing.",
+      "reason_code": "target_leakage_exact_duplicate",
+      "requires_review": false,
+      "role": "numeric",
+      "source": "preprocessing",
+      "steps": []
+    }
+  ],
+  "findings": [
+    {
+      "code": "missing_values",
+      "column": {
+        "label_type": "str",
+        "name": "Age"
+      },
+      "details": {
+        "missing_count": 55,
+        "missing_ratio": 0.09166666666666666,
+        "threshold": 0.2
+      },
+      "message": "Column 'Age' has 55 missing value(s) (9.2% of rows).",
+      "recommendation": "Decide on an imputation strategy, or confirm the values are missing by design before modelling.",
+      "requires_review": false,
+      "severity": "info",
+      "source": "quality"
+    },
+    {
+      "code": "high_cardinality",
+      "column": {
+        "label_type": "str",
+        "name": "CustomerID"
+      },
+      "details": {
+        "also_id_like": true,
+        "threshold": 50,
+        "unique_count": 600,
+        "unique_ratio": 1.0
+      },
+      "message": "Column 'CustomerID' has 600 distinct values, above the configured threshold of 50.",
+      "recommendation": "One-hot encoding would add one column per distinct value. Consider grouping rare categories or a different encoding.",
+      "requires_review": false,
+      "severity": "warning",
+      "source": "quality"
+    },
+    {
+      "code": "high_cardinality",
+      "column": {
+        "label_type": "str",
+        "name": "HighCardinalityFeature"
+      },
+      "details": {
+        "also_id_like": false,
+        "threshold": 50,
+        "unique_count": 220,
+        "unique_ratio": 0.36666666666666664
+      },
+      "message": "Column 'HighCardinalityFeature' has 220 distinct values, above the configured threshold of 50.",
+      "recommendation": "One-hot encoding would add one column per distinct value. Consider grouping rare categories or a different encoding.",
+      "requires_review": false,
+      "severity": "warning",
+      "source": "quality"
+    },
+    {
+      "code": "possible_id_like",
+      "column": {
+        "label_type": "str",
+        "name": "CustomerID"
+      },
+      "details": {
+        "detected_kind": "categorical",
+        "threshold": 0.95,
+        "unique_count": 600,
+        "unique_ratio": 1.0
+      },
+      "message": "Column 'CustomerID' may be a record identifier: 100.0% of its values are distinct and its name or value structure resembles an identifier. This is a heuristic and needs review.",
+      "recommendation": "An identifier used as a feature lets a model memorise rows. If this is an identifier, declare it as the id column rather than a feature.",
+      "requires_review": true,
+      "severity": "warning",
+      "source": "quality"
+    },
+    {
+      "code": "possible_target_leakage",
+      "column": {
+        "label_type": "str",
+        "name": "HighCardinalityFeature"
+      },
+      "details": {
+        "distinct_feature_values": 220,
+        "signals": [
+          "deterministic_mapping"
+        ],
+        "target": "Churn"
+      },
+      "message": "Column 'HighCardinalityFeature' may contain information about the target 'Churn' that would not be available at prediction time (signals: deterministic_mapping). This is a heuristic and needs review.",
+      "recommendation": "Ask whether this value is known before the outcome occurs. If it is recorded afterwards, it inflates validation scores and the model will fail in production. Nothing has been removed.",
+      "requires_review": true,
+      "severity": "warning",
+      "source": "quality"
+    },
+    {
+      "code": "target_leakage_exact_duplicate",
+      "column": {
+        "label_type": "str",
+        "name": "Churn_Copy"
+      },
+      "details": {
+        "target": "Churn"
+      },
+      "message": "Column 'Churn_Copy' is exactly equal to the target 'Churn' in every row. Training on it would measure nothing.",
+      "recommendation": "Remove this column from the feature set yourself, or confirm it is a duplicate export of the label.",
+      "requires_review": false,
+      "severity": "error",
+      "source": "quality"
+    }
+  ],
+  "known_limitations": [
+    "Leakage detection is statistical. A feature that encodes the outcome for reasons the numbers do not show will not be found here.",
+    "Only tabular supervised classification has been verified end to end. Regression, clustering, time series, text, and images are out of scope.",
+    "Datetime columns are profiled but never turned into features automatically; any calendar engineering is the analyst's decision.",
+    "Preprocessing decisions are proposals recorded as evidence. This artifact does not prove a model was trained on the data it describes.",
+    "A dataset fingerprint identifies content, not provenance. It cannot show where the data came from or whether it was collected lawfully.",
+    "Numeric values beyond the float32 range are unsupported by several estimators and are not rejected at profiling time."
+  ],
+  "lineage": [
+    {
+      "action": "review",
+      "fit_scope": "not_applicable",
+      "observed": false,
+      "outputs": [],
+      "reason": "Held back because 'CustomerID' looks like a record identifier (600 distinct values). This is a heuristic from the quality inspector; add it to force_include to use it anyway, or to confirmed_id_columns to settle the matter.",
+      "source": {
+        "label_type": "str",
+        "name": "CustomerID"
+      },
+      "source_kind": "id_like",
+      "steps": []
+    },
+    {
+      "action": "include",
+      "fit_scope": "training_only",
+      "observed": true,
+      "outputs": [
+        "Age"
+      ],
+      "reason": "Included because 'Age' is numeric; gaps are filled by median; the model requires scaling, so standard scaling is applied.",
+      "source": {
+        "label_type": "str",
+        "name": "Age"
+      },
+      "source_kind": "numeric",
+      "steps": [
+        "median_imputation",
+        "standard_scaling"
+      ]
+    },
+    {
+      "action": "include",
+      "fit_scope": "training_only",
+      "observed": true,
+      "outputs": [
+        "MonthlyCharges"
+      ],
+      "reason": "Included because 'MonthlyCharges' is numeric; gaps are filled by median; the model requires scaling, so standard scaling is applied.",
+      "source": {
+        "label_type": "str",
+        "name": "MonthlyCharges"
+      },
+      "source_kind": "numeric",
+      "steps": [
+        "median_imputation",
+        "standard_scaling"
+      ]
+    },
+    {
+      "action": "include",
+      "fit_scope": "training_only",
+      "observed": true,
+      "outputs": [
+        "City_Dammam",
+        "City_Jeddah",
+        "City_Riyadh"
+      ],
+      "reason": "Included because 'City' is a label with no inherent order with 3 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
+      "source": {
+        "label_type": "str",
+        "name": "City"
+      },
+      "source_kind": "nominal",
+      "steps": [
+        "most_frequent_imputation",
+        "onehot_encoding"
+      ]
+    },
+    {
+      "action": "include",
+      "fit_scope": "training_only",
+      "observed": true,
+      "outputs": [
+        "ContractType_annual",
+        "ContractType_monthly",
+        "ContractType_two_year"
+      ],
+      "reason": "Included because 'ContractType' is a label with no inherent order with 3 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
+      "source": {
+        "label_type": "str",
+        "name": "ContractType"
+      },
+      "source_kind": "nominal",
+      "steps": [
+        "most_frequent_imputation",
+        "onehot_encoding"
+      ]
+    },
+    {
+      "action": "include",
+      "fit_scope": "training_only",
+      "observed": true,
+      "outputs": [
+        "Education_primary",
+        "Education_secondary",
+        "Education_tertiary"
+      ],
+      "reason": "Included because 'Education' is a label with no inherent order with 3 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
+      "source": {
+        "label_type": "str",
+        "name": "Education"
+      },
+      "source_kind": "nominal",
+      "steps": [
+        "most_frequent_imputation",
+        "onehot_encoding"
+      ]
+    },
+    {
+      "action": "include",
+      "fit_scope": "training_only",
+      "observed": true,
+      "outputs": [
+        "IsActive_False",
+        "IsActive_True"
+      ],
+      "reason": "Included because 'IsActive' is a two-valued label with 2 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
+      "source": {
+        "label_type": "str",
+        "name": "IsActive"
+      },
+      "source_kind": "binary_categorical",
+      "steps": [
+        "most_frequent_imputation",
+        "onehot_encoding"
+      ]
+    },
+    {
+      "action": "review",
+      "fit_scope": "not_applicable",
+      "observed": false,
+      "outputs": [],
+      "reason": "Held back because 'HighCardinalityFeature' has 220 distinct values. One-hot encoding would add one column per value; set high_cardinality_policy=\"onehot\" to do it anyway.",
+      "source": {
+        "label_type": "str",
+        "name": "HighCardinalityFeature"
+      },
+      "source_kind": "nominal",
+      "steps": []
+    },
+    {
+      "action": "exclude",
+      "fit_scope": "not_applicable",
+      "observed": false,
+      "outputs": [],
+      "reason": "Excluded because 'Churn_Copy' was proved equal to the target in every row. Training on it would measure nothing.",
+      "source": {
+        "label_type": "str",
+        "name": "Churn_Copy"
+      },
+      "source_kind": "numeric",
+      "steps": []
+    }
+  ],
+  "model": {
+    "aliases": [
+      "logistic",
+      "logreg"
+    ],
+    "backend": "sklearn",
+    "canonical_name": "logistic_regression",
+    "capabilities": {
+      "backend": "sklearn",
+      "handles_missing_values": false,
+      "interpretability_level": "high",
+      "is_baseline": false,
+      "preprocessing_profile": "scaling=1,sparse=1,native_nan=0",
+      "requires_scaling": true,
+      "supports_multiclass": true,
+      "supports_predict_proba": true,
+      "supports_sparse_input": true,
+      "task_type": "classification"
+    },
+    "default_params": {
+      "max_iter": 1000,
+      "random_state": 42
+    },
+    "preprocessing_profile": "scaling=1,sparse=1,native_nan=0",
+    "source": "model_capabilities",
+    "task_type": "classification"
+  },
+  "plan_fingerprint": "90b978c9c9dc745a9a9d0d0f8f0143ca",
+  "provenance": {
+    "created_at": "2025-02-01T00:00:00Z",
+    "environment": {
+      "aidatasetkit": "0.1.0a1",
+      "numpy": "2.5.2",
+      "pandas": "3.0.5",
+      "python": "3.12.3",
+      "scikit_learn": "1.9.0",
+      "scipy": "1.18.0"
+    },
+    "semantic_fingerprint": "a16e92a5d21b5cef18cff588089dc71a3a9fab997bdc59165da9d50c46475412"
+  },
+  "schema_version": "1.0",
+  "stage": "prepared",
+  "target": {
+    "class_counts": {
+      "0": 480,
+      "1": 120
+    },
+    "class_labels": [
+      "0",
+      "1"
+    ],
+    "detection_note": "numeric target with exactly two values; positive label 1 by the 0/1 convention",
+    "imbalance_ratio": 4.0,
+    "is_binary": true,
+    "missing_count": 0,
+    "n_classes": 2,
+    "name": {
+      "label_type": "str",
+      "name": "Churn"
+    },
+    "positive_label": "1",
+    "positive_label_resolved": true,
+    "source": "task_detection",
+    "task_type": "classification"
+  },
+  "verdict": "blocked",
+  "verdict_reasons": [
+    "error finding target_leakage_exact_duplicate on Churn_Copy"
+  ],
+  "warnings": []
+}

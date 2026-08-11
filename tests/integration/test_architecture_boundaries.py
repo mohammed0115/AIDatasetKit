@@ -46,9 +46,13 @@ LAYERS: dict[str, int] = {
     "preprocessing": 3,
     "models": 3,
     "visualization": 3,
+    # Evidence reads every layer below it and is read by none of them. That is
+    # what lets an audit record be reshaped without touching a measurement.
+    "evidence": 4,
     "training": 4,
     "evaluation": 4,
     "prediction": 4,
+    "cli": 6,
     "facade": 5,
 }
 
@@ -68,6 +72,21 @@ FORBIDDEN_PAIRS: frozenset[tuple[str, str]] = frozenset(
         # visualization layer knows nothing about models or preprocessing.
         ("visualization", "models"),
         ("visualization", "preprocessing"),
+        # Evidence aggregates; nothing may depend on it. A measurement layer that
+        # imported the audit record could not be changed without changing the
+        # record's format, which is the cycle this whole layer exists to avoid.
+        ("core", "evidence"),
+        ("statistics", "evidence"),
+        ("profiling", "evidence"),
+        ("preprocessing", "evidence"),
+        ("models", "evidence"),
+        ("visualization", "evidence"),
+        # The CLI orchestrates. Nothing imports it.
+        ("core", "cli"),
+        ("profiling", "cli"),
+        ("preprocessing", "cli"),
+        ("models", "cli"),
+        ("evidence", "cli"),
         ("models", "visualization"),
         ("preprocessing", "visualization"),
     }

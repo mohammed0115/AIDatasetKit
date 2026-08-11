@@ -4,20 +4,36 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aidatasetkit"
-version = "0.1.0.dev0"
-description = "A toolkit that takes tabular data from raw frame to model-ready: profiling, statistics, quality checks, capability-driven preprocessing, and model comparison."
+version = "0.1.0a1"
+description = "Prove what happened between your data and your model: profiling, quality and leakage checks, capability-driven preprocessing, and a signed-off audit artifact."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
 authors = [{ name = "Mohamed" }]
-keywords = ["data-analysis", "statistics", "profiling", "data-quality", "machine-learning"]
+keywords = [
+    "data-quality",
+    "data-audit",
+    "ml-safety",
+    "provenance",
+    "data-lineage",
+    "profiling",
+    "machine-learning",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Software Development :: Quality Assurance",
+    "Typing :: Typed",
 ]
+
+# The project has declared MIT since its first commit. That declaration is left
+# exactly as it was found: changing it would be a legal decision, and so would
+# removing it. It is not yet backed by a LICENSE file, which is recorded as a
+# release blocker in README.md for the owner to resolve before publication.
+license = { text = "MIT" }
 
 dependencies = [
     "numpy>=1.26",
@@ -33,6 +49,9 @@ boosting = ["xgboost>=2.0", "lightgbm>=4.0", "catboost>=1.2"]
 viz = ["matplotlib>=3.9"]
 dev = ["pytest>=8.0"]
 all = ["aidatasetkit[boosting,viz,dev]"]
+
+[project.scripts]
+aidatasetkit = "aidatasetkit.cli.main:main"
 
 [tool.setuptools.packages.find]
 include = ["aidatasetkit*"]

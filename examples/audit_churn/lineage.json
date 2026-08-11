@@ -1,0 +1,161 @@
+{
+  "dataset_fingerprint": "8135be14ca667643b0782e42924942e87a659b27c519e72b01dacb57f1b16ec2",
+  "features": [
+    {
+      "action": "review",
+      "fit_scope": "not_applicable",
+      "observed": false,
+      "outputs": [],
+      "reason": "Held back because 'CustomerID' looks like a record identifier (600 distinct values). This is a heuristic from the quality inspector; add it to force_include to use it anyway, or to confirmed_id_columns to settle the matter.",
+      "source": {
+        "label_type": "str",
+        "name": "CustomerID"
+      },
+      "source_kind": "id_like",
+      "steps": []
+    },
+    {
+      "action": "include",
+      "fit_scope": "training_only",
+      "observed": true,
+      "outputs": [
+        "Age"
+      ],
+      "reason": "Included because 'Age' is numeric; gaps are filled by median; the model requires scaling, so standard scaling is applied.",
+      "source": {
+        "label_type": "str",
+        "name": "Age"
+      },
+      "source_kind": "numeric",
+      "steps": [
+        "median_imputation",
+        "standard_scaling"
+      ]
+    },
+    {
+      "action": "include",
+      "fit_scope": "training_only",
+      "observed": true,
+      "outputs": [
+        "MonthlyCharges"
+      ],
+      "reason": "Included because 'MonthlyCharges' is numeric; gaps are filled by median; the model requires scaling, so standard scaling is applied.",
+      "source": {
+        "label_type": "str",
+        "name": "MonthlyCharges"
+      },
+      "source_kind": "numeric",
+      "steps": [
+        "median_imputation",
+        "standard_scaling"
+      ]
+    },
+    {
+      "action": "include",
+      "fit_scope": "training_only",
+      "observed": true,
+      "outputs": [
+        "City_Dammam",
+        "City_Jeddah",
+        "City_Riyadh"
+      ],
+      "reason": "Included because 'City' is a label with no inherent order with 3 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
+      "source": {
+        "label_type": "str",
+        "name": "City"
+      },
+      "source_kind": "nominal",
+      "steps": [
+        "most_frequent_imputation",
+        "onehot_encoding"
+      ]
+    },
+    {
+      "action": "include",
+      "fit_scope": "training_only",
+      "observed": true,
+      "outputs": [
+        "ContractType_annual",
+        "ContractType_monthly",
+        "ContractType_two_year"
+      ],
+      "reason": "Included because 'ContractType' is a label with no inherent order with 3 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
+      "source": {
+        "label_type": "str",
+        "name": "ContractType"
+      },
+      "source_kind": "nominal",
+      "steps": [
+        "most_frequent_imputation",
+        "onehot_encoding"
+      ]
+    },
+    {
+      "action": "include",
+      "fit_scope": "training_only",
+      "observed": true,
+      "outputs": [
+        "Education_primary",
+        "Education_secondary",
+        "Education_tertiary"
+      ],
+      "reason": "Included because 'Education' is a label with no inherent order with 3 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
+      "source": {
+        "label_type": "str",
+        "name": "Education"
+      },
+      "source_kind": "nominal",
+      "steps": [
+        "most_frequent_imputation",
+        "onehot_encoding"
+      ]
+    },
+    {
+      "action": "include",
+      "fit_scope": "training_only",
+      "observed": true,
+      "outputs": [
+        "IsActive_False",
+        "IsActive_True"
+      ],
+      "reason": "Included because 'IsActive' is a two-valued label with 2 distinct values; gaps are filled with the most frequent value, then one-hot encoding, which leaves an unseen category as all zeros rather than failing.",
+      "source": {
+        "label_type": "str",
+        "name": "IsActive"
+      },
+      "source_kind": "binary_categorical",
+      "steps": [
+        "most_frequent_imputation",
+        "onehot_encoding"
+      ]
+    },
+    {
+      "action": "review",
+      "fit_scope": "not_applicable",
+      "observed": false,
+      "outputs": [],
+      "reason": "Held back because 'HighCardinalityFeature' has 220 distinct values. One-hot encoding would add one column per value; set high_cardinality_policy=\"onehot\" to do it anyway.",
+      "source": {
+        "label_type": "str",
+        "name": "HighCardinalityFeature"
+      },
+      "source_kind": "nominal",
+      "steps": []
+    },
+    {
+      "action": "exclude",
+      "fit_scope": "not_applicable",
+      "observed": false,
+      "outputs": [],
+      "reason": "Excluded because 'Churn_Copy' was proved equal to the target in every row. Training on it would measure nothing.",
+      "source": {
+        "label_type": "str",
+        "name": "Churn_Copy"
+      },
+      "source_kind": "numeric",
+      "steps": []
+    }
+  ],
+  "schema_version": "1.0",
+  "stage": "prepared"
+}
