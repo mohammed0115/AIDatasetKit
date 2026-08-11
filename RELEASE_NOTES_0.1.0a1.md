@@ -99,6 +99,12 @@ information: it contains column names, class labels, numeric minima and maxima,
 one-hot category names, and any ordering you supplied. `docs/privacy.md` lists
 all of it precisely. Read that before publishing one.
 
+## License
+
+Apache License 2.0 (`Apache-2.0`). The full text is in `LICENSE`; the decision
+record is `docs/LICENSE_DECISION.md`. No `NOTICE` file is required: this package
+declares its dependencies rather than vendoring any third-party code.
+
 ## Reporting bugs
 
 Open an issue with: the command you ran, the terminal output, and — if you can

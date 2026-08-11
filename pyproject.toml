@@ -29,11 +29,10 @@ classifiers = [
     "Typing :: Typed",
 ]
 
-# The project has declared MIT since its first commit. That declaration is left
-# exactly as it was found: changing it would be a legal decision, and so would
-# removing it. It is not yet backed by a LICENSE file, which is recorded as a
-# release blocker in README.md for the owner to resolve before publication.
-license = { text = "MIT" }
+# Apache-2.0, chosen by the repository owner. The SPDX-string form (PEP 639)
+# rather than the TOML table setuptools has scheduled for removal in 2027.
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 
 dependencies = [
     "numpy>=1.26",

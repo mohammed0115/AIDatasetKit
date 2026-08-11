@@ -1,130 +1,86 @@
-# License decision — required before release
+# Decision record — project license
 
-**This is the only blocker holding `0.1.0a1`.**
+| | |
+|---|---|
+| **Decision** | Apache License 2.0 (SPDX: `Apache-2.0`) |
+| **Status** | Accepted |
+| **Date** | 2026-08-11 |
+| **Decided by** | Repository owner |
+| **Scope** | The AIDatasetKit open-source repository and published package |
 
-## Current state
+## The decision
 
-`pyproject.toml` has declared `license = { text = "MIT" }` since the first
-commit (`559d085`). There is **no `LICENSE` file** in the repository.
+AIDatasetKit is licensed under the Apache License, Version 2.0. The repository
+root carries the official, unmodified licence text in `LICENSE`, and
+`pyproject.toml` declares it as:
 
-**The declaration also uses a form setuptools has deprecated.** Building today
-emits:
+```toml
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+```
+
+This closes the only blocker that stood between the `0.1.0a1` preparation work
+and an owner-authorised release.
+
+## What was decided against
+
+**MIT.** `pyproject.toml` declared `license = { text = "MIT" }` from the first
+commit (`559d085`) through `bd5e254`, and no `LICENSE` file ever accompanied it.
+That declaration was left untouched by every stage of automated work, because
+choosing a licence — and removing one — are decisions for the owner. The owner
+chose Apache-2.0 instead, and the MIT declaration was removed as part of applying
+that choice.
+
+**Declaring nothing.** A package with no declared licence is "all rights
+reserved", which is a clear position but not the one wanted for an open-source
+release.
+
+## Why the spelling matters
+
+The old declaration used a form setuptools has deprecated:
 
 > `SetuptoolsDeprecationWarning: project.license as a TOML table is deprecated.`
 > Please use a simple string containing a SPDX expression. **By 2027-Feb-18 you
 > need to update your project.**
 
-That is a second, independent reason to touch this field — but it is still not a
-reason for a tool to touch it unasked, because the modern form requires naming
-the licence, which is the decision itself. Both options below use the current
-(PEP 639) spelling.
+The new declaration uses the PEP 639 SPDX string, so the metadata is correct
+today and will still build after that date. `python -m build` no longer emits
+that warning.
 
-That combination is not a neutral state. A package index will display "MIT" from
-the metadata while the repository contains no licence text, which is worse than
-either choosing one or declaring none: a user reading the metadata believes they
-have permission that the repository does not grant in writing.
+One consequence is worth recording, because the first attempt at this change hit
+it: with an SPDX expression, the old `License :: OSI Approved :: ...` trove
+classifier is no longer optional-but-harmless — setuptools **refuses to build**
+while both are present:
 
-Neither the declaration nor its absence was changed by any automated work.
-Choosing a licence and removing one are both legal decisions, and both belong to
-the owner.
+> `InvalidConfigError: License classifiers have been superseded by license
+> expressions (see PEP 639). Please remove: License :: OSI Approved :: Apache
+> Software License`
 
-## Option A — MIT
+So the classifier list carries no licence entry. The expression is the single
+declaration.
 
-Consistent with what the metadata has always said. Permissive: anyone may use,
-modify, and redistribute, including commercially, provided the notice travels
-with the code. No patent grant.
+## NOTICE
 
-**Changes required:**
+**Not required by the current repository contents.** Apache-2.0 requires a
+`NOTICE` file only when one is inherited from redistributed third-party material.
+This repository vendors nothing: numpy, pandas, scipy, and scikit-learn are
+*declared* dependencies installed from their own distributions, not copied into
+this package. No file in `aidatasetkit/` carries a third-party copyright or SPDX
+header.
 
-1. Add `LICENSE` containing the official MIT text, with the copyright line
-   completed:
+If third-party code is ever vendored, that changes and a `NOTICE` becomes
+required.
 
-   ```
-   MIT License
+## Copyright holder
 
-   Copyright (c) 2026 <COPYRIGHT HOLDER>
+The `LICENSE` appendix retains the standard placeholders
+(`Copyright [yyyy] [name of copyright owner]`). No copyright holder, legal
+entity, or year was invented, because none is established anywhere in the
+repository's metadata. Filling those in is a separate owner decision, and
+Apache-2.0 does not require it for the licence to apply.
 
-   Permission is hereby granted, free of charge, to any person obtaining a copy
-   ... (the unmodified OSI text)
-   ```
+## History
 
-2. `pyproject.toml` — move to the non-deprecated SPDX form:
-
-   ```diff
-   -license = { text = "MIT" }
-   +license = "MIT"
-   +license-files = ["LICENSE"]
-   ```
-
-   The meaning is unchanged; only the spelling is, and the current spelling is on
-   a removal schedule.
-
-3. Optionally add the trove classifier:
-
-   ```toml
-   classifiers = [
-       ...,
-       "License :: OSI Approved :: MIT License",
-   ]
-   ```
-
-4. `MANIFEST.in` — no change; `LICENSE` is included in both distributions
-   automatically by setuptools.
-
-5. Both distributions must be rebuilt afterwards, and `python -m build` should
-   then emit no `SetuptoolsDeprecationWarning`. That is the check that the change
-   landed.
-
-## Option B — Apache-2.0
-
-Also permissive, and additionally grants patent rights and terminates them for a
-party that starts patent litigation. Usually preferred where contributors or
-users may hold patents.
-
-**Changes required:**
-
-1. Add `LICENSE` containing the full, unmodified Apache License 2.0 text.
-
-2. `pyproject.toml` — change the declaration, using the non-deprecated form:
-
-   ```diff
-   -license = { text = "MIT" }
-   +license = "Apache-2.0"
-   +license-files = ["LICENSE"]
-   ```
-
-3. Optionally add the trove classifier:
-
-   ```toml
-   "License :: OSI Approved :: Apache Software License",
-   ```
-
-4. A `NOTICE` file is required **only if** the project distributes third-party
-   material that carries its own NOTICE. It does not today: the runtime
-   dependencies (numpy, pandas, scipy, scikit-learn) are declared, not vendored.
-   So no `NOTICE` is needed unless that changes.
-
-5. Apache-2.0 conventionally adds a short header to each source file. That is a
-   separate mechanical change across roughly forty files and is not included in
-   the diff above.
-
-## Option C — something else, or nothing yet
-
-If the owner wants a different licence, or wants to keep the code private for
-now, the honest interim step is to **remove the MIT declaration** rather than
-leave metadata asserting a grant that no file makes:
-
-```diff
--license = { text = "MIT" }
-```
-
-Note that this option also silences the deprecation warning, since the field
-disappears entirely.
-
-A package with no declared licence is legally "all rights reserved", which is a
-clear position. A package declaring MIT with no licence text is an unclear one.
-
-## Recommendation
-
-None. This is the one decision in this project that an automated process should
-not make, and the reason it is written down rather than acted on.
+This document previously recorded the decision as *pending*, and set out the
+exact change each option would need. That content is superseded by the decision
+above and is preserved in git history at `bd5e254` and earlier.

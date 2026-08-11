@@ -55,11 +55,10 @@ First public alpha. Everything below is new, because nothing was public before.
 Interfaces and the artifact schema may change before `1.0`. The artifact carries
 `schema_version` so a future release can recognise and migrate an older file.
 
-### Release blocker
+### License
 
-- No `LICENSE` file exists, while `pyproject.toml` declares MIT. See
-  `docs/LICENSE_DECISION.md`. This release cannot be published until the owner
-  resolves it.
+- Apache License 2.0 (`Apache-2.0`), chosen by the repository owner and applied
+  in the metadata and in `LICENSE`. See `docs/LICENSE_DECISION.md`.
 
 ### Known limitations
 

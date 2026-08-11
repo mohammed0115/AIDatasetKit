@@ -217,17 +217,10 @@ for code-scanning integrations.
 
 What ships next is shaped by what alpha users report, not by this list's order.
 
-## Release blockers
+## License
 
-**This alpha is not ready to publish.** One item is outstanding:
-
-- **LICENSE DECISION REQUIRED.** `pyproject.toml` has declared MIT since the
-  first commit, but there is no `LICENSE` file in the repository. A package index
-  would show "MIT" from the metadata while the repository grants nothing in
-  writing — worse than either choosing a licence or declaring none. The
-  declaration was left exactly as found: choosing one, and removing one, are both
-  decisions for the owner. `docs/LICENSE_DECISION.md` sets out the exact change
-  each option needs.
+AIDatasetKit is licensed under the Apache License 2.0. See `LICENSE` for the
+full text, and `docs/LICENSE_DECISION.md` for the decision record.
 
 ## Documentation
 
@@ -247,7 +240,7 @@ Read `docs/privacy.md` before sharing an artifact outside your team.
 
 ## Status
 
-Public alpha (`0.1.0a1`). The artifact schema is versioned independently of the
+Public alpha (`0.1.0a1`), Apache-2.0 licensed. The artifact schema is versioned independently of the
 package (`1.0`) so that stored artifacts stay readable as the library changes.
 Interfaces may still move. Feedback on the audit artifact — what is missing, what
 is unclear, what you would want to fail a build on — is the most useful thing you
