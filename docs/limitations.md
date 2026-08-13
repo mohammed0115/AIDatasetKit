@@ -7,10 +7,42 @@ page. If two documents ever disagree, this one is right.
 
 ## Scope
 
-**Only tabular supervised classification has been verified end to end.**
-Regression, clustering, anomaly detection, dimensionality reduction, time series,
-text, and images are out of scope for this alpha. Some of the machinery would
-appear to work on them; none of it has been verified for them.
+**Only the classification readiness verdict has been verified end to end.**
+Anomaly detection, dimensionality reduction, time series, text, and images are
+out of scope. Some of the machinery would appear to work on them; none of it has
+been verified for them.
+
+**Regression is verified at the model layer, not at the verdict.** The nine
+regressors are held to the same executed capability contracts as the classifiers,
+and they reach preprocessing through the same capability triple — the same
+registry, the same factory, the same plan. What has *not* been verified for a
+regression target is the readiness verdict itself: its thresholds, and the
+leakage checks behind it, were built and measured against classification targets.
+Class-imbalance reporting correctly does not apply to a continuous target; the
+association-based leakage signal has not been re-measured for one. An audit of a
+regression target records this in its own warnings.
+
+**Clustering is verified at the model layer, and its metrics are in-sample.** The
+six clusterers are held to the same executed capability contracts and reach
+preprocessing through the same capability triple. Three limitations are specific
+to them and none is a defect to be fixed later:
+
+- **The metrics score the rows the model was fitted on.** There is no target for
+  a score to be inflated by and the three metrics are internal, so this is not
+  the leakage the supervised layers refuse — but it does mean a silhouette
+  describes *this* partition and is not evidence that it will reproduce on new
+  data.
+- **No default ranking metric exists, deliberately.** All three internal metrics
+  reward compact convex clusters, and all three were measured preferring a wrong
+  partition to a correct one on non-convex data. A comparison reports the three
+  and orders by none.
+- **Half the catalogue cannot label an unseen row.** `DBSCAN`, `OPTICS` and
+  `AgglomerativeClustering` define no rule for a row they were not fitted on, and
+  asking them to assign one is refused rather than approximated.
+
+The readiness verdict has not been verified for a clustering run either. Its
+thresholds and its leakage checks were built against a target, and a clustering
+frame has none.
 
 **CSV only, from the command line.** The Python API accepts any pandas
 DataFrame. The CLI reads CSV and nothing else — no Parquet, Excel, databases, or
@@ -25,6 +57,14 @@ reasons the numbers do not show will not be found. See
 **Identifier detection is a heuristic.** A column of distinct values with an
 identifier-shaped name is *reported*, never dropped. A genuine measurement that
 happens to be unique per row looks the same.
+
+**Scaling applies to the numeric branch only.** A model declaring
+`requires_scaling` gets its numeric columns standardised; ordinal-encoded and
+one-hot columns are passed through as encoded. For a distance model — `knn` in
+either family — an ordinal column arrives with raw integer levels beside
+standardised numerics and weighs more in the distance than its spread deserves.
+Measured on a three-level ordinal beside one standardised numeric: standard
+deviations 1.0 and 0.8165.
 
 **Datetime columns are profiled but never engineered.** No day-of-week, no
 month, no elapsed time. Calendar features are a modelling decision.
@@ -43,7 +83,33 @@ not currently flag this.
 treats a feature as constant when its spread falls below an absolute threshold of
 1e-7 after a float32 cast. A quantity recorded in units so small that the whole
 column spans less than a ten-millionth is silently dropped by the tree family.
-Standardising rescues it.
+Standardising rescues it. Measured on the regressors as well as the classifiers:
+importance 0.9997 at a range of 5.5, 0.2321 at 5.5e-07, and 0.0000 at 5.5e-08.
+
+**A regression target below about 1.5e-8 in standard deviation silently stops
+the tree family.** scikit-learn's tree splitter compares a candidate split's
+impurity improvement against a tolerance derived from double eps. When the
+target's variance falls beneath it, every node looks pure, no split is taken,
+and `decision_tree_regressor`, `random_forest_regressor`, `extra_trees_regressor`
+and `gradient_boosting_regressor` return the training mean for every row — with
+no error, no warning, and a perfectly well-shaped array of finite numbers.
+Measured: R² 1.000 at a target standard deviation of 2.2, 0.706 at 2.2e-08, and a
+constant prediction at 2.2e-09. `linear_regression`, `ridge_regression`,
+`knn_regressor` and `hist_gradient_boosting_regressor` are unaffected. This is
+the target-side mirror of the feature-side threshold above. Rescaling the target
+rescues it; the library will not do that for you, because the units of the thing
+being predicted are yours.
+
+**StandardScaler overflows above a magnitude near 1e200, and underflows below
+about 1e-161.** The variance pass squares each value. Above the range, a column
+of finite float64 values produces an all-`NaN` scaled column and a numpy
+`RuntimeWarning`; no built-in model can reach that silently, because no model
+both requires scaling and consumes `NaN` natively, so the `NaN` reaches an
+estimator that refuses it — though the resulting error names `NaN` rather than
+the overflow behind it. Below the range the variance underflows to exactly zero,
+scikit-learn sets `scale_ = 1.0`, and the column passes through **completely
+unscaled** with no warning at all — so a model that asked for scaling silently
+does not get it. That direction is the quieter of the two.
 
 ## What the artifact records
 
@@ -79,9 +145,36 @@ surprise anyone expecting set semantics.
 **Schema compatibility is not promised yet.** Artifacts carry a schema version so
 that future migration is possible. No migration path exists today.
 
+## Training and comparison
+
+**A comparison is one split, not cross-validation.** Models are trained on one
+training set and judged on one evaluation set, drawn once and shared by every
+model in the run. A different seed gives a different split and can give a
+different order. Cross-validation is future work; it is not a hidden default.
+
+**Multiclass ROC-AUC is not computed.** It needs an explicit one-vs-rest or
+one-vs-one policy and every class present in the evaluation rows. This version
+publishes no such policy and reports the metric as not applicable, with that
+reason, rather than choosing one silently.
+
+**R² is reported as undefined on a constant evaluation target**, and with fewer
+than two evaluation rows. scikit-learn answers a constant target with `1.0` for a
+perfect constant prediction and `0.0` for a wrong one — the same `0.0` whether
+the prediction is off by 1.5 or by 892.5.
+
+**A ranking is not a recommendation.** It says which model ranked first under one
+dataset, one split, one preprocessing contract, one configuration and one metric.
+It says nothing about which model suits the problem.
+
+**Timing is observational.** It never decides a ranking and is deliberately
+excluded from serialised results, because it would make two identical runs
+compare unequal.
+
+See [training-and-comparison.md](training-and-comparison.md).
+
 ## Not implemented
 
-Model training, evaluation, metrics, model comparison, hyperparameter tuning,
-cross-validation orchestration, feature importance, SHAP, resampling, automatic
-class weighting, model selection of any kind. Several of these are deliberate
+Hyperparameter tuning, cross-validation orchestration, parallel model training,
+feature importance, SHAP, resampling, automatic class weighting, model
+persistence, and model selection of any kind. Several of these are deliberate
 product boundaries rather than missing work.

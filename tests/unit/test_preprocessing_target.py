@@ -142,6 +142,154 @@ class TestRegressionIsRefused:
             TargetLabelEncoder().fit(pd.Series([1.5, 2.5]), profile)
 
 
+class TestTheDetectorAndTheEncoderCannotDisagree:
+    """The closure that ends three silent-corruption routes.
+
+    Both components answer "is this a quantity or a set of labels", and they used
+    to answer it separately. The detector asked pandas for a dtype; the encoder
+    looked for non-integral floats. Three inputs made them disagree, and each
+    disagreement resolved the same way -- a measurement became a class index,
+    with nothing raised at any point:
+
+    ==========================================  ==============  ===============
+    Target                                      Detector said   Encoder did
+    ==========================================  ==============  ===============
+    continuous floats, hint="classification"    classification  encoded 0..5
+    object-dtype floats, no hint                classification  encoded 0..3
+    60 distinct integers, no profile            **regression**  encoded 0..59
+    ==========================================  ==============  ===============
+
+    The third row is the one that cannot be argued with: the library's own
+    detector called the column regression, and its own encoder turned it into
+    class indices anyway. Both now read
+    :func:`~aidatasetkit.core.schema.target_holds_quantities`.
+    """
+
+    #: Targets that hold quantities, whatever their dtype says.
+    QUANTITIES = {
+        "non-integral floats": pd.Series([1.5, 2.25, 3.75, 4.5, 5.125, 6.75] * 10),
+        "object-dtype floats": pd.Series([1.25, 2.50, 3.75, 4.10] * 15, dtype=object),
+        "60 distinct integers": pd.Series(np.arange(60) * 7),
+        "60 distinct whole floats": pd.Series(np.arange(60) * 7.0),
+        "prices with gaps": pd.Series([10.5, 22.7, np.nan, 18.2, 31.4] * 12),
+    }
+
+    #: Targets that are genuinely labels and must keep working untouched.
+    LABELS = {
+        "binary integers": pd.Series([0, 1] * 30),
+        "multiclass integers": pd.Series([0, 1, 2, 3, 4] * 12),
+        "string labels": pd.Series(["churn", "stay"] * 30),
+        "object-dtype strings": pd.Series(["a", "b", "c"] * 20, dtype=object),
+        "object-dtype whole floats": pd.Series([0.0, 1.0] * 30, dtype=object),
+        "booleans": pd.Series([True, False] * 30),
+    }
+
+    # -- the three routes ------------------------------------------------- #
+
+    def test_a_classification_hint_cannot_override_continuous_evidence(self):
+        """Defect A: the hint was accepted on any column with two distinct values."""
+        values = self.QUANTITIES["non-integral floats"]
+        assert TaskDetector().detect(values).task_type is TaskType.REGRESSION
+        with pytest.raises(UnsupportedTaskError, match="holds quantities"):
+            TaskDetector().detect(values, hint="classification")
+
+    def test_that_refusal_says_everything_a_reader_needs(self):
+        with pytest.raises(UnsupportedTaskError) as raised:
+            TaskDetector().detect(
+                self.QUANTITIES["non-integral floats"], hint="classification"
+            )
+        message = str(raised.value)
+        assert "Classification was requested" in message      # what was asked for
+        assert "holds quantities" in message                  # what the data is
+        assert "destroy" in message                           # what it would cost
+        assert 'hint="regression"' in message                 # how to proceed
+        assert "not reinterpreted for you" in message         # and what was not done
+
+    def test_object_dtype_no_longer_hides_numeric_semantics(self):
+        """Defect B: is_numeric_dtype answers False for a column of floats."""
+        values = self.QUANTITIES["object-dtype floats"]
+        assert values.dtype == object
+        profile = TaskDetector().detect(values)
+        assert profile.task_type is TaskType.REGRESSION
+        assert "non-numeric" not in (profile.detection_note or "")
+
+    def test_an_integer_target_the_detector_calls_regression_is_refused(self):
+        """Defect C: the encoder's guard only ever looked for non-integral floats."""
+        values = self.QUANTITIES["60 distinct integers"]
+        assert TaskDetector().detect(values).task_type is TaskType.REGRESSION
+        with pytest.raises(UnsupportedTaskError, match="must not be"):
+            TargetLabelEncoder().fit(values)
+
+    # -- the general contract --------------------------------------------- #
+
+    @pytest.mark.parametrize("label", sorted(QUANTITIES))
+    def test_no_quantity_is_encoded_without_a_profile(self, label):
+        with pytest.raises(UnsupportedTaskError, match="must not be label encoded"):
+            TargetLabelEncoder().fit(self.QUANTITIES[label])
+
+    @pytest.mark.parametrize("label", sorted(QUANTITIES))
+    def test_and_the_detector_agrees_it_is_regression(self, label):
+        """The two answers side by side. This is the invariant that was missing."""
+        assert TaskDetector().detect(self.QUANTITIES[label]).task_type is (
+            TaskType.REGRESSION
+        )
+
+    @pytest.mark.parametrize("label", sorted(QUANTITIES))
+    def test_the_refusal_is_a_project_error_not_a_backend_one(self, label):
+        with pytest.raises(UnsupportedTaskError) as raised:
+            TargetLabelEncoder().fit(self.QUANTITIES[label])
+        assert type(raised.value).__module__.startswith("aidatasetkit")
+        assert "sklearn" not in str(raised.value)
+        assert len(str(raised.value)) > 80, "an error nobody can act on is not one"
+
+    @pytest.mark.parametrize("label", sorted(QUANTITIES))
+    def test_the_caller_target_is_unchanged_after_a_refusal(self, label):
+        values = self.QUANTITIES[label]
+        before = values.copy()
+        with pytest.raises(UnsupportedTaskError):
+            TargetLabelEncoder().fit(values)
+        pd.testing.assert_series_equal(values, before)
+
+    @pytest.mark.parametrize("label", sorted(LABELS))
+    def test_every_genuine_label_target_still_encodes(self, label):
+        """The half that must not have moved. Refusing these would be worse."""
+        values = self.LABELS[label]
+        encoded = TargetLabelEncoder().fit_transform(values)
+        assert len(encoded) == len(values)
+        assert set(np.unique(encoded)) == set(range(values.nunique()))
+
+    @pytest.mark.parametrize("label", sorted(LABELS))
+    def test_and_round_trips_back_to_what_went_in(self, label):
+        values = self.LABELS[label]
+        encoder = TargetLabelEncoder()
+        decoded = encoder.inverse_transform(encoder.fit_transform(values))
+        assert list(decoded) == list(values)
+
+    def test_a_five_class_integer_target_is_still_accepted(self):
+        """The ambiguous middle. The detector will not decide it without a hint;
+        calling the encoder *is* the caller deciding it."""
+        from aidatasetkit.core.exceptions import AmbiguousTaskError
+
+        values = self.LABELS["multiclass integers"]
+        with pytest.raises(AmbiguousTaskError):
+            TaskDetector().detect(values)
+        assert len(np.unique(TargetLabelEncoder().fit_transform(values))) == 5
+
+    def test_a_regression_target_survives_the_path_that_does_not_encode(self):
+        """The other half of the contract: on the regression path y is untouched."""
+        from aidatasetkit.models import ModelFactory
+
+        values = self.QUANTITIES["60 distinct integers"]
+        profile = TaskDetector().detect(values)
+        assert profile.task_type is TaskType.REGRESSION
+
+        features = np.random.default_rng(3).normal(size=(len(values), 2))
+        before = values.copy()
+        ModelFactory.create("linear_regression", target=profile).fit(features, values)
+        pd.testing.assert_series_equal(values, before)
+        assert values.dtype == before.dtype
+
+
 class TestRejectedInput:
     def test_an_unseen_label_at_transform_is_refused(self):
         encoder = TargetLabelEncoder().fit(pd.Series(["a", "b"] * 30))

@@ -638,8 +638,8 @@ class TestModelsNeverSeeThePreprocessingLayer:
         script = (
             "import sys;"
             "from aidatasetkit.models import ModelFactory;"
-            "p = ModelFactory.registration('random_forest').capabilities."
-            "preprocessing_profile();"
+            "p = ModelFactory.registration('random_forest', task='classification')"
+            ".capabilities.preprocessing_profile();"
             "print(p.key);"
             "print(any(m.startswith('aidatasetkit.preprocessing') for m in sys.modules))"
         )

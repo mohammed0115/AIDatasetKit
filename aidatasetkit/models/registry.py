@@ -199,10 +199,23 @@ class ModelRegistry:
         return len(self._entries)
 
     def __contains__(self, name: object) -> bool:
-        """Whether ``name`` resolves, by canonical name or alias.
+        """Whether this registry knows ``name``, by canonical name or alias.
 
-        Deliberately matches :meth:`resolve`: a membership test that disagreed
-        with it could not be used to guard a lookup.
+        This answers "is the name registered", which is *not* quite "will
+        :meth:`resolve` return something". They agreed exactly until a second
+        task family arrived: eight short aliases -- ``dummy``, ``baseline``,
+        ``decision_tree``, ``knn``, ``random_forest``, ``extra_trees``,
+        ``gradient_boosting``, ``hist_gradient_boosting`` -- now name a
+        classifier *and* a regressor, so ``in`` is true for them while
+        :meth:`resolve` raises
+        :class:`~aidatasetkit.core.exceptions.AmbiguousModelAliasError` until a
+        task narrows it.
+
+        The guard pattern that follows from this is
+        ``if name in registry: registry.resolve(name, task=...)``. Making ``in``
+        return ``False`` for a name the registry demonstrably holds would be the
+        worse answer: it would report a known model as unknown, and the error a
+        caller then raised would send them looking for a typo.
         """
         if not isinstance(name, str):
             return False

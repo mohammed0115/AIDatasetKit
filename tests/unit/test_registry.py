@@ -21,7 +21,11 @@ from aidatasetkit.core.exceptions import (
     ValidationError,
 )
 from aidatasetkit.core.types import Backend, Interpretability, TaskType
-from tests.conftest import BUILT_IN_CLASSIFIERS
+from tests.conftest import (
+    BUILT_IN_CLASSIFIERS,
+    BUILT_IN_CLUSTERERS,
+    BUILT_IN_REGRESSORS,
+)
 
 from aidatasetkit.models import (
     ModelCapabilities,
@@ -467,7 +471,99 @@ class TestSerialisation:
 
 class TestIsolationFromTheBuiltInRegistry:
     def test_the_built_in_registry_holds_the_expected_models(self):
-        assert set(default_registry().available()) == set(BUILT_IN_CLASSIFIERS)
+        assert (
+            set(default_registry().available())
+            == set(BUILT_IN_CLASSIFIERS)
+            | set(BUILT_IN_REGRESSORS)
+            | set(BUILT_IN_CLUSTERERS)
+        )
+
+    def test_the_three_families_coexist_without_a_canonical_name_collision(self):
+        """Twenty-four registrations, twenty-four distinct canonical names.
+
+        Registration refuses a duplicate outright, so a reused name would have
+        aborted import rather than failed here -- which is the point: asserting
+        the count says which invariant kept that from happening.
+        """
+        names = [entry.canonical_name for entry in default_registry()]
+        assert len(names) == len(set(names)) == 24
+
+    def test_every_shared_alias_maps_to_exactly_one_model_per_family(self):
+        """The alias namespace stayed resolvable as the second family arrived."""
+        seen: dict[tuple[str, TaskType], str] = {}
+        for entry in default_registry():
+            for alias in entry.aliases:
+                key = (alias, entry.task_type)
+                assert key not in seen, f"{alias} is ambiguous within {entry.task_type}"
+                seen[key] = entry.canonical_name
+        assert seen
+
+    #: The eight aliases S6 made ambiguous, named once so the number is a fact
+    #: rather than a count nobody checked.
+    SHARED_ALIASES = (
+        "baseline",
+        "decision_tree",
+        "dummy",
+        "extra_trees",
+        "gradient_boosting",
+        "hist_gradient_boosting",
+        "knn",
+        "random_forest",
+    )
+
+    def test_the_shared_aliases_are_exactly_these_eight(self):
+        """Derived from the registry, so the documented list cannot drift from it.
+
+        docs/getting-started.md enumerates these for users, and an earlier
+        version of that list had seven -- ``extra_trees`` was missing, so a
+        reader would have believed it was safe to pass bare.
+        """
+        by_alias: dict[str, set[TaskType]] = {}
+        for entry in default_registry():
+            for alias in entry.aliases:
+                by_alias.setdefault(alias, set()).add(entry.task_type)
+        shared = tuple(sorted(a for a, tasks in by_alias.items() if len(tasks) > 1))
+        assert shared == self.SHARED_ALIASES
+
+    def test_the_documented_list_names_every_one_of_them(self):
+        """The disclosure has to be complete or it misleads worse than silence."""
+        from pathlib import Path
+
+        docs = Path(__file__).resolve().parents[2] / "docs" / "getting-started.md"
+        text = docs.read_text(encoding="utf-8")
+        for alias in self.SHARED_ALIASES:
+            assert f"`{alias}`" in text, f"getting-started.md does not mention {alias}"
+
+    def test_and_the_changelog_records_the_break(self):
+        from pathlib import Path
+
+        changelog = (
+            Path(__file__).resolve().parents[2] / "CHANGELOG.md"
+        ).read_text(encoding="utf-8")
+        assert "AmbiguousModelAliasError" in changelog
+
+    @pytest.mark.parametrize("alias", SHARED_ALIASES)
+    def test_membership_is_true_while_resolution_refuses(self, alias):
+        """The invariant S6 changed, pinned rather than left to be discovered.
+
+        ``__contains__`` answers "is this name registered", and it is. ``resolve``
+        answers "which model is it", and without a task there is no single
+        answer. The docstring on ``__contains__`` says so; this proves the two
+        really do behave as it describes.
+        """
+        registry = default_registry()
+        assert alias in registry
+        with pytest.raises(AmbiguousModelAliasError):
+            registry.resolve(alias)
+        assert registry.resolve(alias, task=TaskType.CLASSIFICATION) is not None
+        assert registry.resolve(alias, task=TaskType.REGRESSION) is not None
+
+    def test_an_unshared_alias_still_satisfies_the_old_guard_pattern(self):
+        """Only the eight are affected; every other name behaves as before."""
+        registry = default_registry()
+        for alias in ("logistic", "logreg", "gnb", "ridge"):
+            assert alias in registry
+            assert registry.resolve(alias) is not None
 
     def test_a_scratch_registry_starts_empty(self):
         assert len(ModelRegistry()) == 0

@@ -77,6 +77,22 @@ class ModelCapabilities:
         is_baseline: Whether this model exists to establish a floor rather than to
             compete. Reported separately in comparisons so that an improvement can
             be read against it.
+        supports_out_of_sample_assignment: Whether a *fitted* model can assign a
+            row it never saw. Meaningful only for clustering, and false by
+            default, so every model that predates this field keeps the answer it
+            already had.
+
+            A supervised model answers this trivially -- predicting unseen rows
+            is what it is for -- so declaring it there would be a field that is
+            ``True`` for all eighteen and carries no information. Clustering is
+            where it divides: ``KMeans`` keeps centroids and can assign one,
+            while ``DBSCAN`` and ``AgglomerativeClustering`` produce a labelling
+            *of the fitted rows only* and expose no ``predict`` at all. Verified
+            by fitting and then calling, not by reading a class hierarchy.
+
+            This is the difference between a model that can be deployed and a
+            model that has described one dataset, which is why it is recorded
+            rather than discovered at prediction time.
     """
 
     task_type: TaskType
@@ -88,8 +104,19 @@ class ModelCapabilities:
     handles_missing_values: bool
     interpretability_level: Interpretability
     is_baseline: bool = False
+    supports_out_of_sample_assignment: bool = False
 
     def __post_init__(self) -> None:
+        if (
+            self.task_type is not TaskType.CLUSTERING
+            and self.supports_out_of_sample_assignment
+        ):
+            raise ValidationError(
+                f"supports_out_of_sample_assignment is meaningless for a "
+                f"{self.task_type.value} model; a supervised model assigns unseen "
+                "rows by definition, so declaring it would state nothing. It "
+                "divides clustering algorithms, and only those."
+            )
         if self.task_type is not TaskType.CLASSIFICATION:
             if self.supports_predict_proba:
                 raise ValidationError(
@@ -117,16 +144,31 @@ class ModelCapabilities:
             handles_missing_values=self.handles_missing_values,
         )
 
-    def validate_for(self, target: TargetProfile) -> None:
+    def validate_for(self, target: TargetProfile | None) -> None:
         """Check this model against a resolved target, before any fitting.
 
         Args:
-            target: What the task detector concluded about the target.
+            target: What the task detector concluded about the target, or
+                ``None`` when there is no target at all. ``None`` is a real
+                answer, not a missing argument: clustering has no target by
+                definition, and the alternative -- a caller inventing a
+                placeholder ``TargetProfile`` to get past this check -- would put
+                a fabricated task type into the audit record.
 
         Raises:
             IncompatibleModelError: If the model serves a different task family,
-                or if the target is multiclass and the model is binary-only.
+                if a supervised model is offered no target at all, or if the
+                target is multiclass and the model is binary-only.
         """
+        if target is None:
+            if self.task_type is not TaskType.CLUSTERING:
+                raise IncompatibleModelError(
+                    f"This model serves {self.task_type.value} tasks and was "
+                    "offered no target. A supervised model has nothing to learn "
+                    "from unlabelled rows. Name the label column, or choose a "
+                    "clustering model if the data has no labels."
+                )
+            return
         if target.task_type is not self.task_type:
             raise IncompatibleModelError(
                 f"This model serves {self.task_type.value} tasks, but the target "
@@ -143,8 +185,8 @@ class ModelCapabilities:
                 f"{target.n_classes}."
             )
 
-    def is_compatible_with(self, target: TargetProfile) -> bool:
-        """Whether this model can be used for ``target``."""
+    def is_compatible_with(self, target: TargetProfile | None) -> bool:
+        """Whether this model can be used for ``target``, ``None`` meaning none."""
         try:
             self.validate_for(target)
         except IncompatibleModelError:
@@ -163,5 +205,11 @@ class ModelCapabilities:
             "handles_missing_values": self.handles_missing_values,
             "interpretability_level": self.interpretability_level.value,
             "is_baseline": self.is_baseline,
+            # Emitted for every model, not only the clustering ones. A field
+            # present on some rows and absent on others is a field a reader has
+            # to guess the meaning of, and hiding it from the artifact to keep an
+            # old fingerprint stable would be arranging the evidence to match a
+            # number. The fingerprint moved; CHANGELOG.md records why.
+            "supports_out_of_sample_assignment": self.supports_out_of_sample_assignment,
             "preprocessing_profile": self.preprocessing_profile().key,
         }

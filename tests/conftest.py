@@ -30,9 +30,42 @@ BUILT_IN_CLASSIFIERS = (
     "random_forest_classifier",
 )
 
-#: Distinct PreprocessingProfile keys across that catalog. Nine models, five
-#: preprocessors: the reuse S4 caches on, stated as a number so that a change to
-#: any capability has to be acknowledged here.
+#: The built-in regression catalog, in the canonical order the registry
+#: publishes. Same rule as the classifiers above: one edit, and a model
+#: appearing or vanishing is a failure rather than a quietly updated
+#: expectation.
+BUILT_IN_REGRESSORS = (
+    "decision_tree_regressor",
+    "dummy_regressor",
+    "extra_trees_regressor",
+    "gradient_boosting_regressor",
+    "hist_gradient_boosting_regressor",
+    "knn_regressor",
+    "linear_regression",
+    "random_forest_regressor",
+    "ridge_regression",
+)
+
+#: The built-in clustering catalog, in the canonical order the registry
+#: publishes. Same rule as the two families above.
+BUILT_IN_CLUSTERERS = (
+    "agglomerative_clustering",
+    "birch_clustering",
+    "dbscan_clustering",
+    "kmeans_clustering",
+    "minibatch_kmeans_clustering",
+    "optics_clustering",
+)
+
+#: Distinct PreprocessingProfile keys across the whole catalog. Twenty-four
+#: models, five preprocessors: the reuse S4 caches on, stated as a number so that
+#: a change to any capability has to be acknowledged here.
+#:
+#: The number did not move when regression arrived, and did not move again when
+#: clustering did. The nine classifiers occupy five keys, the nine regressors
+#: four, and the six clusterers two -- and both of the smaller sets are subsets
+#: of the five. That is what it looks like when the cache key is a capability
+#: triple rather than a model name.
 BUILT_IN_PROFILE_COUNT = 5
 
 

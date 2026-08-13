@@ -76,8 +76,17 @@ _logger = logging.getLogger(__name__)
 KNOWN_LIMITATIONS: tuple[str, ...] = (
     "Leakage detection is statistical. A feature that encodes the outcome for "
     "reasons the numbers do not show will not be found here.",
-    "Only tabular supervised classification has been verified end to end. "
-    "Regression, clustering, time series, text, and images are out of scope.",
+    # Narrowed twice, for the same reason each time: an artifact travels further
+    # than any other document this library produces, so it must not carry a scope
+    # statement the library has outgrown. S6 removed regression from the
+    # out-of-scope list when nine regressors were held to the same executed
+    # capability contracts as the classifiers; S9 removed clustering when six
+    # clusterers were. What has *not* moved either time is the verdict, which is
+    # still the one thing verified end to end for classification alone.
+    "Only the classification readiness verdict has been verified end to end. "
+    "Regression and clustering models and their preprocessing are verified; "
+    "anomaly detection, dimensionality reduction, time series, text, and images "
+    "remain out of scope.",
     "Datetime columns are profiled but never turned into features automatically; "
     "any calendar engineering is the analyst's decision.",
     "Preprocessing decisions are proposals recorded as evidence. This artifact "

@@ -63,20 +63,44 @@ class TestPreprocessingProfile:
         }
         assert profiles == {
             # The tree family keeps native NaN and gives up sparse: scikit-learn
-            # supports each alone and refuses the two together.
+            # supports each alone and refuses the two together. Both families
+            # answer this the same way, and both were measured.
             "decision_tree_classifier": "scaling=0,sparse=0,native_nan=1",
             "extra_trees_classifier": "scaling=0,sparse=0,native_nan=1",
             "random_forest_classifier": "scaling=0,sparse=0,native_nan=1",
             "hist_gradient_boosting_classifier": "scaling=0,sparse=0,native_nan=1",
-            # The baseline genuinely takes both, because it reads neither.
+            "decision_tree_regressor": "scaling=0,sparse=0,native_nan=1",
+            "extra_trees_regressor": "scaling=0,sparse=0,native_nan=1",
+            "random_forest_regressor": "scaling=0,sparse=0,native_nan=1",
+            "hist_gradient_boosting_regressor": "scaling=0,sparse=0,native_nan=1",
+            # The baselines genuinely take both, because they read neither.
             "dummy_classifier": "scaling=0,sparse=1,native_nan=1",
+            "dummy_regressor": "scaling=0,sparse=1,native_nan=1",
             "gradient_boosting_classifier": "scaling=0,sparse=1,native_nan=0",
+            "gradient_boosting_regressor": "scaling=0,sparse=1,native_nan=0",
             "knn_classifier": "scaling=1,sparse=1,native_nan=0",
             "logistic_regression": "scaling=1,sparse=1,native_nan=0",
+            "knn_regressor": "scaling=1,sparse=1,native_nan=0",
+            # Both linear models ask for scaling, for different reasons: Ridge
+            # because the penalty reads the unit a column was recorded in, and
+            # ordinary least squares because lstsq truncates a small singular
+            # value and drops a real column near a 1e6 magnitude ratio.
+            "linear_regression": "scaling=1,sparse=1,native_nan=0",
+            "ridge_regression": "scaling=1,sparse=1,native_nan=0",
             "gaussian_nb": "scaling=1,sparse=0,native_nan=0",
+            # Every clusterer needs scaling, and none of them accepts a NaN, so
+            # they land on two keys that already existed. The split is sparse:
+            # OPTICS routes through scipy distance metrics, and Agglomerative
+            # needs a dense array for its linkage.
+            "kmeans_clustering": "scaling=1,sparse=1,native_nan=0",
+            "minibatch_kmeans_clustering": "scaling=1,sparse=1,native_nan=0",
+            "dbscan_clustering": "scaling=1,sparse=1,native_nan=0",
+            "birch_clustering": "scaling=1,sparse=1,native_nan=0",
+            "optics_clustering": "scaling=1,sparse=0,native_nan=0",
+            "agglomerative_clustering": "scaling=1,sparse=0,native_nan=0",
         }
 
-    def test_nine_models_need_only_five_preprocessors(self):
+    def test_twenty_four_models_need_only_five_preprocessors(self):
         from tests.conftest import BUILT_IN_PROFILE_COUNT
 
         keys = {
@@ -84,6 +108,46 @@ class TestPreprocessingProfile:
             for entry in default_registry().catalog()
         }
         assert len(keys) == BUILT_IN_PROFILE_COUNT
+
+    def test_neither_regression_nor_clustering_added_a_profile(self):
+        """Fifteen more models, and the number of preprocessors did not move.
+
+        Not an arrangement: it is what happens when the cache key is a capability
+        triple. Every profile a regressor or a clusterer needs was already
+        required by some classifier, so both families are strict subsets of the
+        five. Clustering is the sharper case -- six algorithms with nothing in
+        common mechanically, sharing two pipelines with a logistic regression and
+        a naive Bayes.
+        """
+        from aidatasetkit.core.types import TaskType
+
+        by_task: dict[TaskType, set] = {}
+        for entry in default_registry().catalog():
+            by_task.setdefault(entry.task_type, set()).add(
+                entry.capabilities.preprocessing_profile()
+            )
+        classification = by_task[TaskType.CLASSIFICATION]
+        assert len(by_task[TaskType.REGRESSION]) == 4
+        assert by_task[TaskType.REGRESSION] < classification
+        assert len(by_task[TaskType.CLUSTERING]) == 2
+        assert by_task[TaskType.CLUSTERING] < classification
+
+    def test_models_from_different_families_do_share_a_profile(self):
+        """The reuse is across task families, not only within one."""
+        profiles: dict[str, set[str]] = {}
+        for entry in default_registry().catalog():
+            profiles.setdefault(
+                entry.capabilities.preprocessing_profile().key, set()
+            ).add(entry.task_type.value)
+        mixed = [key for key, tasks in profiles.items() if len(tasks) > 1]
+        # All five, once clustering arrived. Gaussian naive Bayes was the last
+        # model sitting alone on a profile, and OPTICS and Agglomerative joined
+        # it -- so there is no pipeline in this library built for one family.
+        assert len(mixed) == len(profiles) == 5
+        # And one of the five serves all three families at once, which is the
+        # strongest form of the claim: a single preprocessor for a logistic
+        # regression, a ridge, a k-nearest-neighbours and a KMeans.
+        assert sum(1 for tasks in profiles.values() if len(tasks) == 3) == 1
 
     def test_logistic_regression_requires_scaling(self):
         capability = default_registry().resolve("logistic_regression").capabilities
@@ -152,14 +216,36 @@ class TestTargetCompatibility:
     def test_an_unknown_class_count_does_not_block_a_binary_only_model(self):
         capabilities(supports_multiclass=False).validate_for(self._target(n_classes=None))
 
-    def test_both_built_in_models_accept_a_binary_classification_target(self):
-        for entry in default_registry().catalog():
+    def test_every_classifier_accepts_a_binary_classification_target(self):
+        for entry in default_registry().catalog(task=TaskType.CLASSIFICATION):
             entry.capabilities.validate_for(self._target())
 
-    def test_both_built_in_models_refuse_a_regression_target(self):
-        for entry in default_registry().catalog():
+    def test_every_classifier_refuses_a_regression_target(self):
+        for entry in default_registry().catalog(task=TaskType.CLASSIFICATION):
             with pytest.raises(IncompatibleModelError):
                 entry.capabilities.validate_for(self._target(TaskType.REGRESSION, None))
+
+    def test_every_regressor_accepts_a_regression_target(self):
+        for entry in default_registry().catalog(task=TaskType.REGRESSION):
+            entry.capabilities.validate_for(self._target(TaskType.REGRESSION, None))
+
+    def test_every_regressor_refuses_a_classification_target(self):
+        """Task separation is symmetric: neither family can stand in for the other."""
+        for entry in default_registry().catalog(task=TaskType.REGRESSION):
+            with pytest.raises(IncompatibleModelError, match="regression tasks"):
+                entry.capabilities.validate_for(self._target())
+
+    def test_a_regressor_is_not_asked_about_class_counts(self):
+        """A many-class target must not trip the binary-only check on a regressor.
+
+        Every regressor declares ``supports_multiclass=False`` because classes
+        are meaningless for it. If ``validate_for`` consulted that field outside
+        classification, a regression target would be refused for having too many
+        distinct values -- which is what a regression target is.
+        """
+        many = TargetProfile(task_type=TaskType.REGRESSION, n_classes=None)
+        for entry in default_registry().catalog(task=TaskType.REGRESSION):
+            entry.capabilities.validate_for(many)
 
 
 class TestSerialisation:
@@ -210,6 +296,51 @@ class TestInterpretability:
         assert levels["decision_tree_classifier"] is Interpretability.HIGH
         assert levels["random_forest_classifier"] is Interpretability.MEDIUM
         assert levels["knn_classifier"] is Interpretability.LOW
+        # The same reading, applied to the regressors independently.
+        assert levels["linear_regression"] is Interpretability.HIGH
+        assert levels["decision_tree_regressor"] is Interpretability.HIGH
+        assert levels["random_forest_regressor"] is Interpretability.MEDIUM
+        assert levels["hist_gradient_boosting_regressor"] is Interpretability.LOW
+        assert levels["knn_regressor"] is Interpretability.LOW
+
+    def test_the_regression_levels_match_what_the_fitted_object_exposes(self):
+        """Not a vibe: HIGH means readable coefficients or rules, MEDIUM means
+        importances and no decision function, LOW means neither."""
+        import numpy as np
+
+        from aidatasetkit.models import ModelFactory
+
+        rng = np.random.default_rng(5)
+        features = rng.normal(size=(60, 3))
+        target = features[:, 0] * 2 - features[:, 1]
+
+        expectations = {
+            "linear_regression": ("coef_", Interpretability.HIGH),
+            "ridge_regression": ("coef_", Interpretability.HIGH),
+            "decision_tree_regressor": ("feature_importances_", Interpretability.HIGH),
+            "random_forest_regressor": ("feature_importances_", Interpretability.MEDIUM),
+            "extra_trees_regressor": ("feature_importances_", Interpretability.MEDIUM),
+            "gradient_boosting_regressor": (
+                "feature_importances_",
+                Interpretability.MEDIUM,
+            ),
+            "hist_gradient_boosting_regressor": (None, Interpretability.LOW),
+            "knn_regressor": (None, Interpretability.LOW),
+        }
+        for name, (attribute, level) in expectations.items():
+            overrides = {}
+            params = ModelFactory.create(name).get_params()
+            if "n_estimators" in params:
+                overrides["n_estimators"] = 5
+            if "max_iter" in params and "early_stopping" in params:
+                overrides["max_iter"] = 10
+            fitted = ModelFactory.create(name, **overrides).fit(features, target)
+            assert default_registry().resolve(name).capabilities.interpretability_level is level
+            if attribute is None:
+                assert not hasattr(fitted, "feature_importances_"), name
+                assert not hasattr(fitted, "coef_"), name
+            else:
+                assert hasattr(fitted, attribute), name
 
     def test_it_is_typed_rather_than_a_bare_string(self):
         assert isinstance(capabilities().interpretability_level, Interpretability)

@@ -39,6 +39,7 @@ __all__ = [
     "UnsupportedChartError",
     "EvidenceError",
     "SerializationError",
+    "TrainingError",
     "WorkflowStateError",
     "PredictionValidationError",
 ]
@@ -224,6 +225,18 @@ class SerializationError(EvidenceError):
     Almost always an object that should never have reached the artifact at all --
     an estimator, a DataFrame, an array. Coercing it to text would put something
     that looks like a record into a document whose whole purpose is to be one.
+    """
+
+
+class TrainingError(AIDatasetKitError):
+    """Raised when a run cannot be trained, split, or compared as asked.
+
+    Conditions this library owns: too few rows to divide, a split that would
+    leave one side empty, evaluation data whose columns do not match what
+    training saw, a model that cannot serve the resolved target. Not for a
+    backend's own refusal -- an estimator that declines its input raises its own
+    error, and wrapping every one of those would hide real defects behind a
+    uniform message.
     """
 
 

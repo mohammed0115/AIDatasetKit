@@ -683,7 +683,7 @@
   ],
   "known_limitations": [
     "Leakage detection is statistical. A feature that encodes the outcome for reasons the numbers do not show will not be found here.",
-    "Only tabular supervised classification has been verified end to end. Regression, clustering, time series, text, and images are out of scope.",
+    "Only the classification readiness verdict has been verified end to end. Regression and clustering models and their preprocessing are verified; anomaly detection, dimensionality reduction, time series, text, and images remain out of scope.",
     "Datetime columns are profiled but never turned into features automatically; any calendar engineering is the analyst's decision.",
     "Preprocessing decisions are proposals recorded as evidence. This artifact does not prove a model was trained on the data it describes.",
     "A dataset fingerprint identifies content, not provenance. It cannot show where the data came from or whether it was collected lawfully.",
@@ -861,6 +861,7 @@
       "preprocessing_profile": "scaling=1,sparse=1,native_nan=0",
       "requires_scaling": true,
       "supports_multiclass": true,
+      "supports_out_of_sample_assignment": false,
       "supports_predict_proba": true,
       "supports_sparse_input": true,
       "task_type": "classification"

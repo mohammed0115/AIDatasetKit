@@ -22,6 +22,7 @@ import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 
 from aidatasetkit.core.exceptions import PreprocessingError, UnsupportedTaskError
+from aidatasetkit.core.schema import target_holds_quantities
 from aidatasetkit.core.types import TargetProfile, TaskType
 from aidatasetkit.preprocessing.types import TargetEncoding
 
@@ -288,24 +289,39 @@ def _require_uniform_labels(series: pd.Series) -> None:
 
 
 def _refuse_continuous(series: pd.Series) -> None:
-    """Stop an obviously continuous target from becoming class indices.
+    """Stop a continuous target from becoming class indices.
 
-    A :class:`TargetProfile` settles the question properly, and passing one is the
-    reliable route. Without it, this catches the case that cannot be anything
-    else: a float column holding values that are not whole numbers. Turning
-    those into 0..n-1 would silently destroy the quantity being predicted.
+    A :class:`TargetProfile` settles the question properly and passing one is the
+    reliable route. Without it this has to answer the question itself -- and the
+    answer has to be the *same* answer, which is why it comes from
+    :func:`~aidatasetkit.core.schema.target_holds_quantities` rather than from
+    rules written here.
+
+    It used to be written here, and the two drifted in three separate ways. The
+    guard tested ``is_float_dtype``, so a column of Python floats under ``object``
+    dtype walked past the very case its docstring claimed to catch. It looked only
+    for non-integral values, so an integer column the detector itself resolved as
+    regression -- sixty distinct readings, well above the class limit -- was
+    encoded into ``0..59``. And nothing anywhere compared the two components'
+    conclusions, so the library could say *regression* in one breath and hand back
+    class indices in the next, with no error raised at any point.
+
+    Deciding this from a shared function is the fix. The thresholds it applies are
+    the detector's own, so the two cannot answer differently again.
+
+    Raises:
+        UnsupportedTaskError: If the values are quantities.
     """
-    if not pd.api.types.is_float_dtype(series):
+    if not target_holds_quantities(series):
         return
-    values = series.dropna().to_numpy(dtype="float64", na_value=np.nan)
-    if values.size and not np.all(values == np.floor(values)):
-        raise UnsupportedTaskError(
-            "This target holds non-integral numbers, so it looks like a regression "
-            "target and must not be label encoded: its values are quantities, and "
-            "replacing them with class indices would destroy what is being "
-            "predicted. Pass a TargetProfile if it really is a classification "
-            "target with numeric labels."
-        )
+    raise UnsupportedTaskError(
+        "This target holds quantities rather than labels, so it must not be "
+        "label encoded: replacing each value with a class index would destroy "
+        "the thing being predicted. The same values passed to TaskDetector "
+        "resolve as a regression target. Pass that TargetProfile through if you "
+        "want the check made explicitly, or pass the labels themselves if the "
+        "column you meant is a different one."
+    )
 
 
 def _as_series(y: Any) -> pd.Series:

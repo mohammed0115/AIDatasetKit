@@ -46,6 +46,24 @@ step names the capability that asked for it.
 | `--include-values` | Turn redaction **off everywhere**: the most frequent value of each column and every value quoted in a finding are written in plain text. Off by default. |
 | `--debug` | Show the full traceback instead of one clear line. |
 
+### Aliases name a family, not a model
+
+Eight short aliases each answer for both a classifier and a regressor:
+
+`random_forest` · `extra_trees` · `decision_tree` · `gradient_boosting` ·
+`hist_gradient_boosting` · `knn` · `dummy` · `baseline`
+
+Pass `--task` to say which, or use the canonical name:
+
+```bash
+aidatasetkit audit train.csv --target Price --task regression --model random_forest
+aidatasetkit audit train.csv --target Price --model random_forest_regressor
+```
+
+Without one of those the run stops and names both candidates. Nothing is chosen
+for you — preferring one family by convention is exactly the kind of quiet
+decision this library refuses to make.
+
 ## Before you share an artifact
 
 An audit artifact is designed to travel — into a repository, a CI run, an email.

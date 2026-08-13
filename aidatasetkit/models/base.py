@@ -7,8 +7,8 @@ is what lets one strategy serve training, cross-validation, and comparison
 without knowing any of them exist.
 
 The contract is deliberately not tied to scikit-learn. ``build`` returns anything
-satisfying :class:`~aidatasetkit.core.types.Estimator` -- ``fit``, ``predict``,
-``get_params``, ``set_params`` -- so a future PyTorch or TensorFlow strategy can
+satisfying :class:`~aidatasetkit.core.types.Fittable` -- ``fit``, ``get_params``,
+``set_params`` -- so a future PyTorch or TensorFlow strategy can
 return a thin adapter without a single change to the facade, the comparator, or
 the evaluator. scikit-learn is today's implementation; it is not the abstraction.
 """
@@ -21,7 +21,7 @@ from typing import Any, ClassVar
 
 from aidatasetkit.core.config import KitConfig
 from aidatasetkit.core.exceptions import InvalidModelParameterError
-from aidatasetkit.core.types import Estimator, TargetProfile
+from aidatasetkit.core.types import Fittable, TargetProfile
 from aidatasetkit.models.capabilities import ModelCapabilities
 
 __all__ = ["ModelStrategy"]
@@ -83,7 +83,7 @@ class ModelStrategy(ABC):
         self.capabilities.validate_for(target)
 
     @abstractmethod
-    def build(self, **params: Any) -> Estimator:
+    def build(self, **params: Any) -> Fittable:
         """Construct a new, unfitted estimator.
 
         Every call returns a fresh instance. Returning a shared object would let
@@ -96,7 +96,10 @@ class ModelStrategy(ABC):
 
         Returns:
             An unfitted object satisfying the
-            :class:`~aidatasetkit.core.types.Estimator` protocol.
+            :class:`~aidatasetkit.core.types.Fittable` protocol -- and, for every
+            model that can answer for an unseen row, the narrower
+            :class:`~aidatasetkit.core.types.Estimator` too. Three clusterers
+            satisfy only the former, because they have no ``predict``.
 
         Raises:
             InvalidModelParameterError: If a parameter is not accepted by the

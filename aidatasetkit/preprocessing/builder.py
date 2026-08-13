@@ -349,13 +349,32 @@ class FittedPreprocessor:
                 continue
             try:
                 values = X[column].to_numpy(dtype="float64", na_value=np.nan)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 # A text column bound for the numeric-text parser cannot be cast
                 # directly. Coercing is enough to see whether it holds an
                 # infinity; skipping here would let one straight through.
-                values = pd.to_numeric(X[column], errors="coerce").to_numpy(
-                    dtype="float64", na_value=np.nan
-                )
+                #
+                # OverflowError is numpy's answer to a Python int beyond float64
+                # range, and it is a subclass of neither of the others -- the same
+                # lesson _validate_codes records on the target path. Adding it to
+                # the tuple is not on its own enough, because pd.to_numeric raises
+                # it too, so the fallback is guarded as well and the condition is
+                # owned here rather than escaping as a bare "int too large to
+                # convert to float" that names no column.
+                try:
+                    values = pd.to_numeric(X[column], errors="coerce").to_numpy(
+                        dtype="float64", na_value=np.nan
+                    )
+                except OverflowError:
+                    raise PreprocessingError(
+                        f"Column {column!r} contains "
+                        f"{_unrepresentable_count(X[column])} value(s) too large to "
+                        "represent as a 64-bit float, which this version does not "
+                        "support as a trainable value -- casting one produces an "
+                        "infinity, and infinity is not a value the library will "
+                        "invent a replacement for. Remove the rows, cap the values, "
+                        "or exclude the column."
+                    ) from None
             infinite = int(np.isinf(values).sum())
             if infinite:
                 raise PreprocessingError(
@@ -735,3 +754,19 @@ def _group_pairs(fitted: Any, columns: Sequence[Any]) -> list[tuple[Any, str]]:
 def _text_of(value: Any) -> Any:
     """The text form of a present value; missing stays missing."""
     return value if value is None or value != value else str(value)
+
+
+def _unrepresentable_count(series: pd.Series) -> int:
+    """How many present values will not fit in a ``float64``.
+
+    Only ever called while building an error message, so the per-value loop costs
+    nothing on the path that works. Counting is worth the loop: "some values" and
+    "3 values" send a reader to different places in their data.
+    """
+    total = 0
+    for value in series.dropna():
+        try:
+            float(value)
+        except (TypeError, ValueError, OverflowError):
+            total += 1
+    return total

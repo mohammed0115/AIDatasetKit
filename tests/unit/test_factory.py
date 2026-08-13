@@ -24,7 +24,11 @@ from aidatasetkit.core.types import (
     TargetProfile,
     TaskType,
 )
-from tests.conftest import BUILT_IN_CLASSIFIERS
+from tests.conftest import (
+    BUILT_IN_CLASSIFIERS,
+    BUILT_IN_CLUSTERERS,
+    BUILT_IN_REGRESSORS,
+)
 
 from aidatasetkit.models import (
     ModelCapabilities,
@@ -68,14 +72,37 @@ class TestConstruction:
     @pytest.mark.parametrize(
         ("alias", "expected"),
         [
-            ("dummy", "DummyClassifier"),
-            ("baseline", "DummyClassifier"),
             ("logistic", "LogisticRegression"),
             ("logreg", "LogisticRegression"),
+            ("ridge", "Ridge"),
+            ("gnb", "GaussianNB"),
         ],
     )
-    def test_aliases_produce_the_right_estimator(self, alias, expected):
+    def test_an_unshared_alias_produces_the_right_estimator(self, alias, expected):
         assert type(ModelFactory.create(alias)).__name__ == expected
+
+    @pytest.mark.parametrize(
+        ("alias", "task", "expected"),
+        [
+            ("dummy", "classification", "DummyClassifier"),
+            ("dummy", "regression", "DummyRegressor"),
+            ("baseline", "classification", "DummyClassifier"),
+            ("baseline", "regression", "DummyRegressor"),
+            ("random_forest", "classification", "RandomForestClassifier"),
+            ("random_forest", "regression", "RandomForestRegressor"),
+            ("knn", "classification", "KNeighborsClassifier"),
+            ("knn", "regression", "KNeighborsRegressor"),
+        ],
+    )
+    def test_a_shared_alias_needs_the_task_to_settle_it(self, alias, task, expected):
+        """Since S6 both families answer to the same short names, narrowed by task."""
+        assert type(ModelFactory.create(alias, task=task)).__name__ == expected
+
+    @pytest.mark.parametrize("alias", ["dummy", "baseline", "random_forest", "knn"])
+    def test_and_the_bare_form_refuses_to_guess(self, alias):
+        """The registry names both candidates rather than choosing one."""
+        with pytest.raises(AmbiguousModelAliasError, match="Pass task="):
+            ModelFactory.create(alias)
 
     def test_every_call_returns_a_new_instance(self):
         first = ModelFactory.create("dummy_classifier")
@@ -191,8 +218,8 @@ class TestTaskValidation:
     def test_a_matching_target_is_accepted(self):
         assert ModelFactory.create("logistic_regression", target=BINARY_TARGET) is not None
 
-    def test_a_multiclass_target_is_accepted_by_both_proof_models(self):
-        for name in ModelFactory.available():
+    def test_a_multiclass_target_is_accepted_by_every_classifier(self):
+        for name in ModelFactory.available(task=TaskType.CLASSIFICATION):
             assert ModelFactory.create(name, target=MULTICLASS_TARGET) is not None
 
     def test_compatible_models_can_be_listed_for_a_target(self):
@@ -200,8 +227,30 @@ class TestTaskValidation:
             BUILT_IN_CLASSIFIERS
         )
 
-    def test_no_model_is_compatible_with_a_regression_target_yet(self):
-        assert ModelFactory.compatible_with(REGRESSION_TARGET) == ()
+    def test_a_regression_target_selects_the_regressors_and_only_those(self):
+        assert set(ModelFactory.compatible_with(REGRESSION_TARGET)) == set(
+            BUILT_IN_REGRESSORS
+        )
+
+    def test_the_families_do_not_overlap(self):
+        """Task separation, asked of the public selection surface.
+
+        Every classifier is unreachable through a regression target and every
+        regressor through a classification one. If a model were registered in the
+        wrong family this is where it would show.
+
+        The clusterers are unreachable through *either*, which is the stronger
+        statement S9 added: a target of any kind excludes all six, because
+        `compatible_with` filters on the target's task family and no target ever
+        resolves to clustering.
+        """
+        classifiers = set(ModelFactory.compatible_with(BINARY_TARGET))
+        regressors = set(ModelFactory.compatible_with(REGRESSION_TARGET))
+        assert not (classifiers & regressors)
+        assert not (classifiers | regressors) & set(BUILT_IN_CLUSTERERS)
+        assert classifiers | regressors | set(BUILT_IN_CLUSTERERS) == set(
+            ModelFactory.available()
+        )
 
     def test_listing_compatible_models_ranks_nothing(self):
         """A filter, not a recommendation."""
@@ -296,12 +345,26 @@ class TestErrorCases:
 
 class TestDiscovery:
     def test_available_lists_the_built_in_models(self):
-        assert ModelFactory.available() == BUILT_IN_CLASSIFIERS
+        assert ModelFactory.available() == tuple(
+            sorted(BUILT_IN_CLASSIFIERS + BUILT_IN_REGRESSORS + BUILT_IN_CLUSTERERS)
+        )
 
     def test_available_filters_by_task(self):
-        assert ModelFactory.available(task="regression") == ()
-        assert len(ModelFactory.available(task=TaskType.CLASSIFICATION)) == len(
+        assert ModelFactory.available(task="regression") == BUILT_IN_REGRESSORS
+        assert ModelFactory.available(task=TaskType.CLASSIFICATION) == (
             BUILT_IN_CLASSIFIERS
+        )
+        assert ModelFactory.available(task="clustering") == BUILT_IN_CLUSTERERS
+
+    def test_the_three_task_filters_partition_the_catalog(self):
+        classification = ModelFactory.available(task=TaskType.CLASSIFICATION)
+        regression = ModelFactory.available(task=TaskType.REGRESSION)
+        clustering = ModelFactory.available(task=TaskType.CLUSTERING)
+        assert not (set(classification) & set(regression))
+        assert not (set(classification) & set(clustering))
+        assert not (set(regression) & set(clustering))
+        assert set(classification) | set(regression) | set(clustering) == set(
+            ModelFactory.available()
         )
 
     def test_the_catalog_carries_structured_metadata(self):
@@ -317,7 +380,11 @@ class TestDiscovery:
 
     def test_the_catalog_is_json_serialisable(self):
         payload = json.loads(json.dumps(ModelFactory.catalog()))
-        assert len(payload) == len(BUILT_IN_CLASSIFIERS)
+        assert len(payload) == (
+            len(BUILT_IN_CLASSIFIERS)
+            + len(BUILT_IN_REGRESSORS)
+            + len(BUILT_IN_CLUSTERERS)
+        )
 
     def test_the_catalog_holds_no_estimator_objects(self):
         for entry in ModelFactory.catalog():

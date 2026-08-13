@@ -81,6 +81,67 @@ FORBIDDEN_PAIRS: frozenset[tuple[str, str]] = frozenset(
         ("preprocessing", "evidence"),
         ("models", "evidence"),
         ("visualization", "evidence"),
+        # Training and evaluation sit on evidence's layer, so the numbers alone
+        # permit them to import it. They must not: evidence aggregates what other
+        # layers established, and a training run that wrote its own audit record
+        # would make the record's shape a dependency of the orchestration.
+        ("training", "evidence"),
+        ("evaluation", "evidence"),
+        # Evaluation computes metrics from arrays. It has no business knowing
+        # which models exist, how data is prepared, or how a run is orchestrated.
+        ("evaluation", "models"),
+        ("evaluation", "preprocessing"),
+        ("evaluation", "profiling"),
+        ("evaluation", "training"),
+        ("evaluation", "visualization"),
+        # Nothing below the orchestration layer may reach back up into it.
+        ("core", "training"),
+        ("statistics", "training"),
+        ("profiling", "training"),
+        ("preprocessing", "training"),
+        ("models", "training"),
+        ("visualization", "training"),
+        ("evidence", "training"),
+        ("core", "evaluation"),
+        ("statistics", "evaluation"),
+        ("profiling", "evaluation"),
+        ("preprocessing", "evaluation"),
+        ("models", "evaluation"),
+        ("visualization", "evaluation"),
+        ("evidence", "evaluation"),
+        # Prediction applies a fitted model and learns nothing. It has no reason
+        # to know how data is prepared, how a run is orchestrated, or what an
+        # audit record looks like.
+        ("prediction", "preprocessing"),
+        ("prediction", "profiling"),
+        ("prediction", "evidence"),
+        ("prediction", "evaluation"),
+        ("prediction", "visualization"),
+        ("core", "prediction"),
+        ("statistics", "prediction"),
+        ("profiling", "prediction"),
+        ("preprocessing", "prediction"),
+        ("models", "prediction"),
+        ("visualization", "prediction"),
+        ("evidence", "prediction"),
+        ("training", "prediction"),
+        ("evaluation", "prediction"),
+        # The facade is the top of the library. It may reach anything below it;
+        # nothing below may reach back. A domain layer that imported the
+        # convenience wrapper would make the wrapper load-bearing, and the
+        # architecture it exists to present would start depending on it.
+        ("core", "facade"),
+        ("statistics", "facade"),
+        ("datasets", "facade"),
+        ("profiling", "facade"),
+        ("preprocessing", "facade"),
+        ("models", "facade"),
+        ("visualization", "facade"),
+        ("evidence", "facade"),
+        ("training", "facade"),
+        ("evaluation", "facade"),
+        ("prediction", "facade"),
+        ("cli", "facade"),
         # The CLI orchestrates. Nothing imports it.
         ("core", "cli"),
         ("profiling", "cli"),

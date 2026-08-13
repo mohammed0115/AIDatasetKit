@@ -774,6 +774,23 @@ class TestAnUnverifiedTaskSaysSo:
         artifact = json.loads((output / "audit.json").read_text())
         assert any("regression" in w for w in artifact["warnings"])
 
+    def test_the_warning_no_longer_claims_the_models_are_unverified(self, tmp_path):
+        """S6 verified them, and saying otherwise would be a false claim.
+
+        The narrowing is the point: what is still unproven for a regression audit
+        is the readiness verdict, not the model layer underneath it.
+        """
+        output = tmp_path / "reg"
+        run_cli(
+            "audit", str(EXAMPLE), "--target", "Churn", "--task", "regression",
+            "--output", str(output),
+        )
+        artifact = json.loads((output / "audit.json").read_text())
+        note = next(w for w in artifact["warnings"] if "regression task" in w)
+        assert "has not been verified" in note
+        assert "readiness verdict" in note
+        assert "model-capability evidence for regression has not been verified" not in note
+
     def test_classification_carries_no_such_warning(self, tmp_path):
         output = tmp_path / "cls"
         run_cli(
@@ -782,3 +799,183 @@ class TestAnUnverifiedTaskSaysSo:
         )
         artifact = json.loads((output / "audit.json").read_text())
         assert not any("not been verified" in w for w in artifact["warnings"])
+
+
+class TestRegressionModelsAreReachableFromTheCommandLine:
+    """S6 registered nine regressors; the CLI needed no change to accept one.
+
+    ``--model`` resolves through the same registry as everything else, and
+    ``--task`` was already there to narrow a shared alias. These tests pin that
+    the existing contract really does carry regression, rather than assuming it.
+    """
+
+    @pytest.fixture(scope="class")
+    @staticmethod
+    def ridge(tmp_path_factory):
+        output = tmp_path_factory.mktemp("ridge")
+        result = run_cli(
+            "audit", str(EXAMPLE), "--target", "Churn", "--task", "regression",
+            "--model", "ridge_regression", "--output", str(output),
+        )
+        return result, json.loads((output / "audit.json").read_text())
+
+    def test_a_regression_model_context_produces_a_full_artifact(self, ridge):
+        result, artifact = ridge
+        assert "Traceback" not in result.stderr
+        assert artifact["model"]["canonical_name"] == "ridge_regression"
+        assert artifact["model"]["task_type"] == "regression"
+        assert artifact["model"]["capabilities"]["supports_predict_proba"] is False
+
+    def test_the_recorded_profile_is_the_capability_key_and_nothing_else(self, ridge):
+        _, artifact = ridge
+        assert (
+            artifact["model"]["preprocessing_profile"] == "scaling=1,sparse=1,native_nan=0"
+        )
+
+    def test_no_estimator_object_reached_the_artifact(self, ridge):
+        _, artifact = ridge
+        assert "Ridge(" not in json.dumps(artifact)
+
+    def test_the_plan_it_recorded_scales_because_the_capability_said_so(self, ridge):
+        _, artifact = ridge
+        steps = [
+            step for decision in artifact["decisions"] for step in decision["steps"]
+        ]
+        assert any("scaling" in step for step in steps)
+
+    def test_and_records_the_requirement_that_put_it_there(self, ridge):
+        _, artifact = ridge
+        scaled = [
+            decision
+            for decision in artifact["decisions"]
+            if any("scaling" in step for step in decision["steps"])
+        ]
+        assert scaled
+        for decision in scaled:
+            assert decision["model_requirement"] is not None
+            assert "ridge" not in decision["reason"].lower()
+
+    def test_a_shared_alias_narrows_by_task_from_the_command_line(self, tmp_path):
+        output = tmp_path / "alias"
+        result = run_cli(
+            "audit", str(EXAMPLE), "--target", "Churn", "--task", "regression",
+            "--model", "random_forest", "--output", str(output),
+        )
+        assert result.returncode != EXIT_CODES["usage"], result.stderr
+        artifact = json.loads((output / "audit.json").read_text())
+        assert artifact["model"]["canonical_name"] == "random_forest_regressor"
+
+    def test_the_same_alias_under_the_other_task_gives_the_classifier(self, tmp_path):
+        output = tmp_path / "alias_cls"
+        run_cli(
+            "audit", str(EXAMPLE), "--target", "Churn", "--task", "classification",
+            "--model", "random_forest", "--output", str(output),
+        )
+        artifact = json.loads((output / "audit.json").read_text())
+        assert artifact["model"]["canonical_name"] == "random_forest_classifier"
+
+    def test_an_ambiguous_alias_is_refused_clearly_rather_than_guessed(self, tmp_path):
+        """No --task, and a name both families answer to. It must not pick one."""
+        result = run_cli(
+            "audit", str(EXAMPLE), "--target", "Churn", "--model", "random_forest",
+            "--output", str(tmp_path / "ambiguous"),
+        )
+        assert result.returncode == EXIT_CODES["usage"]
+        assert "Traceback" not in result.stderr
+        assert "random_forest_classifier" in result.stderr
+        assert "random_forest_regressor" in result.stderr
+
+    def test_and_nothing_was_written_for_that_run(self, tmp_path):
+        output = tmp_path / "ambiguous_out"
+        run_cli(
+            "audit", str(EXAMPLE), "--target", "Churn", "--model", "random_forest",
+            "--output", str(output),
+        )
+        assert not output.exists() or not list(output.iterdir())
+
+    def test_a_classifier_named_under_the_regression_task_is_a_contradiction(
+        self, tmp_path
+    ):
+        result = run_cli(
+            "audit", str(EXAMPLE), "--target", "Churn", "--task", "regression",
+            "--model", "logistic_regression", "--output", str(tmp_path / "wrong"),
+        )
+        assert result.returncode == EXIT_CODES["usage"]
+        assert "Traceback" not in result.stderr
+        assert "classification" in result.stderr
+
+    def test_the_ambiguity_error_names_the_flag_the_command_line_actually_has(
+        self, tmp_path
+    ):
+        """The registry says "Pass task=", which is a Python keyword, not a flag."""
+        result = run_cli(
+            "audit", str(EXAMPLE), "--target", "Churn", "--model", "knn",
+            "--output", str(tmp_path / "flagged"),
+        )
+        assert result.returncode == EXIT_CODES["usage"]
+        assert "--task classification" in result.stderr
+
+
+class TestAModelMustMatchTheTargetTheDetectorFound:
+    """An artifact recording a regressor beside a classification target asserts
+    a contradiction, and used to do so with ``warnings == []``.
+
+    The model has to be resolved before the target is typed -- ``--task`` may be
+    absent and the registry needs something to narrow a shared alias with -- so
+    the compatibility check ``ModelFactory.create(name, target=...)`` performs is
+    repeated once the detector has spoken. The run is not aborted: the profiling
+    and quality evidence is still true and still worth having. What is withheld
+    is the preprocessing plan, which would otherwise be built for a model that
+    cannot serve this target.
+    """
+
+    @pytest.fixture(scope="class")
+    @staticmethod
+    def mismatched(tmp_path_factory):
+        output = tmp_path_factory.mktemp("mismatch")
+        result = run_cli(
+            "audit", str(EXAMPLE), "--target", "Churn",
+            "--model", "ridge_regression", "--output", str(output),
+        )
+        return result, json.loads((output / "audit.json").read_text())
+
+    def test_the_run_completes_rather_than_aborting(self, mismatched):
+        result, artifact = mismatched
+        assert "Traceback" not in result.stderr
+        assert artifact["columns"], "the profiling evidence should survive"
+
+    def test_the_mismatch_is_reported_rather_than_recorded_silently(self, mismatched):
+        _, artifact = mismatched
+        assert artifact["warnings"]
+        assert any(
+            "does not match the detected target" in w for w in artifact["warnings"]
+        )
+
+    def test_the_warning_names_both_families(self, mismatched):
+        _, artifact = mismatched
+        note = next(
+            w for w in artifact["warnings"] if "does not match the detected target" in w
+        )
+        assert "regression" in note and "classification" in note
+
+    def test_no_preprocessing_plan_was_built_for_the_wrong_model(self, mismatched):
+        _, artifact = mismatched
+        assert artifact["decisions"] == []
+        assert artifact["plan_fingerprint"] is None
+
+    def test_the_verdict_is_blocked_rather_than_ready(self, mismatched):
+        _, artifact = mismatched
+        assert artifact["verdict"] == "blocked"
+
+    def test_the_matching_direction_still_works_untouched(self, tmp_path):
+        """The guard must not fire on a model that does serve the target."""
+        output = tmp_path / "matched"
+        run_cli(
+            "audit", str(EXAMPLE), "--target", "Churn",
+            "--model", "logistic_regression", "--output", str(output),
+        )
+        artifact = json.loads((output / "audit.json").read_text())
+        assert not any(
+            "does not match the detected target" in w for w in artifact["warnings"]
+        )
+        assert artifact["decisions"], "a compatible model should still get a plan"

@@ -80,6 +80,7 @@ class KitConfig:
     prediction_column: str = "prediction"
 
     def __post_init__(self) -> None:
+        self._require_seed("random_state", self.random_state)
         self._require_open_unit_interval("validation_size", self.validation_size)
         self._require_closed_unit_interval("missing_warning_threshold", self.missing_warning_threshold)
         self._require_closed_unit_interval("near_constant_threshold", self.near_constant_threshold)
@@ -119,6 +120,51 @@ class KitConfig:
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise ConfigurationError(f"{name} must be a non-empty string, got {value!r}.")
+
+    @staticmethod
+    def _require_seed(name: str, value: Any) -> None:
+        """Refuse a seed that is not a plain integer.
+
+        The field is annotated ``int`` and nothing enforced it, so a
+        ``numpy.random.RandomState`` or ``Generator`` could be stored here and
+        handed by reference to every consumer. That is not a seed: it is mutable
+        state, and each draw advances it, so two runs configured identically
+        produce different results. Splitting made the defect reachable through a
+        supported public call, which is what turned it from a latent flaw into
+        one worth refusing.
+
+        ``numpy.int64`` and friends are accepted. They are immutable, they are
+        exactly as deterministic as a Python ``int``, scikit-learn takes them
+        everywhere, and ``np.arange(3)[0]`` produces one -- refusing them would
+        turn an ordinary way of getting hold of a number into an error, and the
+        message about mutable generator state would be untrue of them.
+
+        ``bool`` is excluded explicitly. It is a subclass of ``int``, so
+        ``random_state=True`` would otherwise be silently accepted as the seed 1.
+        ``None`` is refused too: scikit-learn reads it as "draw from global
+        entropy", which is the one thing a reproducibility contract cannot allow.
+
+        The range is checked as well as the type. numpy accepts a seed in
+        ``[0, 2**32 - 1]``, and a value outside it fails much later inside a
+        splitter, where the error this library raises would blame
+        ``validation_size`` for something ``random_state`` did.
+        """
+        import numbers
+
+        if isinstance(value, bool) or not isinstance(value, numbers.Integral):
+            raise ConfigurationError(
+                f"{name} must be an integer, got {type(value).__name__} "
+                f"({value!r}). A generator object is mutable state rather than a "
+                "seed -- every draw advances it, so two runs configured "
+                "identically would not agree. Pass the integer you would have "
+                "seeded that generator with."
+            )
+        if not 0 <= int(value) <= 2**32 - 1:
+            raise ConfigurationError(
+                f"{name} must lie between 0 and 2**32 - 1, got {value!r}. Outside "
+                "that range numpy refuses it, and the refusal would arrive from a "
+                "splitter several steps later."
+            )
 
     @staticmethod
     def _require_open_unit_interval(name: str, value: float) -> None:

@@ -21,6 +21,8 @@ what was asked for.
 """
 
 from aidatasetkit.models import classification as _classification  # noqa: F401
+from aidatasetkit.models import clustering as _clustering  # noqa: F401
+from aidatasetkit.models import regression as _regression  # noqa: F401
 from aidatasetkit.models.base import ModelStrategy
 from aidatasetkit.models.capabilities import ModelCapabilities
 from aidatasetkit.models.factory import ModelFactory

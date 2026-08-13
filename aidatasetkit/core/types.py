@@ -31,7 +31,9 @@ __all__ = [
     "Severity",
     "ColumnKind",
     "ColumnKinds",
+    "ClusterEstimator",
     "Estimator",
+    "Fittable",
     "ProbabilisticEstimator",
     "PreprocessingProfile",
     "NumericSummary",
@@ -165,10 +167,11 @@ class ColumnKind(_CoercibleStrEnum):
 
 
 @runtime_checkable
-class Estimator(Protocol):
-    """The minimum interface a model strategy must produce.
+class Fittable(Protocol):
+    """What every model this library constructs has in common.
 
-    Any object exposing these four methods qualifies, whether it comes from
+    Learning from data, and being clonable with its configuration intact. Any
+    object exposing these three methods qualifies, whether it comes from
     scikit-learn, a gradient-boosting library, or a neural-network wrapper.
     ``get_params``/``set_params`` are part of the contract because pipeline
     composition and cross-validation clone estimators.
@@ -180,11 +183,47 @@ class Estimator(Protocol):
 
     def fit(self, X: Any, y: Any = None) -> Any: ...
 
-    def predict(self, X: Any) -> Any: ...
-
     def get_params(self, deep: bool = True) -> dict[str, Any]: ...
 
     def set_params(self, **params: Any) -> Any: ...
+
+
+@runtime_checkable
+class Estimator(Fittable, Protocol):
+    """A model that can answer for a row it was not fitted on.
+
+    Every supervised model, and the subset of clusterers that keep enough fitted
+    state to place a new row -- ``KMeans``, ``MiniBatchKMeans``, ``Birch``. The
+    required members are unchanged from when this protocol had no base class:
+    ``fit``, ``predict``, ``get_params``, ``set_params``.
+
+    ``DBSCAN``, ``OPTICS`` and ``AgglomerativeClustering`` deliberately do *not*
+    satisfy this, which is why :class:`Fittable` was split out beneath it. They
+    expose no ``predict``, because they define no rule for an unseen row, and a
+    protocol wide enough to admit them would be promising a method that is not
+    there -- a promise that would come due at prediction time rather than here.
+    """
+
+    def predict(self, X: Any) -> Any: ...
+
+
+@runtime_checkable
+class ClusterEstimator(Fittable, Protocol):
+    """A model that partitions the rows it is fitted on.
+
+    ``fit_predict`` rather than ``predict``, because for several of these
+    algorithms the labelling is produced *by* the fit and cannot be recovered
+    afterwards for any other rows.
+
+    Satisfying this says nothing about whether new rows can be assigned. That
+    question is :class:`Estimator`, and the two overlap: ``KMeans`` satisfies
+    both, ``DBSCAN`` only this one. The overlap is exactly the set of models
+    declaring ``supports_out_of_sample_assignment``, and the contract tests
+    assert that the protocol and the declaration agree rather than trusting
+    either on its own.
+    """
+
+    def fit_predict(self, X: Any, y: Any = None) -> Any: ...
 
 
 @runtime_checkable

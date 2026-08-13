@@ -15,6 +15,7 @@ from scipy import sparse
 
 from aidatasetkit.core.exceptions import (
     AmbiguousFeatureRoleError,
+    PreprocessingError,
     SchemaError,
     UnsupportedTaskError,
 )
@@ -205,8 +206,14 @@ class TestNothingVanishesSilently:
 
 class TestRegressionTargetGuard:
     def test_a_continuous_target_is_refused_without_a_profile(self):
-        """Silently turning prices into class indices destroys the quantity."""
-        with pytest.raises(UnsupportedTaskError, match="non-integral"):
+        """Silently turning prices into class indices destroys the quantity.
+
+        The match was ``"non-integral"`` while the guard looked for non-integral
+        floats specifically. It now asks the shared authority whether the values
+        are quantities at all, so the assertion names the *contract* rather than
+        the implementation that happened to enforce it.
+        """
+        with pytest.raises(UnsupportedTaskError, match="must not be label encoded"):
             TargetLabelEncoder().fit(pd.Series(np.linspace(0.0, 1000.0, 200)))
 
     def test_integer_coded_classes_still_encode(self):
@@ -216,6 +223,107 @@ class TestRegressionTargetGuard:
     def test_whole_number_floats_are_still_allowed(self):
         encoded = TargetLabelEncoder().fit_transform(pd.Series([0.0, 1.0] * 30))
         assert set(np.unique(encoded)) == {0, 1}
+
+
+class TestOversizedNumbersDoNotEscapeAsABareOverflowError:
+    """S4 owns finiteness, so it owns the value that cannot be made finite.
+
+    ``numeric_text_policy="convert"`` routes a text column through the numeric
+    branch, where ``_require_finite`` casts it to ``float64`` to look for
+    infinities. A Python ``int`` beyond ``float64`` range answers that cast with
+    ``OverflowError``, which is a subclass of neither ``TypeError`` nor
+    ``ValueError`` -- so it walked past the guard and reached the caller as a bare
+    ``"int too large to convert to float"`` naming no column, for a condition this
+    layer had built a check for. ``_validate_codes`` on the target path catches
+    ``OverflowError`` deliberately, with a comment saying why; this one did not.
+
+    Adding it to the tuple was necessary and not sufficient: ``pd.to_numeric``,
+    the fallback the tuple routes to, raises the same exception. Both are guarded.
+    """
+
+    @staticmethod
+    def _prepare(frame, config):
+        profile = PreprocessingProfile(
+            requires_scaling=False,
+            supports_sparse_input=False,
+            handles_missing_values=False,
+        )
+        dataset_profile = DataProfiler().profile(frame)
+        quality = DataQualityInspector().inspect(frame, profile=dataset_profile)
+        plan = PreprocessingPlanner(config).plan(
+            frame, dataset_profile, profile, quality=quality
+        )
+        return PreprocessorBuilder(config).build(plan, frame)
+
+    @pytest.fixture
+    def convert(self):
+        from aidatasetkit.preprocessing import NumericTextPolicy
+
+        return PreprocessingConfig(numeric_text_policy=NumericTextPolicy.CONVERT)
+
+    @pytest.fixture
+    def oversized(self):
+        """Whole numbers written out, far beyond what a float64 can hold."""
+        return pd.DataFrame(
+            {
+                "amount": pd.Series([10**400] * 3 + [1, 2] * 24, dtype=object),
+                "steady": np.linspace(0.0, 1.0, 51),
+            }
+        )
+
+    def test_no_raw_overflow_error_escapes(self, oversized, convert):
+        preprocessor = self._prepare(oversized, convert)
+        with pytest.raises(PreprocessingError) as raised:
+            preprocessor.fit(oversized)
+        assert not isinstance(raised.value, OverflowError)
+        assert "int too large to convert to float" not in str(raised.value)
+
+    def test_the_error_is_the_project_s_own_and_names_the_column(
+        self, oversized, convert
+    ):
+        preprocessor = self._prepare(oversized, convert)
+        with pytest.raises(PreprocessingError) as raised:
+            preprocessor.fit(oversized)
+        message = str(raised.value)
+        assert type(raised.value).__module__.startswith("aidatasetkit")
+        assert "'amount'" in message
+        assert "3 value(s)" in message, "the count sends a reader to the right rows"
+        assert "steady" not in message, "the innocent column must not be blamed"
+
+    def test_the_caller_frame_is_unchanged(self, oversized, convert):
+        before = oversized.copy(deep=True)
+        preprocessor = self._prepare(oversized, convert)
+        with pytest.raises(PreprocessingError):
+            preprocessor.fit(oversized)
+        pd.testing.assert_frame_equal(oversized, before)
+
+    def test_oversized_text_still_reports_as_an_infinity(self, convert):
+        """The route that already worked keeps its own wording.
+
+        ``"1e400"`` coerces to ``inf`` rather than overflowing, so it is caught by
+        the original check. Both routes end in a project error naming the column;
+        they differ only in which true thing they say about the value.
+        """
+        frame = pd.DataFrame(
+            {
+                "amount": pd.Series(["1e400", "1", "2", "3"] * 13, dtype=object),
+                "steady": np.linspace(0.0, 1.0, 52),
+            }
+        )
+        preprocessor = self._prepare(frame, convert)
+        with pytest.raises(PreprocessingError, match="infinite value"):
+            preprocessor.fit(frame)
+
+    def test_ordinary_numeric_text_still_converts(self, convert):
+        """The guard must not start refusing the column this policy exists for."""
+        frame = pd.DataFrame(
+            {
+                "amount": pd.Series(["1", "2", "3", "4"] * 13, dtype=object),
+                "steady": np.linspace(0.0, 1.0, 52),
+            }
+        )
+        preprocessor = self._prepare(frame, convert)
+        assert preprocessor.fit_transform(frame).shape[0] == len(frame)
 
 
 class TestConfigIntegrity:

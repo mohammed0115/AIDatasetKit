@@ -29,7 +29,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from aidatasetkit.core.exceptions import AIDatasetKitError
+from aidatasetkit.core.exceptions import (
+    AIDatasetKitError,
+    AmbiguousModelAliasError,
+    IncompatibleModelError,
+)
 from aidatasetkit.evidence import (
     AuditBuilder,
     Verdict,
@@ -144,10 +148,10 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         choices=["classification", "regression"],
         help=(
-            "Task hint. Detected from the target when omitted. Only "
-            "classification is verified in this release; 'regression' is "
-            "accepted and profiled, but its preprocessing and model evidence "
-            "are not yet verified, and the run says so."
+            "Task hint, and the way to say which family a shared model alias "
+            "means. Detected from the target when omitted. Regression models "
+            "and their preprocessing are verified; the readiness verdict is "
+            "not, and a regression run says so."
         ),
     )
     audit.add_argument(
@@ -155,7 +159,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Optional model context, by canonical name or alias. Used only to "
-            "record which capabilities shaped the plan; nothing is trained."
+            "record which capabilities shaped the plan; nothing is trained. "
+            "Most short aliases name a family and need --task to settle them."
         ),
     )
     audit.add_argument(
@@ -299,7 +304,19 @@ def _audit(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return EXIT_CODES["usage"]
-        registration = ModelFactory.registration(args.model, task=args.task)
+        try:
+            registration = ModelFactory.registration(args.model, task=args.task)
+        except AmbiguousModelAliasError as error:
+            # The registry's message is written for the Python API and says to
+            # "Pass task=", a keyword no command line accepts. The candidates it
+            # names are the useful part, so they are kept and the instruction is
+            # translated into the flag this program actually has.
+            print(
+                f"error: {error} Here that means --task classification or "
+                "--task regression.",
+                file=sys.stderr,
+            )
+            return EXIT_CODES["usage"]
         registration.require_available()
 
     # --- established facts, each from the layer that owns it ---------------
@@ -327,15 +344,43 @@ def _audit(args: argparse.Namespace) -> int:
 
     if target_profile is not None and target_profile.task_type.value == "regression":
         # Accepted rather than refused: the profiling and quality evidence is
-        # just as useful for a regression target. But this release verified
-        # classification end to end and nothing else, and an artifact that did
-        # not say so would let a reader assume a guarantee that was never made.
+        # just as useful for a regression target.
+        #
+        # The warning is narrower than it was. Until S6 nothing regression-shaped
+        # had been verified at all, so it said so. S6 held nine regressors to the
+        # same executed capability contracts the classifiers pass, and drove them
+        # through the same S4 path, so continuing to claim otherwise would be the
+        # same failure in reverse -- telling a reader something is unproven when
+        # it has been proven. What remains genuinely unverified is named instead.
         warnings.append(
-            "This run was audited as a regression task. Only classification "
-            "readiness is verified in 0.1.0a1: the profiling and quality "
-            "evidence applies, but preprocessing and model-capability evidence "
-            "for regression has not been verified."
+            "This run was audited as a regression task. The profiling, quality, "
+            "preprocessing and model-capability evidence applies: regression "
+            "models are held to the same verified capability contracts as "
+            "classifiers. What has not been verified is the readiness verdict "
+            "itself -- its thresholds, and the leakage checks behind it, were "
+            "built and measured against classification targets."
         )
+
+    if registration is not None and target_profile is not None:
+        # The model was resolved before the target was typed -- it has to be,
+        # because --task may be absent and the registry needs *something* to
+        # narrow a shared alias. So the compatibility check that
+        # ModelFactory.create(name, target=...) performs has to be repeated here,
+        # against what the detector actually concluded.
+        #
+        # Without it an audit will happily record a regressor beside a
+        # classification target, with warnings == [] -- an artifact asserting a
+        # contradiction, which is worse than one that refuses to be written. The
+        # plan is skipped rather than the run aborted, because the profiling and
+        # quality evidence is still true and still worth having.
+        try:
+            registration.capabilities.validate_for(target_profile)
+        except IncompatibleModelError as error:
+            blocked_reason = (
+                f"the model does not match the detected target: {error}"
+            )
+            warnings.append(blocked_reason)
+            _logger.info("model/target task mismatch", exc_info=True)
 
     if registration is not None and args.target is not None and blocked_reason is None:
         try:

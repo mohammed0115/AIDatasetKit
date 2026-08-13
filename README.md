@@ -142,6 +142,86 @@ open("audit.json", "w").write(canonical_json(artifact.to_dict()))
 Every layer is usable on its own: profiling without quality checks, quality
 checks without preprocessing, preprocessing without a model.
 
+## The guided workflow
+
+For the common path from a dataframe to predictions, one object walks the whole
+sequence:
+
+```python
+from aidatasetkit import AIDataFacade
+
+ai = AIDataFacade(
+    target="Churn",
+    id_column="CustomerID",
+    task="classification",
+    positive_label="churn",     # "churn" sorts first, so it encodes to 0
+)
+ai.load(train_df, test_df)
+
+ai.profile()
+ai.statistics()
+ai.check_quality()              # BLOCKED data cannot be trained through here
+ai.prepare()                    # plans the pipelines; fits nothing
+
+results = ai.compare_models()   # one split, every model, one metric policy
+print(results.to_frame())
+
+ai.select_model("logistic_regression")   # your decision, not the ranking's
+
+ai.train()
+print(ai.evaluate()["f1"].value)
+
+predictions = ai.predict_test()          # original labels, not 0/1
+print(predictions.to_frame().head())
+```
+
+Regression works the same way — `AIDataFacade(target="price")` infers the task,
+and predictions come back as quantities that never touch a label encoder.
+
+**`compare_models()` is not hyperparameter optimization.** Comparing ten models
+is exactly ten fits at their published defaults. And it does not select anything:
+a ranking holds under one dataset, one split and one metric, so choosing stays
+explicit.
+
+The facade is optional. Everything above is the same code the section before it
+calls directly, and for identical inputs the two routes produce identical
+results. See `docs/facade.md`.
+
+## Clustering
+
+Data with no labels takes the same path, minus the target:
+
+```python
+ai = AIDataFacade(task="clustering")     # no target, and naming one is refused
+ai.load(customers)
+ai.check_quality()
+
+result = ai.cluster("kmeans", n_clusters=3)
+print(result.n_clusters, result.noise_count, result.cluster_sizes)
+print(result.evaluation["silhouette"].value)
+
+result.assign(new_customers)             # only for models that can
+```
+
+Six algorithms — `kmeans`, `minibatch_kmeans`, `dbscan`, `optics`,
+`agglomerative`, `birch` — on the same registry, factory and capability-driven
+preprocessing as the eighteen supervised models. Twenty-four models still need
+only five preprocessors between them.
+
+Three things about it are worth knowing before you read a number it produces:
+
+- **Half of them cannot label a row they were not fitted on.** `DBSCAN`, `OPTICS`
+  and `AgglomerativeClustering` produce a labelling of the fitted rows and define
+  no rule for any other row, so `assign()` refuses rather than refitting. The
+  capability is recorded per model, measured by calling it.
+- **The metrics are in-sample and internal.** They describe how tidily this model
+  divided *this* data. A high silhouette is not evidence the clusters will
+  reproduce.
+- **There is no default ranking metric, deliberately.** On two interleaved
+  half-moons, all three internal metrics preferred KMeans's *wrong* convex split
+  to DBSCAN's correct one. Ranking on any of them would have put the model that
+  found the real structure last. `docs/clustering.md` has the numbers.
+
 ## What you get
 
 | File | What it is |
@@ -177,19 +257,30 @@ says *no known blocker found*, *review required*, *possible leakage*,
 ## Scope of this alpha
 
 Supported: pandas DataFrames and CSV files · tabular data · binary and multiclass
-classification readiness · scikit-learn model contexts · profiling · quality and
-leakage diagnostics · capability-driven preprocessing plans · feature lineage ·
-audit artifacts.
+classification readiness · regression model contexts · scikit-learn model
+contexts · profiling · quality and leakage diagnostics · capability-driven
+preprocessing plans · feature lineage · audit artifacts.
 
-Not supported yet: regression, clustering, anomaly detection, dimensionality
-reduction, time series, text, images, model training, model comparison,
-hyperparameter tuning, databases, cloud storage, Parquet, Excel.
+Also merged, unreleased: model training, evaluation, model comparison, the
+`AIDataFacade` workflow above, and clustering.
+
+Not supported yet: anomaly detection, dimensionality reduction, time series,
+text, images, hyperparameter tuning, cross-validation, model persistence,
+databases, cloud storage, Parquet, Excel.
+
+Regression models and their preprocessing are held to the same executed
+capability contracts as the classifiers. The *readiness verdict* is not: its
+thresholds, and the leakage checks behind it, were built and measured against
+classification targets. An audit of a regression target says so in its own
+output.
 
 ## Known limitations
 
 - Leakage detection is statistical. A feature that encodes the outcome for
   reasons the numbers do not show will not be found.
-- Only tabular supervised classification has been verified end to end.
+- The readiness verdict has been verified end to end for classification only.
+  Regression models and preprocessing are verified; the thresholds that turn
+  findings into a verdict were measured against classification targets.
 - Datetime columns are profiled but never turned into features automatically.
 - An audit records what preprocessing *would* do. It does not prove a model was
   trained on the data it describes.
@@ -207,13 +298,27 @@ people use is worth more right now than a larger catalogue nobody has tried.
 quality · visualization planning · capability-driven preprocessing · nine
 classifiers · evidence and provenance · the CLI.
 
-**Next, after alpha feedback** — regression readiness · training and evaluation
-orchestration · a unified facade over the layers.
+**Merged since the alpha, unreleased** — nine regressors, on the same registry,
+the same factory and the same capability-driven preprocessing. Eighteen models
+still need only five preprocessors between them, because the cache key is a
+capability triple and not a model name. One behaviour changed with them: eight
+short aliases (`random_forest`, `knn`, `dummy`, and five others) now name both a
+classifier and a regressor, so they need a task to settle them. `CHANGELOG.md`
+lists all eight.
 
-**Planned expansion** — clustering · anomaly detection and dimensionality
-reduction · external model backends (XGBoost, LightGBM, CatBoost) · deep
-learning · richer leakage evidence · artifact diffing across runs · SARIF output
-for code-scanning integrations.
+Also merged: **training, evaluation and model comparison**. One split drawn once
+and shared by every model, capability-driven preparation per model, metrics that
+say why they are missing rather than going quiet, and a ranking that claims only
+what it measured. `docs/training-and-comparison.md` describes it. It is not
+hyperparameter optimization: comparing ten models is exactly ten fits.
+
+**Next, after alpha feedback** — richer leakage evidence · shaped by what alpha
+users actually report.
+
+**Planned expansion** — anomaly detection and dimensionality reduction · external
+model backends (XGBoost, LightGBM, CatBoost) · deep learning · richer leakage
+evidence · artifact diffing across runs · SARIF output for code-scanning
+integrations.
 
 What ships next is shaped by what alpha users report, not by this list's order.
 
@@ -233,6 +338,9 @@ The full documentation ships with the source distribution, under `docs/`:
 | `docs/lineage.md` | What happened to each column, and how to read it |
 | `docs/safety-model.md` | What the verdict claims, and what it does not |
 | `docs/privacy.md` | Exactly what an artifact does and does not reveal |
+| `docs/facade.md` | The guided workflow, its state, and its safety behaviour |
+| `docs/training-and-comparison.md` | Training, metrics, ranking, and what a comparison claims |
+| `docs/clustering.md` | The six clusterers, what their metrics claim, and what they do not |
 | `docs/limitations.md` | What this release cannot do |
 | `CONTRIBUTING.md` | Setup, tests, architecture boundaries, extension points |
 

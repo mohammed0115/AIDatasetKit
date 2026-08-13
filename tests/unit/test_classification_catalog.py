@@ -59,8 +59,13 @@ class TestTheCatalogHoldsWhatWasApproved:
     def test_it_contains_exactly_the_approved_models(self):
         assert ModelFactory.available(task="classification") == EXPECTED
 
-    def test_no_regression_model_has_appeared(self):
-        assert ModelFactory.available(task="regression") == ()
+    def test_the_regression_family_did_not_leak_into_this_one(self):
+        """S6 added nine regressors. None of them may answer to a classification
+        filter, and none of these nine may vanish because it did."""
+        from tests.conftest import BUILT_IN_REGRESSORS
+
+        assert not (set(EXPECTED) & set(BUILT_IN_REGRESSORS))
+        assert set(ModelFactory.available(task="classification")) == set(EXPECTED)
 
     def test_every_classifier_is_constructible_here(self):
         for name in EXPECTED:
@@ -90,7 +95,8 @@ _FRESH_SCRIPT = (
     "from aidatasetkit.models import ModelFactory;"
     "print(','.join(ModelFactory.available(task='classification')));"
     "print(len(ModelFactory.available(task='classification')));"
-    "print(ModelFactory.create('random_forest').__class__.__name__);"
+    "print(ModelFactory.create('random_forest', task='classification')"
+    ".__class__.__name__);"
     "print(any('classification.forest' in m for m in sys.modules))"
 )
 
@@ -138,7 +144,7 @@ class TestOrderingIsDeterministic:
 
 
 class TestRegistrationNeedsNoManualImport:
-    """A user types ModelFactory.create('random_forest'). Nothing else."""
+    """A user types ModelFactory.create('random_forest', task=...). Nothing else."""
 
     def test_a_fresh_interpreter_sees_every_classifier(self, fresh_runs):
         assert {run[1] for run in fresh_runs.values()} == {"9"}
@@ -154,8 +160,10 @@ class TestRegistrationNeedsNoManualImport:
 class TestAliases:
     @pytest.mark.parametrize("canonical,aliases", sorted(EXPECTED_ALIASES.items()))
     def test_the_concise_alias_resolves_to_its_model(self, canonical, aliases):
+        """Narrowed by task: since S6 all but ``gnb`` are shared with a regressor."""
         for alias in aliases:
-            assert ModelFactory.registration(alias).canonical_name == canonical
+            entry = ModelFactory.registration(alias, task="classification")
+            assert entry.canonical_name == canonical
 
     @pytest.mark.parametrize("canonical,aliases", sorted(EXPECTED_ALIASES.items()))
     def test_the_registry_reports_those_aliases(self, canonical, aliases):
@@ -166,7 +174,7 @@ class TestAliases:
         assert "naive_bayes" not in default_registry()
 
     def test_no_alias_shadows_a_canonical_name(self):
-        canonical = set(ModelFactory.available(task="classification"))
+        canonical = set(ModelFactory.available())
         for aliases in EXPECTED_ALIASES.values():
             assert not (set(aliases) & canonical)
 
@@ -177,8 +185,45 @@ class TestAliases:
         )
 
     def test_asking_for_a_classifier_as_a_regressor_is_a_contradiction(self):
-        with pytest.raises(IncompatibleModelError):
-            ModelFactory.registration("random_forest", task="regression")
+        """A *canonical* name carries its family, so the task cannot override it.
+
+        Before S6 the alias made the same point, because nothing regression-shaped
+        answered to it. Now the alias legitimately resolves to a regressor, and the
+        contradiction this test exists to pin is the one a canonical name creates.
+        """
+        with pytest.raises(IncompatibleModelError, match="serves classification"):
+            ModelFactory.registration("random_forest_classifier", task="regression")
+
+    @pytest.mark.parametrize("alias", sorted({a for v in EXPECTED_ALIASES.values() for a in v}))
+    def test_every_shared_alias_now_answers_for_both_families(self, alias):
+        """The concise names are shared, and the task is what settles them.
+
+        ``gnb`` is the one exception: there is no Gaussian naive Bayes regressor,
+        so its alias resolves without a task and is expected to.
+        """
+        classifier = ModelFactory.registration(alias, task="classification")
+        assert classifier.task_type is TaskType.CLASSIFICATION
+        if alias == "gnb":
+            assert ModelFactory.registration(alias).canonical_name == "gaussian_nb"
+            return
+        regressor = ModelFactory.registration(alias, task="regression")
+        assert regressor.task_type is TaskType.REGRESSION
+        assert classifier.canonical_name != regressor.canonical_name
+
+    @pytest.mark.parametrize(
+        "alias",
+        ["decision_tree", "dummy", "baseline", "extra_trees", "gradient_boosting",
+         "hist_gradient_boosting", "knn", "random_forest"],
+    )
+    def test_and_the_bare_form_refuses_rather_than_preferring_this_family(self, alias):
+        """The one user-visible behaviour S6 changes, pinned deliberately.
+
+        A classification-first tie-break would have kept these calls working and
+        would have been the registry choosing arbitrarily -- the single thing its
+        design refuses to do. The refusal names both candidates.
+        """
+        with pytest.raises(AmbiguousModelAliasError, match="Pass task="):
+            ModelFactory.registration(alias)
 
 
 class TestAliasesSurviveTheArrivalOfRegression:
@@ -348,11 +393,20 @@ class TestErrorsDidNotRegressWhileTheCatalogGrew:
 
     def test_an_unknown_parameter_is_still_refused_by_name(self):
         with pytest.raises(InvalidModelParameterError, match="n_estimatorss"):
-            ModelFactory.create("random_forest", n_estimatorss=10)
+            ModelFactory.create("random_forest", task="classification", n_estimatorss=10)
 
     def test_the_refusal_lists_what_is_accepted(self):
         with pytest.raises(InvalidModelParameterError, match="n_estimators"):
-            ModelFactory.create("extra_trees", nonsense=1)
+            ModelFactory.create("extra_trees", task="classification", nonsense=1)
+
+    def test_an_ambiguous_alias_is_reported_before_the_parameter_is_looked_at(self):
+        """Two mistakes at once still names the one the user must fix first.
+
+        Nothing can be said about whether ``n_estimatorss`` is accepted until it
+        is known which estimator was meant.
+        """
+        with pytest.raises(AmbiguousModelAliasError):
+            ModelFactory.create("random_forest", n_estimatorss=10)
 
     @pytest.mark.parametrize(
         "name,param,value",
@@ -367,15 +421,21 @@ class TestErrorsDidNotRegressWhileTheCatalogGrew:
         ],
     )
     def test_overrides_reach_the_estimator(self, name, param, value):
-        assert ModelFactory.create(name, **{param: value}).get_params()[param] == value
+        estimator = ModelFactory.create(name, task="classification", **{param: value})
+        assert estimator.get_params()[param] == value
 
     def test_class_weight_may_be_passed_but_is_never_chosen(self):
         """The library must not select a rebalancing strategy on the user's behalf."""
-        assert ModelFactory.create("random_forest").get_params()["class_weight"] is None
         assert (
-            ModelFactory.create("random_forest", class_weight="balanced").get_params()[
+            ModelFactory.create("random_forest", task="classification").get_params()[
                 "class_weight"
             ]
+            is None
+        )
+        assert (
+            ModelFactory.create(
+                "random_forest", task="classification", class_weight="balanced"
+            ).get_params()["class_weight"]
             == "balanced"
         )
 
@@ -424,10 +484,10 @@ class TestPreprocessingProfilesAreShared:
 
     def test_the_two_boosters_do_not_share_a_profile(self, by_profile):
         gradient = ModelFactory.registration(
-            "gradient_boosting"
+            "gradient_boosting", task="classification"
         ).capabilities.preprocessing_profile()
         hist = ModelFactory.registration(
-            "hist_gradient_boosting"
+            "hist_gradient_boosting", task="classification"
         ).capabilities.preprocessing_profile()
         assert gradient != hist
 

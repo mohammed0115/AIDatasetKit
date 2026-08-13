@@ -28,6 +28,7 @@ from aidatasetkit.core.exceptions import (
     UnsupportedTaskError,
     ValidationError,
 )
+from aidatasetkit.core.schema import numeric_target_values, target_holds_quantities
 from aidatasetkit.core.types import (
     SUPERVISED_TASKS,
     NumericSummary,
@@ -172,15 +173,36 @@ class TaskDetector:
     def _resolve_task(
         self, present: pd.Series, requested: TaskType | None
     ) -> tuple[TaskType, str]:
-        """Decide the task family and explain how the decision was reached."""
+        """Decide the task family and explain how the decision was reached.
+
+        A hint is the caller saying what they intend, and it is checked against
+        the data in *both* directions. Regression has always been refused on a
+        target holding labels. Classification was not refused on a target holding
+        quantities, and the consequence was not a bad model but a silent one: the
+        profile said classification, the target encoder trusted the profile, and a
+        column of measurements became class indices with nothing raised anywhere.
+        """
         unique_count = int(present.nunique())
-        is_numeric = pdt.is_numeric_dtype(present) and not pdt.is_bool_dtype(present)
+        # Values, not dtype. A column of floats stored under object dtype holds
+        # nothing but quantities, and asking pandas for the dtype answers that it
+        # is not numeric at all.
+        is_numeric = numeric_target_values(present) is not None
 
         if requested is TaskType.REGRESSION:
             if not is_numeric:
                 raise UnsupportedTaskError(
                     f"Regression was requested but the target has dtype "
                     f"{present.dtype!r}, which holds labels rather than quantities."
+                )
+            if unique_count < 2:
+                # The classification branch below and the inference path both
+                # refuse this; the regression branch did not, so a constant target
+                # became a valid run in which every model scored a perfect
+                # RMSE of 0.0 and the leaderboard looked excellent.
+                raise UnsupportedTaskError(
+                    "Regression was requested but the target holds a single "
+                    "distinct value, so there is nothing to predict. Every model "
+                    "would score perfectly by returning that value."
                 )
             return TaskType.REGRESSION, "regression requested by the caller"
 
@@ -190,9 +212,42 @@ class TaskDetector:
                     "Classification was requested but the target has only "
                     f"{unique_count} distinct value(s); at least two are needed."
                 )
+            if target_holds_quantities(present, self._config):
+                raise UnsupportedTaskError(self._quantity_refusal(present, unique_count))
             return TaskType.CLASSIFICATION, "classification requested by the caller"
 
         return self._infer_task(present, unique_count, is_numeric)
+
+    def _quantity_refusal(self, present: pd.Series, unique_count: int) -> str:
+        """Explain why a requested classification is not being carried out.
+
+        Four things a reader needs: what they asked for, what the data looks
+        like, what encoding it would cost them, and how to proceed. The task is
+        never quietly reinterpreted -- answering a different question than the
+        one asked is how a caller ends up trusting a result they did not request.
+        """
+        if self._all_integral(present):
+            evidence = (
+                f"{unique_count} distinct whole numbers, above the "
+                f"{self._config.task_detection_max_classes}-class limit"
+            )
+        else:
+            evidence = f"{unique_count} distinct values, not all of them whole numbers"
+        return (
+            f"Classification was requested, but this target holds quantities: "
+            f"{evidence}. Encoding them as classes would replace every "
+            "measurement with an arbitrary index and destroy the thing being "
+            'predicted. Pass hint="regression" if that is what this column is, '
+            "or name the label column if you meant a different one. The task you "
+            "asked for is not reinterpreted for you."
+        )
+
+    def _all_integral(self, present: pd.Series) -> bool:
+        """Whether every present value is a whole number."""
+        values = numeric_target_values(present)
+        if values is None:
+            return False
+        return bool(np.all(np.isfinite(values)) and np.all(values == np.floor(values)))
 
     def _infer_task(
         self, present: pd.Series, unique_count: int, is_numeric: bool
@@ -229,7 +284,10 @@ class TaskDetector:
         if unique_count == 2:
             return TaskType.CLASSIFICATION, "numeric target with exactly two values"
 
-        values = present.to_numpy(dtype="float64", na_value=np.nan)
+        # Through the shared reader, so that an object-dtype column of numbers
+        # reaches this branch with the same values a float64 column would.
+        # ``is_numeric`` was decided by the same function, so this cannot be None.
+        values = numeric_target_values(present)
         integral = bool(np.all(np.isfinite(values)) and np.all(values == np.floor(values)))
         if not integral:
             return TaskType.REGRESSION, "numeric target with non-integral values"
