@@ -346,6 +346,10 @@ The full documentation ships with the source distribution, under `docs/`:
 
 Read `docs/privacy.md` before sharing an artifact outside your team.
 
+## Research & Real-World Comparative Study
+
+The repository includes a reproducible [comparative research lab](https://github.com/mohammed0115/AIDatasetKit/blob/main/examples/research/AIDatasetKit_Real_World_Comparative_Study.ipynb) that contrasts a conventional `pandas`/`scikit-learn` workflow with AIDatasetKit across public tabular datasets. It evaluates trade-offs in **safety, transparency, reproducibility, workflow complexity, flexibility, and runtime**; it does not claim universal superiority or replace domain validation. The [research protocol](https://github.com/mohammed0115/AIDatasetKit/blob/main/docs/research/AIDatasetKit_Research_Protocol.md) defines the datasets, fairness criteria, controlled stress tests, limitations, and threats to validity.
+
 ## Status
 
 Public alpha (`0.1.0a1`), Apache-2.0 licensed. The artifact schema is versioned independently of the

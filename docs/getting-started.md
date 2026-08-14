@@ -154,3 +154,8 @@ what the other layers concluded and computes nothing of its own.
 - [The audit artifact](audit-artifact.md) — every field, and what it means
 - [Feature lineage](lineage.md) — what happened to each column
 - [Safety model](safety-model.md) — what the verdict does and does not claim
+
+
+## After the guided task workflows
+
+Once you can inspect a dataset, read the [facade guide](facade.md), and understand the task-specific contracts, explore the [Real-World Comparative Study](../examples/research/AIDatasetKit_Real_World_Comparative_Study.ipynb). It contrasts a careful manual `pandas`/`scikit-learn` workflow with AIDatasetKit on published public datasets. Read its [research protocol](research/AIDatasetKit_Research_Protocol.md) before drawing conclusions: the lab studies trade-offs in safety, transparency, reproducibility, complexity, flexibility, and runtime; it does not claim universal superiority.
