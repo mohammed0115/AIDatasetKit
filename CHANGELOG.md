@@ -9,6 +9,32 @@ Versions before `1.0` may change public interfaces and the artifact schema; see
 First alpha, not yet released: nothing has been published to PyPI, TestPyPI or
 as a GitHub release, and no version is tagged. Everything below is new.
 
+### G0 baseline stabilisation
+
+Evidence for every item: `docs/evidence/G0_FINAL_CERTIFICATION_REPORT.md`.
+
+- **Breaking — output layout.** `aidatasetkit audit` publishes each run as a
+  complete set under `<output>/runs/<run_id>/` with a `manifest.json` of sizes
+  and SHA-256 digests, and makes it current by atomically replacing
+  `<output>/CURRENT`. Read runs with `aidatasetkit.evidence.read_current`, which
+  verifies the whole set or refuses it. Nothing is written at the root of
+  `--output` any more; files an older version left there are not touched.
+- **Validation and final test are separate.** `AIDataFacade.evaluate()` scores
+  the validation rows, which also rank a comparison;
+  `status["validation_used_for_selection"]` says when they did.
+  `evaluate_final()` scores the external test frame once and freezes the
+  experiment: comparing, selecting and training refuse until new data is loaded.
+- **Breaking — `KitConfig.cv_folds` removed.** Nothing read it; there is no
+  cross-validation. The config fingerprint moved, and the migration is recorded.
+- **Multicollinearity check** (twelfth default check), bounded to 50 numeric
+  columns and 20,000 rows, overflow-safe, with a validated threshold.
+- **Overflow.** Integers beyond float64 are counted exactly on pandas 2; means,
+  medians, quantiles and standard deviations of values near 1e308 are exact
+  instead of `nan`/`-inf`; a range beyond float64 is recorded as undefined.
+- **Dependency floors** raised to the tested minimum: numpy 1.26.4, pandas 2.1.4,
+  scipy 1.11.4, scikit-learn 1.6.1 (from an untested 1.4). SciPy 1.11 works again.
+- The package description no longer claims a "signed-off" artifact.
+
 ### The guided workflow
 
 - **`AIDataFacade`**, exported from the package root — one object walking load,
