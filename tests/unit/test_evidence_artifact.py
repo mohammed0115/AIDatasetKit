@@ -32,6 +32,8 @@ from aidatasetkit.models import ModelFactory
 from aidatasetkit.preprocessing import PreprocessingPlanner, PreprocessorBuilder
 from aidatasetkit.profiling import DataProfiler, DataQualityInspector, TaskDetector
 
+from tests.conftest import isolated_env
+
 SENSITIVE = "aisha.al-otaibi@example.com"
 
 
@@ -546,7 +548,7 @@ class TestDeterminismAcrossInterpreters:
                 capture_output=True,
                 text=True,
                 check=True,
-                env={"PYTHONHASHSEED": seed, "PATH": ""},
+                env=isolated_env(seed),
             ).stdout.strip().splitlines()
             results[seed] = (out[0], out[1])
         return results

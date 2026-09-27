@@ -21,6 +21,8 @@ from aidatasetkit.evidence import (
     schema_fingerprint,
 )
 
+from tests.conftest import isolated_env
+
 
 @pytest.fixture
 def frame() -> pd.DataFrame:
@@ -165,7 +167,7 @@ class TestFingerprintsSurviveAFreshInterpreter:
             capture_output=True,
             text=True,
             check=True,
-            env={"PYTHONHASHSEED": seed, "PATH": ""},
+            env=isolated_env(seed),
         ).stdout.strip()
 
     @pytest.fixture(scope="class")

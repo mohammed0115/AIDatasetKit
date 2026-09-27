@@ -6,6 +6,9 @@ unseeded random number generator or on the wall clock.
 
 from __future__ import annotations
 
+import os
+import sys
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -13,6 +16,32 @@ import pytest
 from aidatasetkit.core import KitConfig
 
 RANDOM_SEED = 20240101
+
+#: The variables a fresh Windows interpreter cannot start without, and nothing
+#: else. ``SystemRoot`` is not optional there: scikit-learn imports joblib, joblib
+#: imports asyncio, and asyncio's Windows event loop initialises Winsock, which
+#: fails with ``WinError 10106`` when the variable is absent. Measured, not
+#: assumed -- an environment of the seed and an empty PATH fails, and adding this
+#: one name and no other makes it start.
+WINDOWS_REQUIRED_ENV = ("SystemRoot",)
+
+
+def isolated_env(seed: str) -> dict[str, str]:
+    """An environment for a child interpreter that inherits as little as possible.
+
+    The determinism tests start a new interpreter under a chosen hash seed and
+    compare answers, so the child must not pick up anything from the parent that
+    could make two runs agree for the wrong reason. Passing ``os.environ``
+    through would defeat that. What is passed is the seed, an empty ``PATH``, and
+    on Windows the platform minimum without which the interpreter cannot import
+    scikit-learn at all.
+    """
+    env = {"PYTHONHASHSEED": seed, "PATH": ""}
+    if sys.platform == "win32":
+        for name in WINDOWS_REQUIRED_ENV:
+            if name in os.environ:
+                env[name] = os.environ[name]
+    return env
 
 #: The built-in classification catalog, in the canonical order the registry
 #: publishes. Written here rather than in each test file that needs it, so that

@@ -30,7 +30,12 @@ from aidatasetkit.core.types import (
 )
 from aidatasetkit.models import ModelFactory, default_registry
 
-from tests.conftest import BUILT_IN_CLASSIFIERS, BUILT_IN_CLUSTERERS, BUILT_IN_REGRESSORS
+from tests.conftest import (
+    BUILT_IN_CLASSIFIERS,
+    BUILT_IN_CLUSTERERS,
+    BUILT_IN_REGRESSORS,
+    isolated_env,
+)
 
 #: The approved catalog, named once in conftest and asserted here.
 EXPECTED = BUILT_IN_REGRESSORS
@@ -176,7 +181,7 @@ def _fresh(seed: str) -> list[str]:
         capture_output=True,
         text=True,
         check=True,
-        env={"PYTHONHASHSEED": seed, "PATH": ""},
+        env=isolated_env(seed),
     )
     return result.stdout.strip().splitlines()
 
