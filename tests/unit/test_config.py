@@ -57,6 +57,11 @@ class TestValidation:
         with pytest.raises(ConfigurationError, match="outlier_iqr_multiplier"):
             KitConfig(outlier_iqr_multiplier=value)
 
+    @pytest.mark.parametrize("value", [1.0, 0.5, -3.0])
+    def test_multicollinearity_threshold_must_exceed_one(self, value):
+        with pytest.raises(ConfigurationError, match="multicollinearity_vif_threshold"):
+            KitConfig(multicollinearity_vif_threshold=value)
+
     def test_task_detection_needs_at_least_two_classes(self):
         with pytest.raises(ConfigurationError, match="task_detection_max_classes"):
             KitConfig(task_detection_max_classes=1)

@@ -1,6 +1,6 @@
 """The shared input every quality check receives.
 
-The context exists so that eleven checks do not each recompute unique counts,
+The context exists so that twelve checks do not each recompute unique counts,
 missing ratios, and quartiles over the same frame. Everything measurable once is
 measured once, by the profiler, and handed to the checks.
 

@@ -41,6 +41,7 @@ __all__ = [
     "check_numeric_stored_as_text",
     "check_infinite_values",
     "check_outliers",
+    "check_multicollinearity",
     "check_class_imbalance",
     "check_target_leakage",
 ]
@@ -68,6 +69,13 @@ _LEADING_ZERO_PATTERN = re.compile(r"^[+-]?0\d")
 
 #: Values inspected when testing whether text is really numeric.
 _TEXT_SAMPLE_SIZE = 1000
+
+#: Floor on a regression's unexplained variance when turning it into a variance
+#: inflation factor. An exact linear dependency drives the unexplained share to
+#: zero and the VIF to a mathematical infinity, which ``json.dumps`` would emit
+#: as the non-standard ``Infinity`` token. The floor keeps every VIF finite --
+#: and, at ``1 / 1e-10``, unmistakably large -- so the artifact stays strict JSON.
+_MIN_UNEXPLAINED_VARIANCE = 1e-10
 
 
 # --------------------------------------------------------------------------- #
@@ -469,7 +477,107 @@ def check_outliers(frame: pd.DataFrame, context: QualityContext) -> list[Quality
 
 
 # --------------------------------------------------------------------------- #
-# J. Class imbalance
+# J. Multicollinearity among numeric features
+# --------------------------------------------------------------------------- #
+
+
+def check_multicollinearity(
+    frame: pd.DataFrame, context: QualityContext
+) -> list[QualityIssue]:
+    """Report numeric features whose variation is largely redundant with the rest.
+
+    For each eligible numeric feature, an ordinary least-squares fit against
+    every *other* eligible feature gives an R-squared; the variance inflation
+    factor is ``1 / (1 - R-squared)``. A VIF of 1 means the feature carries
+    information none of the others do. A VIF at or above the configured
+    threshold -- 10 by convention -- means most of its variance is already
+    present elsewhere in the feature set.
+
+    The fit is solved with :func:`numpy.linalg.lstsq`, not by inverting a
+    correlation matrix. Matrix inversion is the textbook shortcut for VIF, but
+    on nearly dependent columns it is numerically unstable enough to return a
+    large *negative* number where the true value is a large positive one --
+    floating-point cancellation in the inverse, not a property of the data.
+    A least-squares solve degrades smoothly instead, including on a feature
+    that is an exact linear combination of the others.
+
+    Constant, infinite-valued, and non-numeric columns are excluded before the
+    fit. Each already has its own check, and a constant column would make every
+    fit singular for a reason that has nothing to do with multicollinearity.
+    Rows with a missing value in any eligible column are excluded from this fit
+    only; nothing is imputed and the frame is not modified.
+
+    Fewer than two eligible columns, or no more rows than columns after the
+    exclusions, leaves nothing to compare, and the check reports nothing rather
+    than fit a regression with no degrees of freedom left to test it.
+    """
+    columns = [
+        profile.name
+        for profile in context.feature_profiles
+        if profile.detected_kind in (ColumnKind.NUMERIC, ColumnKind.BOOLEAN)
+        and not profile.is_constant
+        and not profile.infinite_count
+    ]
+    if len(columns) < 2:
+        return []
+
+    sample = frame[columns].dropna()
+    if len(sample) <= len(columns):
+        return []
+
+    matrix = sample.to_numpy(dtype="float64")
+    threshold = context.config.multicollinearity_vif_threshold
+    issues: list[QualityIssue] = []
+
+    for position, column in enumerate(columns):
+        target_values = matrix[:, position]
+        predictors = np.delete(matrix, position, axis=1)
+        design = np.column_stack([np.ones(len(predictors)), predictors])
+
+        coefficients, _, _, _ = np.linalg.lstsq(design, target_values, rcond=None)
+        residuals = target_values - design @ coefficients
+
+        total_variance = float(np.sum((target_values - target_values.mean()) ** 2))
+        if total_variance == 0.0:
+            continue
+
+        r_squared = min(max(1.0 - float(np.sum(residuals**2)) / total_variance, 0.0), 1.0)
+        vif = 1.0 / max(1.0 - r_squared, _MIN_UNEXPLAINED_VARIANCE)
+        if vif < threshold:
+            continue
+
+        issues.append(
+            QualityIssue(
+                code="possible_multicollinearity",
+                severity=Severity.WARNING,
+                column=column,
+                requires_review=True,
+                message=(
+                    f"Column {column!r} has a variance inflation factor of "
+                    f"{vif:.3g} against the other numeric features, at or above "
+                    f"the configured threshold of {threshold:.3g}. Most of its "
+                    "variation is redundant with features already in the set."
+                ),
+                details={
+                    "vif": vif,
+                    "threshold": threshold,
+                    "r_squared": r_squared,
+                    "other_numeric_features": [name for name in columns if name != column],
+                },
+                recommendation=(
+                    "High collinearity does not hurt a model's predictions by "
+                    "itself, but it destabilises coefficients in linear models "
+                    "and makes per-feature importance unreliable. Consider "
+                    "dropping or combining one of the correlated features if "
+                    "you need to interpret coefficients."
+                ),
+            )
+        )
+    return issues
+
+
+# --------------------------------------------------------------------------- #
+# K. Class imbalance
 # --------------------------------------------------------------------------- #
 
 
@@ -516,7 +624,7 @@ def check_class_imbalance(
 
 
 # --------------------------------------------------------------------------- #
-# K. Possible target leakage
+# L. Possible target leakage
 # --------------------------------------------------------------------------- #
 
 
@@ -717,6 +825,7 @@ DEFAULT_CHECKS: tuple[Check, ...] = (
     check_numeric_stored_as_text,
     check_infinite_values,
     check_outliers,
+    check_multicollinearity,
     check_class_imbalance,
     check_target_leakage,
 )

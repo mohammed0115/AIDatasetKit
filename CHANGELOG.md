@@ -218,9 +218,9 @@ First public alpha. Everything below is new, because nothing was public before.
 
 - **Statistics** — every degenerate case that numpy or scipy answers with `NaN`
   raises instead, so a number in a report is never a silent placeholder.
-- **Profiling and data quality** — per-column measurement and eleven independent
+- **Profiling and data quality** — per-column measurement and twelve independent
   checks covering leakage, identifiers, constants, cardinality, missingness,
-  outliers, duplicates, and numbers stored as text.
+  outliers, duplicates, multicollinearity, and numbers stored as text.
 - **Smart visualization** — chart *recommendations* separated entirely from
   rendering; matplotlib stays optional.
 - **Preprocessing** — capability-driven planning. The plan is a proposal you can

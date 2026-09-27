@@ -39,6 +39,11 @@ class KitConfig:
             when the z-score method is selected.
         leakage_correlation_threshold: Absolute correlation with the target above
             which a feature is flagged for leakage review. Heuristic only.
+        multicollinearity_vif_threshold: Variance inflation factor above which a
+            numeric feature is flagged as largely redundant with the other
+            numeric features. 10 is the conventional cutoff in regression
+            diagnostics; a VIF below it is never flagged regardless of how the
+            rest of the threshold is read.
         imbalance_threshold: Minority-class fraction below which accuracy is
             reported as potentially misleading.
         dense_encoding_warning_categories: Total one-hot category count above
@@ -68,6 +73,7 @@ class KitConfig:
     outlier_iqr_multiplier: float = 1.5
     outlier_zscore_threshold: float = 3.0
     leakage_correlation_threshold: float = 0.98
+    multicollinearity_vif_threshold: float = 10.0
     imbalance_threshold: float = 0.2
     dense_encoding_warning_categories: int = 1000
     numeric_text_ratio_threshold: float = 0.75
@@ -114,6 +120,13 @@ class KitConfig:
         if self.outlier_zscore_threshold <= 0:
             raise ConfigurationError(
                 f"outlier_zscore_threshold must be positive, got {self.outlier_zscore_threshold}."
+            )
+        if self.multicollinearity_vif_threshold <= 1.0:
+            raise ConfigurationError(
+                "multicollinearity_vif_threshold must be greater than 1, got "
+                f"{self.multicollinearity_vif_threshold}. A variance inflation "
+                "factor is never below 1, so a threshold at or below it would "
+                "flag every numeric feature regardless of the data."
             )
 
         for name in ("probability_column", "predicted_class_column", "prediction_column"):

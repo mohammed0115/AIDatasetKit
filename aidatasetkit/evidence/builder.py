@@ -124,6 +124,7 @@ _SAFE_TEXT_DETAIL_KEYS: frozenset[str] = frozenset(
         "column",
         "other_column",
         "compared_with",
+        "other_numeric_features",
         "kind",
         "detected_kind",
         "dtype",

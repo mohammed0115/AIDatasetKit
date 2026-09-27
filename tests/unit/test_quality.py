@@ -259,12 +259,92 @@ class TestNumericTextThreshold:
     def test_ordinary_text_is_never_flagged(self):
         assert not self._flagged(["red", "blue", "green", "red"])
 
-    def test_the_threshold_is_configurable(self):
+    def test_a_stricter_threshold_still_fires(self):
         values = ["10", "20", "unknown", "missing"]
         assert self._flagged(values, KitConfig(numeric_text_ratio_threshold=0.5))
 
     def test_leading_zero_codes_are_exempt(self):
         assert not self._flagged(["02134", "90210", "01002", "10001"])
+
+
+def _multicollinear_frame(*, exact: bool = False) -> pd.DataFrame:
+    """Two independent columns, one that is (almost) their sum, and one free agent.
+
+    ``c`` is deliberately built from ``a`` and ``b`` rather than from a single
+    other column, so the fit under test -- each column against *every* other
+    column at once -- is exercised rather than a simple pairwise correlation.
+    ``d`` carries no relationship to the rest and exists to prove the check does
+    not fire on everything just because something else in the frame is collinear.
+    """
+    rng = np.random.default_rng(1234)
+    n = 100
+    a = rng.normal(0, 1, n)
+    b = rng.normal(0, 1, n)
+    noise = 0.0 if exact else rng.normal(0, 0.01, n)
+    c = a + b + noise
+    d = rng.normal(0, 1, n)
+    return pd.DataFrame({"a": a, "b": b, "c": c, "d": d})
+
+
+class TestMulticollinearity:
+    """The variance-inflation check over numeric features."""
+
+    def _issues(self, frame, config=None):
+        from aidatasetkit.profiling.checks import check_multicollinearity
+
+        return check_multicollinearity(frame, context_for(frame, config=config or KitConfig()))
+
+    def test_the_redundant_columns_are_flagged(self):
+        flagged = {issue.column for issue in self._issues(_multicollinear_frame())}
+        assert {"a", "b", "c"} <= flagged
+
+    def test_the_independent_column_is_not_flagged(self):
+        flagged = {issue.column for issue in self._issues(_multicollinear_frame())}
+        assert "d" not in flagged
+
+    def test_independent_numeric_features_raise_nothing(self, clean_frame):
+        assert self._issues(clean_frame) == []
+
+    def test_an_exact_linear_dependency_is_flagged_with_a_finite_vif(self):
+        issues = self._issues(_multicollinear_frame(exact=True))
+        by_column = {issue.column: issue for issue in issues}
+        assert "c" in by_column
+        vif = by_column["c"].details["vif"]
+        assert np.isfinite(vif)
+        assert vif > 1e6
+
+    def test_fewer_than_two_numeric_features_reports_nothing(self):
+        frame = pd.DataFrame({"value": [1.0, 2.0, 3.0, 4.0], "label": ["x", "y", "x", "y"]})
+        assert self._issues(frame) == []
+
+    def test_a_constant_column_does_not_break_the_fit(self):
+        frame = _multicollinear_frame()
+        frame["flat"] = 1.0
+        flagged = {issue.column for issue in self._issues(frame)}
+        assert "flat" not in flagged
+        assert {"a", "b", "c"} <= flagged
+
+    def test_a_column_with_infinities_is_excluded_from_the_fit(self):
+        frame = _multicollinear_frame()
+        frame["bad"] = np.inf
+        flagged = {issue.column for issue in self._issues(frame)}
+        assert "bad" not in flagged
+        assert {"a", "b", "c"} <= flagged
+
+    def test_the_other_features_considered_are_named_in_the_details(self):
+        issues = self._issues(_multicollinear_frame())
+        issue = next(i for i in issues if i.column == "c")
+        assert set(issue.details["other_numeric_features"]) == {"a", "b", "d"}
+
+    def test_the_threshold_is_configurable(self):
+        lenient = KitConfig(multicollinearity_vif_threshold=1_000_000.0)
+        assert self._issues(_multicollinear_frame(), config=lenient) == []
+
+    def test_every_finding_is_a_hedged_warning(self):
+        for issue in self._issues(_multicollinear_frame()):
+            assert issue.severity is Severity.WARNING
+            assert issue.requires_review
+            assert issue.code == "possible_multicollinearity"
 
 
 class TestOutlierEdgeCases:
@@ -372,7 +452,7 @@ class TestInspector:
 
     def test_the_default_check_set_is_exposed(self, inspector):
         assert inspector.checks == DEFAULT_CHECKS
-        assert len(DEFAULT_CHECKS) == 11
+        assert len(DEFAULT_CHECKS) == 12
 
     def test_a_supplied_profile_is_reused(self, inspector, clean_frame):
         profile = DataProfiler().profile(clean_frame)

@@ -1119,6 +1119,7 @@ class TestTheSafeVocabularyListIsComplete:
                 "txt": [f"x{v % 97}" if v % 13 else str(v % 97) for v in index],
                 "hc": [f"lvl{v % 120}" for v in index],
                 "num": (index % 53) * 1.1,
+                "num2": (index % 53) * 2.2,
                 "dup": (index % 2),
                 "label": (index % 2),
             }
