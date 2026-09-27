@@ -1,0 +1,77 @@
+# The support matrix, run for every push and pull request.
+#
+# Each environment installs from a pinned constraints file, so a job can only pass
+# on the versions it names; nothing is found in the runner by accident. Failures
+# are never masked: fail-fast is off so one red cell cannot hide another, and
+# every job uploads its JUnit report whatever the outcome.
+#
+# A workflow file is not evidence. docs/supported-environments.md claims a
+# platform only once a run of this workflow on it has passed.
+
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / ${{ matrix.environment }}${{ matrix.extras && ' + extras' || '' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        environment: [minimum, reference]
+        extras: [false, true]
+        include:
+          - environment: minimum
+            python: "3.11"
+          - environment: reference
+            python: "3.12"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install from ${{ matrix.environment }} constraints
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          if [ "${{ matrix.extras }}" = "true" ]; then EXTRAS="dev,viz,boosting"; else EXTRAS="dev"; fi
+          python -m pip install -c "constraints/${{ matrix.environment }}.txt" -e ".[${EXTRAS}]"
+          python -m pip freeze
+      - name: Import comes from this checkout
+        shell: bash
+        run: python -c "import aidatasetkit, pathlib; p = pathlib.Path(aidatasetkit.__file__).resolve(); print(p); assert pathlib.Path.cwd().resolve() in p.parents"
+      - name: Collect
+        run: python -m pytest --collect-only -q
+      - name: Test
+        run: python -m pytest -rfE --junitxml=junit.xml
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-${{ matrix.os }}-${{ matrix.environment }}-${{ matrix.extras }}
+          path: junit.xml
+
+  package:
+    name: ${{ matrix.os }} / build, install and smoke
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the release tools
+        run: python -m pip install build twine
+      - name: Release smoke test
+        shell: bash
+        run: ./scripts/release_smoke_test.sh

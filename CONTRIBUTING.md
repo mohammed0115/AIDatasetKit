@@ -10,9 +10,14 @@ want to fail a build on.
 git clone <this repository>
 cd aidatasetkit
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -c constraints/reference.txt -e ".[dev]"
 pytest -q
 ```
+
+The two supported environments are pinned in `constraints/minimum.txt` (Python
+3.11) and `constraints/reference.txt` (Python 3.12); CI runs both, on Linux and
+Windows, with and without the optional extras. See
+[docs/supported-environments.md](docs/supported-environments.md).
 
 ## Tests
 

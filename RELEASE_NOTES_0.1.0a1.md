@@ -61,19 +61,25 @@ and multiclass classification readiness · scikit-learn model contexts · profil
 · quality and leakage diagnostics · visualization planning · capability-driven
 preprocessing plans · feature lineage · audit artifacts · a CI-usable CLI.
 
-**Verified environment** — the versions this release was actually tested against:
+**Verified environments** — the two sets the full suite was run on, pinned in
+`constraints/`:
 
-| Component | Version |
-|---|---|
-| Python | 3.12.3 |
-| NumPy | 2.5.2 |
-| pandas | 3.0.5 |
-| SciPy | 1.18.0 |
-| scikit-learn | 1.9.0 |
+| Component | Minimum (`constraints/minimum.txt`) | Reference (`constraints/reference.txt`) |
+|---|---|---|
+| Python | 3.11 | 3.12 |
+| NumPy | 1.26.4 | 2.5.2 |
+| pandas | 2.1.4 | 3.0.5 |
+| SciPy | 1.11.4 | 1.18.0 |
+| scikit-learn | 1.6.1 | 1.9.0 |
+| matplotlib (`viz`) | 3.9.0 | 3.11.2 |
+| xgboost / lightgbm / catboost (`boosting`) | 2.0.0 / 4.0.0 / 1.2 | 3.4.1 / 4.7.0 / 1.2.10 |
 
-That is narrower than the **declared dependency ranges** in `pyproject.toml`
-(`numpy>=1.26`, `pandas>=2.1`, `scipy>=1.11`, `scikit-learn>=1.4`). The ranges say
-what should work; the table says what was run. Report anything that disagrees.
+The **declared floors** in `pyproject.toml` are exactly the minimum column: they
+say what was run, not what might work. There are no upper bounds; versions newer
+than the reference column have not been run. Platforms: the runs behind this table
+were made on Windows. A Linux job is defined in `.github/workflows/ci.yml`; until
+it has produced a passing run, Linux is not claimed. See
+`docs/supported-environments.md` for the reason behind each floor.
 
 ## Not yet a complete public workflow
 

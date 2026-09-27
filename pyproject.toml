@@ -34,21 +34,27 @@ classifiers = [
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 
+# The floors are the oldest versions the full suite has passed on, together, on
+# Python 3.11 -- constraints/minimum.txt pins exactly these and CI runs it -- not
+# the oldest versions that might work. docs/supported-environments.md gives the
+# reason for each; tests/unit/test_dependency_contract.py keeps the two in step.
+# scikit-learn 1.6.1 is the first version on which every declared capability is
+# true (ExtraTrees refuses NaN on 1.5.2). There are no upper bounds.
 dependencies = [
-    "numpy>=1.26",
-    "pandas>=2.1",
-    "scipy>=1.11",
-    "scikit-learn>=1.4",
+    "numpy>=1.26.4",
+    "pandas>=2.1.4",
+    "scipy>=1.11.4",
+    "scikit-learn>=1.6.1",
 ]
 
 # Optional model backends. These are never required: a model that needs one is
 # always visible in the catalog, but raises MissingDependencyError on create().
 [project.optional-dependencies]
-boosting = ["xgboost>=2.0", "lightgbm>=4.0", "catboost>=1.2"]
-viz = ["matplotlib>=3.9"]
+boosting = ["xgboost>=2.0.0", "lightgbm>=4.0.0", "catboost>=1.2"]
+viz = ["matplotlib>=3.9.0"]
 # Everything CONTRIBUTING.md and scripts/release_smoke_test.sh ask a contributor
 # to run. Without build and twine the documented release gate cannot execute.
-dev = ["pytest>=8.0", "build>=1.0", "twine>=5.0"]
+dev = ["pytest>=8.0.0", "build>=1.0", "twine>=5.0"]
 all = ["aidatasetkit[boosting,viz,dev]"]
 
 [project.scripts]

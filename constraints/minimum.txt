@@ -1,0 +1,17 @@
+# The oldest supported environment, pinned exactly. Python 3.11.
+#
+#   pip install -c constraints/minimum.txt -e ".[dev]"            core
+#   pip install -c constraints/minimum.txt -e ".[dev,viz,boosting]"  with extras
+#
+# Every pin equals the floor declared in pyproject.toml, and
+# tests/unit/test_dependency_contract.py fails if the two drift apart. The full
+# suite passed on exactly this set; see docs/supported-environments.md.
+numpy==1.26.4
+pandas==2.1.4
+scipy==1.11.4
+scikit-learn==1.6.1
+pytest==8.0.0
+matplotlib==3.9.0
+xgboost==2.0.0
+lightgbm==4.0.0
+catboost==1.2

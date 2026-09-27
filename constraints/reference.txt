@@ -1,0 +1,18 @@
+# The reference environment, pinned exactly. Python 3.12.
+#
+#   pip install -c constraints/reference.txt -e ".[dev]"
+#   pip install -c constraints/reference.txt -e ".[dev,viz,boosting]"
+#
+# The golden fixture examples/audit_churn/expected_audit_semantic.json is
+# generated here (pandas 3); the pandas-2 fixture beside it on the minimum set.
+# RELEASE_NOTES_0.1.0a1.md's verified-environment table names these versions,
+# and tests/unit/test_dependency_contract.py keeps them in step.
+numpy==2.5.2
+pandas==3.0.5
+scipy==1.18.0
+scikit-learn==1.9.0
+pytest==8.3.3
+matplotlib==3.11.2
+xgboost==3.4.1
+lightgbm==4.7.0
+catboost==1.2.10
