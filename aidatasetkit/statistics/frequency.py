@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 
 from aidatasetkit.core.arrays import to_float_array
+from aidatasetkit.core.counting import value_counts
 from aidatasetkit.core.exceptions import (
     EmptyDataError,
     MissingValueError,
@@ -133,7 +134,7 @@ class FrequencyTable:
     @staticmethod
     def _build_counts(series: pd.Series, sort: FrequencySort) -> dict[Any, int]:
         """Count values and place them in the requested order."""
-        counted = series.value_counts(dropna=False)
+        counted = value_counts(series, dropna=False)
         pairs = [(_normalise(label), int(count)) for label, count in counted.items()]
 
         if sort == "count":

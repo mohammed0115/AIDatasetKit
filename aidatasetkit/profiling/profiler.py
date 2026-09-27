@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 from aidatasetkit.core.config import KitConfig
+from aidatasetkit.core.counting import value_counts
 from aidatasetkit.core.exceptions import DomainError, SchemaError, ValidationError
 from aidatasetkit.core.schema import detect_column_kinds
 from aidatasetkit.core.types import (
@@ -325,7 +326,7 @@ def _count_distinct(present: pd.Series, name: Hashable) -> int:
 def _value_counts(present: pd.Series, name: Hashable) -> pd.Series:
     """Tally values, explaining clearly when the values are unhashable."""
     try:
-        return present.value_counts()
+        return value_counts(present)
     except TypeError as error:
         raise _unhashable_column_error(name) from error
 

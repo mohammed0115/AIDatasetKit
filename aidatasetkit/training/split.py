@@ -32,6 +32,7 @@ import numpy as np
 import pandas as pd
 
 from aidatasetkit.core.config import KitConfig
+from aidatasetkit.core.counting import value_counts
 from aidatasetkit.core.exceptions import TrainingError
 from aidatasetkit.core.types import TaskType
 
@@ -257,7 +258,7 @@ def _stratification(
             "stratification needs a shuffle to draw from"
         )
 
-    counts = y.value_counts()
+    counts = value_counts(y)
     rarest = int(counts.min())
     if rarest < 2:
         label = counts.idxmin()

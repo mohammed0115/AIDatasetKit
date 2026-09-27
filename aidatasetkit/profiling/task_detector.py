@@ -22,6 +22,7 @@ import pandas as pd
 from pandas.api import types as pdt
 
 from aidatasetkit.core.config import KitConfig
+from aidatasetkit.core.counting import value_counts
 from aidatasetkit.core.exceptions import (
     AmbiguousTaskError,
     EmptyDataError,
@@ -328,7 +329,7 @@ class TaskDetector:
         positive_label: Any,
     ) -> TargetProfile:
         """Summarise a classification target."""
-        counted = present.value_counts()
+        counted = value_counts(present)
         class_counts = {_plain(label): int(count) for label, count in counted.items()}
         total = sum(class_counts.values())
         class_ratios = {label: count / total for label, count in class_counts.items()}
@@ -448,5 +449,12 @@ def _sort_key(label: Any) -> tuple[int, str]:
     if isinstance(label, bool):
         return (0, str(int(label)))
     if isinstance(label, (int, float)):
-        return (0, f"{float(label):020.6f}")
+        try:
+            return (0, f"{float(label):020.6f}")
+        except OverflowError:
+            # A Python int beyond float64's range. Its exact digits, in the same
+            # layout the float branch produces for an integer (``5`` and ``5.0``
+            # both give ``0000000000005.000000``), keep the order deterministic
+            # without the conversion that cannot be done.
+            return (0, f"{label:013d}.000000")
     return (1, str(label))

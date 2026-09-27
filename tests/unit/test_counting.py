@@ -1,0 +1,143 @@
+"""Counting values that float64 cannot hold, identically on pandas 2 and 3.
+
+pandas 2.x raises a bare ``OverflowError`` from ``value_counts`` when a column
+holds a Python integer beyond float64's range; pandas 3 does not. These tests run
+unchanged under both majors (CI runs both), so the same assertion proves the
+fallback on pandas 2 and the native path on pandas 3 agree.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from aidatasetkit.core.counting import exact_tally, value_counts
+from aidatasetkit.profiling import DataProfiler, TaskDetector
+
+HUGE = 10**400
+
+
+def _as_pairs(counted: pd.Series) -> list[tuple[object, int]]:
+    """Index and counts as plain pairs, with every missing label made one token."""
+    return [
+        ("<missing>" if pd.isna(label) else label, int(count))
+        for label, count in counted.items()
+    ]
+
+
+ORDINARY = {
+    "integers": pd.Series([3, 1, 2, 1, 3, 3]),
+    "strings": pd.Series(["b", "a", "b", "c", "a", "b"]),
+    "ties_in_appearance_order": pd.Series([2, 1, 2, 1, 5]),
+    "floats_with_nan": pd.Series([1.5, np.nan, 1.5, 2.5, np.nan]),
+    "big_floats": pd.Series([1e308, -1e308, 1e308, 0.0]),
+    "infinities": pd.Series([np.inf, -np.inf, np.inf, 1.0]),
+    "nullable_int": pd.Series([1, None, 1, 2], dtype="Int64"),
+    "nullable_float": pd.Series([0.5, None, 0.5], dtype="Float64"),
+    "nullable_bool": pd.Series([True, None, False, True], dtype="boolean"),
+    "mixed_object": pd.Series([1, "1", 1, "x", 2.0, "x"], dtype=object),
+}
+
+
+class TestTheFallbackAgreesWithPandas:
+    """The exact tally is only trustworthy if it is pandas' tally, exactly."""
+
+    @pytest.mark.parametrize("name", sorted(ORDINARY))
+    def test_on_ordinary_data(self, name):
+        series = ORDINARY[name]
+        assert _as_pairs(exact_tally(series)) == _as_pairs(series.value_counts())
+
+    @pytest.mark.parametrize("name", sorted(ORDINARY))
+    def test_the_wrapper_is_pandas_itself_when_pandas_works(self, name):
+        series = ORDINARY[name]
+        pd.testing.assert_series_equal(value_counts(series), series.value_counts())
+
+    def test_missing_values_are_counted_when_asked(self):
+        series = pd.Series([np.nan, 1.0, np.nan, 2.0, np.nan])
+        tally = _as_pairs(exact_tally(series, dropna=False))
+        assert tally[0] == ("<missing>", 3)
+        assert sorted(tally[1:], key=str) == [(1.0, 1), (2.0, 1)]
+
+
+class TestIntegersBeyondFloat64:
+    @staticmethod
+    def _column():
+        return pd.Series([HUGE] * 3 + [1, 2] * 24 + [-HUGE], dtype=object)
+
+    def test_the_tally_does_not_raise(self):
+        value_counts(self._column())
+
+    def test_every_value_keeps_its_exact_identity(self):
+        labels = set(value_counts(self._column()).index)
+        assert HUGE in labels and -HUGE in labels
+        assert all(type(label) is int for label in labels)
+
+    def test_counts_and_order_match_pandas_3(self):
+        """Most frequent first; ties in order of first appearance."""
+        assert _as_pairs(value_counts(self._column())) == [(1, 24), (2, 24), (HUGE, 3), (-HUGE, 1)]
+
+    def test_missing_values_are_dropped_by_default(self):
+        column = pd.Series([HUGE, None, HUGE, 1], dtype=object)
+        assert _as_pairs(value_counts(column)) == [(HUGE, 2), (1, 1)]
+
+    def test_and_kept_when_asked(self):
+        column = pd.Series([HUGE, None, None, None, HUGE, 1], dtype=object)
+        assert _as_pairs(value_counts(column, dropna=False))[0] == ("<missing>", 3)
+
+    def test_an_unhashable_cell_still_raises_type_error(self):
+        """Callers translate TypeError into a message about the column."""
+        column = pd.Series([HUGE, [1, 2]], dtype=object)
+        with pytest.raises(TypeError):
+            exact_tally(column)
+
+
+class TestTheLayersThatTally:
+    def test_profiling_a_column_of_huge_integers(self):
+        frame = pd.DataFrame({"account": pd.Series([HUGE] * 3 + [1, 2] * 24, dtype=object)})
+        column = DataProfiler().profile(frame).column_profiles[0]
+        assert column.count == 51
+        assert column.unique_count == 3
+        assert column.dominant_value == 1
+        assert column.dominant_ratio == pytest.approx(24 / 51)
+
+    def test_the_profile_is_identical_twice(self):
+        frame = pd.DataFrame({"account": pd.Series([HUGE] * 3 + [1, 2] * 24, dtype=object)})
+        assert DataProfiler().profile(frame).to_dict() == DataProfiler().profile(frame).to_dict()
+
+    @pytest.mark.parametrize(
+        "values",
+        [
+            [1e308, -1e308, 1e308, 0.0] * 10,
+            [np.inf, -np.inf, 1.0, 2.0] * 10,
+            [np.nan, 1.0, 2.0, 1.0] * 10,
+        ],
+        ids=["big_floats", "infinities", "nan"],
+    )
+    def test_profiling_extreme_floats(self, values):
+        frame = pd.DataFrame({"x": values})
+        DataProfiler().profile(frame)
+
+    @pytest.mark.parametrize("dtype", ["Int64", "Float64", "boolean"])
+    def test_profiling_nullable_dtypes(self, dtype):
+        values = [True, False, None, True] * 10 if dtype == "boolean" else [1, 2, None, 1] * 10
+        frame = pd.DataFrame({"x": pd.Series(values, dtype=dtype)})
+        column = DataProfiler().profile(frame).column_profiles[0]
+        assert column.missing_count == 10
+
+    def test_profiling_a_mixed_object_column(self):
+        frame = pd.DataFrame({"x": pd.Series([1, "1", HUGE, "x", 2.5] * 8, dtype=object)})
+        column = DataProfiler().profile(frame).column_profiles[0]
+        assert column.unique_count == 5
+
+    def test_detecting_a_target_of_huge_integer_classes(self):
+        target = pd.Series([HUGE] * 30 + [1] * 30, dtype=object)
+        profile = TaskDetector().detect(target, target_name="t")
+        assert set(profile.class_counts.values()) == {30}
+        assert HUGE in profile.class_counts
+
+    def test_the_class_order_is_deterministic(self):
+        target = pd.Series([HUGE] * 30 + [1] * 30 + [-HUGE] * 30, dtype=object)
+        first = TaskDetector().detect(target, target_name="t")
+        second = TaskDetector().detect(target.iloc[::-1].reset_index(drop=True), target_name="t")
+        assert first.classes == second.classes
