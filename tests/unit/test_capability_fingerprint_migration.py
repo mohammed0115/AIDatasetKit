@@ -71,7 +71,7 @@ class TestTheMigration:
         assert config_fingerprint(semantic) == FINGERPRINT_AFTER
 
     def test_the_committed_fixture_produces_it_too(self):
-        stored = json.loads((EXAMPLE / "expected_audit_semantic.json").read_text())
+        stored = json.loads((EXAMPLE / "expected_audit_semantic.json").read_text(encoding="utf-8"))
         assert config_fingerprint(stored) == FINGERPRINT_AFTER
 
     def test_the_new_fingerprint_is_deterministic(self, semantic):

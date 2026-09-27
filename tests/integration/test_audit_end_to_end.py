@@ -69,7 +69,7 @@ def audited(tmp_path_factory) -> tuple[subprocess.CompletedProcess, Path]:
 @pytest.fixture(scope="module")
 def artifact(audited) -> dict:
     _, output = audited
-    return json.loads((output / "audit.json").read_text())
+    return json.loads((output / "audit.json").read_text(encoding="utf-8"))
 
 
 class TestTheGoldenDatasetExists:
@@ -204,13 +204,13 @@ class TestGoldenDecisionsAndLineage:
 
     def test_lineage_records_the_one_hot_outputs(self, audited):
         _, output = audited
-        lineage = json.loads((output / "lineage.json").read_text())
+        lineage = json.loads((output / "lineage.json").read_text(encoding="utf-8"))
         city = next(e for e in lineage["features"] if e["source"]["name"] == "City")
         assert set(city["outputs"]) == {"City_Dammam", "City_Jeddah", "City_Riyadh"}
 
     def test_lineage_records_what_produced_nothing(self, audited):
         _, output = audited
-        lineage = json.loads((output / "lineage.json").read_text())
+        lineage = json.loads((output / "lineage.json").read_text(encoding="utf-8"))
         held = next(
             e for e in lineage["features"] if e["source"]["name"] == "CustomerID"
         )
@@ -219,7 +219,7 @@ class TestGoldenDecisionsAndLineage:
 
     def test_lineage_carries_its_own_schema_and_dataset_identity(self, audited, artifact):
         _, output = audited
-        lineage = json.loads((output / "lineage.json").read_text())
+        lineage = json.loads((output / "lineage.json").read_text(encoding="utf-8"))
         assert lineage["schema_version"] == artifact["schema_version"]
         assert lineage["dataset_fingerprint"] == artifact["dataset"]["fingerprint"]
 
@@ -227,28 +227,28 @@ class TestGoldenDecisionsAndLineage:
 class TestReportAndJsonAgree:
     def test_the_report_shows_the_same_verdict(self, audited, artifact):
         _, output = audited
-        html = (output / "report.html").read_text()
+        html = (output / "report.html").read_text(encoding="utf-8")
         assert artifact["verdict"].replace("_", " ").upper() in html
 
     def test_the_report_shows_the_same_fingerprint(self, audited, artifact):
         _, output = audited
-        assert artifact["dataset"]["fingerprint"] in (output / "report.html").read_text()
+        assert artifact["dataset"]["fingerprint"] in (output / "report.html").read_text(encoding="utf-8")
 
     def test_every_finding_reaches_the_page(self, audited, artifact):
         _, output = audited
-        html = (output / "report.html").read_text()
+        html = (output / "report.html").read_text(encoding="utf-8")
         for finding in artifact["findings"]:
             assert finding["code"] in html
 
     def test_every_decision_reaches_the_page(self, audited, artifact):
         _, output = audited
-        html = (output / "report.html").read_text()
+        html = (output / "report.html").read_text(encoding="utf-8")
         for decision in artifact["decisions"]:
             assert decision["feature"]["name"] in html
 
     def test_the_page_needs_no_network(self, audited):
         _, output = audited
-        html = (output / "report.html").read_text()
+        html = (output / "report.html").read_text(encoding="utf-8")
         assert "http://" not in html and "https://" not in html
 
 
@@ -264,7 +264,7 @@ class TestExitCodes:
 
     def test_an_unsupported_file_type_says_so(self, tmp_path):
         path = tmp_path / "data.parquet"
-        path.write_text("not really parquet")
+        path.write_text("not really parquet", encoding="utf-8")
         result = run_cli("audit", str(path))
         assert result.returncode == EXIT_CODES["usage"]
         assert "CSV only" in result.stderr
@@ -344,14 +344,14 @@ class TestAuditWithoutAModelOrTarget:
     def bare(tmp_path_factory):
         output = tmp_path_factory.mktemp("bare")
         result = run_cli("audit", str(EXAMPLE), "--output", str(output))
-        return result, json.loads((output / "audit.json").read_text())
+        return result, json.loads((output / "audit.json").read_text(encoding="utf-8"))
 
     @pytest.fixture(scope="class")
     @staticmethod
     def targeted(tmp_path_factory):
         output = tmp_path_factory.mktemp("targeted")
         run_cli("audit", str(EXAMPLE), "--target", "Churn", "--output", str(output))
-        return json.loads((output / "audit.json").read_text())
+        return json.loads((output / "audit.json").read_text(encoding="utf-8"))
 
     def test_a_bare_audit_still_produces_artifacts(self, bare):
         result, artifact = bare
@@ -408,7 +408,7 @@ class TestBlockedAnalysisStillProducesEvidence:
             "audit", str(unpreparable), "--target", "label", "--model",
             "logistic_regression", "--output", str(output),
         )
-        return result, output, json.loads((output / "audit.json").read_text())
+        return result, output, json.loads((output / "audit.json").read_text(encoding="utf-8"))
 
     def test_the_command_does_not_crash(self, blocked):
         result, _, _ = blocked
@@ -506,19 +506,19 @@ class TestTheGoldenSemanticArtifact:
         )
 
     def test_the_evidence_still_matches_it_exactly(self, rebuilt):
-        expected = json.loads(self.EXPECTED.read_text())
+        expected = json.loads(self.EXPECTED.read_text(encoding="utf-8"))
         assert rebuilt == expected
 
     def test_the_canonical_bytes_match_too(self, rebuilt):
-        assert canonical_json(rebuilt) == self.EXPECTED.read_text()
+        assert canonical_json(rebuilt) == self.EXPECTED.read_text(encoding="utf-8")
 
     def test_it_carries_no_timestamp_or_environment(self):
-        expected = json.loads(self.EXPECTED.read_text())
+        expected = json.loads(self.EXPECTED.read_text(encoding="utf-8"))
         assert "provenance" not in expected
         assert "created_at" not in canonical_json(expected)
 
     def test_it_holds_no_absolute_path(self):
-        assert "/home/" not in self.EXPECTED.read_text()
+        assert "/home/" not in self.EXPECTED.read_text(encoding="utf-8")
 
     def test_the_illustrative_artifacts_are_committed_too(self):
         for name in ("audit.json", "lineage.json", "report.html"):
@@ -527,8 +527,8 @@ class TestTheGoldenSemanticArtifact:
     def test_the_committed_report_renders_the_committed_artifact(self):
         from aidatasetkit.evidence import render_report
 
-        payload = json.loads(EXAMPLE.with_name("audit.json").read_text())
-        assert render_report(payload) == EXAMPLE.with_name("report.html").read_text()
+        payload = json.loads(EXAMPLE.with_name("audit.json").read_text(encoding="utf-8"))
+        assert render_report(payload) == EXAMPLE.with_name("report.html").read_text(encoding="utf-8")
 
 
 class TestTheSummaryNeverUnderstatesTheArtifact:
@@ -552,7 +552,7 @@ class TestTheSummaryNeverUnderstatesTheArtifact:
         pd.DataFrame(columns).to_csv(path, index=False)
         output = directory / "out"
         result = run_cli("audit", str(path), "--target", "label", "--output", str(output))
-        return result, json.loads((output / "audit.json").read_text())
+        return result, json.loads((output / "audit.json").read_text(encoding="utf-8"))
 
     def test_the_dataset_really_does_overflow_the_summary(self, crowded):
         _, artifact = crowded
@@ -612,7 +612,7 @@ class TestEveryFailureStillProducesAnArtifact:
         assert "Traceback" not in result.stderr
         for artifact_name in ("audit.json", "lineage.json", "report.html"):
             assert (output / artifact_name).exists(), f"{name}: {artifact_name}"
-        artifact = json.loads((output / "audit.json").read_text())
+        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
         assert artifact["verdict"] == "blocked"
         assert artifact["verdict_reasons"]
 
@@ -621,7 +621,7 @@ class TestEveryFailureStillProducesAnArtifact:
         pd.DataFrame({"a": [1.0, 2.0] * 100, "label": [None] * 200}).to_csv(path, index=False)
         output = tmp_path / "o"
         run_cli("audit", str(path), "--target", "label", "--output", str(output))
-        artifact = json.loads((output / "audit.json").read_text())
+        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
         assert len(artifact["columns"]) == 2
 
 
@@ -629,7 +629,7 @@ class TestInputsTheAuditMustRefuse:
     def test_duplicate_headers_are_refused_rather_than_renamed(self, tmp_path):
         """pandas turns a,a into a,a.1 and the artifact would describe a file nobody has."""
         path = tmp_path / "dup.csv"
-        path.write_text("a,a,label\n1,2,0\n3,4,1\n")
+        path.write_text("a,a,label\n1,2,0\n3,4,1\n", encoding="utf-8")
         result = run_cli("audit", str(path), "--target", "label", "--output", str(tmp_path / "o"))
         assert result.returncode == EXIT_CODES["usage"]
         assert "duplicate column headers" in result.stderr
@@ -637,7 +637,7 @@ class TestInputsTheAuditMustRefuse:
 
     def test_output_pointing_at_a_file_is_refused_before_the_work(self, tmp_path):
         existing = tmp_path / "not_a_dir"
-        existing.write_text("x")
+        existing.write_text("x", encoding="utf-8")
         result = run_cli("audit", str(EXAMPLE), "--output", str(existing))
         assert result.returncode == EXIT_CODES["usage"]
         assert "must be a directory" in result.stderr
@@ -652,7 +652,7 @@ class TestInputsTheAuditMustRefuse:
 
     def test_none_of_these_show_a_traceback(self, tmp_path):
         path = tmp_path / "dup.csv"
-        path.write_text("a,a,label\n1,2,0\n3,4,1\n")
+        path.write_text("a,a,label\n1,2,0\n3,4,1\n", encoding="utf-8")
         for args in (
             ("audit", str(path), "--target", "label", "--output", str(tmp_path / "a")),
             ("audit", str(EXAMPLE), "--model", "knn", "--output", str(tmp_path / "b")),
@@ -683,13 +683,13 @@ class TestExitCodeTwoMeansThresholdMet:
             "audit", str(path), "--target", "label", "--fail-on", "warning",
             "--output", str(tmp_path / "b"),
         )
-        artifact = json.loads((tmp_path / "b" / "audit.json").read_text())
+        artifact = json.loads((tmp_path / "b" / "audit.json").read_text(encoding="utf-8"))
         assert artifact["verdict"] == "ready_with_warnings"
 
     def test_the_documented_table_matches_the_code(self):
         from pathlib import Path
 
-        docs = (Path(__file__).resolve().parents[2] / "docs" / "getting-started.md").read_text()
+        docs = (Path(__file__).resolve().parents[2] / "docs" / "getting-started.md").read_text(encoding="utf-8")
         assert "does not mean `review_required` specifically" in docs
 
 
@@ -771,7 +771,7 @@ class TestAnUnverifiedTaskSaysSo:
             "--output", str(output),
         )
         assert "Note:" in result.stdout
-        artifact = json.loads((output / "audit.json").read_text())
+        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
         assert any("regression" in w for w in artifact["warnings"])
 
     def test_the_warning_no_longer_claims_the_models_are_unverified(self, tmp_path):
@@ -785,7 +785,7 @@ class TestAnUnverifiedTaskSaysSo:
             "audit", str(EXAMPLE), "--target", "Churn", "--task", "regression",
             "--output", str(output),
         )
-        artifact = json.loads((output / "audit.json").read_text())
+        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
         note = next(w for w in artifact["warnings"] if "regression task" in w)
         assert "has not been verified" in note
         assert "readiness verdict" in note
@@ -797,7 +797,7 @@ class TestAnUnverifiedTaskSaysSo:
             "audit", str(EXAMPLE), "--target", "Churn", "--task", "classification",
             "--output", str(output),
         )
-        artifact = json.loads((output / "audit.json").read_text())
+        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
         assert not any("not been verified" in w for w in artifact["warnings"])
 
 
@@ -817,7 +817,7 @@ class TestRegressionModelsAreReachableFromTheCommandLine:
             "audit", str(EXAMPLE), "--target", "Churn", "--task", "regression",
             "--model", "ridge_regression", "--output", str(output),
         )
-        return result, json.loads((output / "audit.json").read_text())
+        return result, json.loads((output / "audit.json").read_text(encoding="utf-8"))
 
     def test_a_regression_model_context_produces_a_full_artifact(self, ridge):
         result, artifact = ridge
@@ -862,7 +862,7 @@ class TestRegressionModelsAreReachableFromTheCommandLine:
             "--model", "random_forest", "--output", str(output),
         )
         assert result.returncode != EXIT_CODES["usage"], result.stderr
-        artifact = json.loads((output / "audit.json").read_text())
+        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
         assert artifact["model"]["canonical_name"] == "random_forest_regressor"
 
     def test_the_same_alias_under_the_other_task_gives_the_classifier(self, tmp_path):
@@ -871,7 +871,7 @@ class TestRegressionModelsAreReachableFromTheCommandLine:
             "audit", str(EXAMPLE), "--target", "Churn", "--task", "classification",
             "--model", "random_forest", "--output", str(output),
         )
-        artifact = json.loads((output / "audit.json").read_text())
+        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
         assert artifact["model"]["canonical_name"] == "random_forest_classifier"
 
     def test_an_ambiguous_alias_is_refused_clearly_rather_than_guessed(self, tmp_path):
@@ -937,7 +937,7 @@ class TestAModelMustMatchTheTargetTheDetectorFound:
             "audit", str(EXAMPLE), "--target", "Churn",
             "--model", "ridge_regression", "--output", str(output),
         )
-        return result, json.loads((output / "audit.json").read_text())
+        return result, json.loads((output / "audit.json").read_text(encoding="utf-8"))
 
     def test_the_run_completes_rather_than_aborting(self, mismatched):
         result, artifact = mismatched
@@ -974,7 +974,7 @@ class TestAModelMustMatchTheTargetTheDetectorFound:
             "audit", str(EXAMPLE), "--target", "Churn",
             "--model", "logistic_regression", "--output", str(output),
         )
-        artifact = json.loads((output / "audit.json").read_text())
+        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
         assert not any(
             "does not match the detected target" in w for w in artifact["warnings"]
         )
