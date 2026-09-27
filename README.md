@@ -169,7 +169,10 @@ print(results.to_frame())
 ai.select_model("logistic_regression")   # your decision, not the ranking's
 
 ai.train()
-print(ai.evaluate()["f1"].value)
+print(ai.evaluate()["f1"].value)          # validation: these rows also ranked the models
+
+final = ai.evaluate_final()               # the independent estimate, once, on the test frame;
+print(final.report["f1"].value)           # compare/select/train now refuse until a new load()
 
 predictions = ai.predict_test()          # original labels, not 0/1
 print(predictions.to_frame().head())

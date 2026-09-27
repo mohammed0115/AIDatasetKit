@@ -26,6 +26,13 @@ Behind that, in order:
 5. An **independent estimator** is fitted on the transformed training matrix.
 6. The evaluation rows are **transformed, never fitted**, and scored.
 
+The evaluation rows here are the **validation** partition. A comparison ranks on
+them, so once it has, they have taken part in choosing the model, and a score on
+them afterwards is a development measurement rather than an independent one. The
+independent estimate comes from an external test frame the comparison never saw —
+see [facade.md](facade.md#external-test-data) for `evaluate_final()`, which takes
+it once and then freezes the experiment.
+
 Step 4 is the promise this library exists for. Imputation medians, scaler
 centres, and one-hot vocabularies are learned from training rows and from nothing
 else. An evaluation row holding an extreme value does not move any of them, and

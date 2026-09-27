@@ -968,6 +968,9 @@ class TestTheFacadeDoesNotDoScienceOfItsOwn:
             # supervised half already has: a verb that does the work, and a
             # property that reports the most recent result.
             "cluster", "clustering",
+            # G0-01. The one independent estimate: the external test frame,
+            # measured once, after which the experiment is frozen. Same shape.
+            "evaluate_final", "final_evaluation",
         }
 
 

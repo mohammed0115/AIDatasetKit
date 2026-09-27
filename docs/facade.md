@@ -59,7 +59,8 @@ one would be teaching that a ranking is an answer rather than a measurement.
 | `select_model()` | a human decision | no |
 | `train()` | model fitting | yes |
 | `cluster()` | partition unlabelled rows | yes |
-| `evaluate()` | measurement on held-out rows | no |
+| `evaluate()` | measurement on the validation rows | no |
+| `evaluate_final()` | the one independent estimate, on the test frame; freezes the experiment | no |
 | `predict_test()` | inference | no |
 
 `profile()`, `statistics()` and `check_quality()` are three independent readings
@@ -151,16 +152,43 @@ about it is yours.
 Training data and test data have different jobs:
 
 ```
-training data  →  internal train/evaluation split  →  development and measurement
-test data      →  final prediction
+training data  →  internal train / validation split  →  development
+test data      →  final evaluation (once), then prediction
 ```
 
-Test data never takes part in preprocessing fit, model comparison, ranking, or
-evaluation. `evaluate()` scores the held-out side of the training split — never
-the training rows, never the test frame.
+Each partition has one job:
 
-The test frame may or may not carry the target. Inference does not need the
-answer.
+| partition | fits the preprocessor and estimators | ranks the comparison | scored by |
+|---|---|---|---|
+| training side of the split | **yes** | no | — |
+| validation side of the split | no | **yes** | `evaluate()` |
+| external test frame | no | no | `evaluate_final()`, once |
+
+**The validation score is a development number.** `compare_models()` ranks on the
+validation rows, and `train()` redraws the same split (same seed, same fraction,
+same rows), so after compare → select → train, `evaluate()` scores the model on
+the rows that chose it. It never learned from them, but it was selected by them,
+and the number is optimistic by however much the ranking exploited them.
+`status["validation_used_for_selection"]` says whether that happened, by comparing
+the two splits' row fingerprints rather than their configuration.
+
+**The final evaluation is the independent one.** `evaluate_final()` scores the
+frozen model on the external test frame, which took part in nothing before it:
+not profiling, the quality verdict, planning, preprocessing fit, comparison,
+ranking, selection, or estimator fit. The library runs no hyperparameter search,
+no decision-threshold search and no cross-validation, so there is no other route
+by which the test rows could have been used. The result also counts test rows
+that are exact copies of training rows, because a model scored on rows it may
+have memorised is not being tested on them.
+
+**It freezes the experiment.** After `evaluate_final()`, `compare_models()`,
+`select_model()` and `train()` refuse until new data is loaded. A test score that
+could still send you back to choose again would make the test rows part of
+development, and the next score on them would not be a test. Reading — `evaluate()`,
+`predict_test()`, the stored results — stays allowed.
+
+For `evaluate_final()` the test frame must carry the target. For `predict_test()`
+it need not: inference does not need the answer.
 
 ## Predictions
 

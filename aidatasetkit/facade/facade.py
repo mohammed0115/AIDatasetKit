@@ -50,7 +50,7 @@ from aidatasetkit.core.types import (
     TaskType,
 )
 from aidatasetkit.evidence import Verdict, decide_verdict
-from aidatasetkit.facade.state import Stage
+from aidatasetkit.facade.state import FinalEvaluation, Stage
 from aidatasetkit.models import ModelFactory
 from aidatasetkit.preprocessing import (
     BlueprintCache,
@@ -210,6 +210,9 @@ class AIDataFacade:
         self._verdict_reasons: tuple[str, ...] = ()
         self._plans: dict[str, Any] | None = None
         self._comparison: ComparisonResult | None = None
+        # Set by evaluate_final and cleared only here, by a new load. See
+        # _refuse_if_frozen for what it forbids and why.
+        self._frozen = False
         self._reset_from_selection()
 
     def _reset_from_selection(self) -> None:
@@ -233,6 +236,7 @@ class AIDataFacade:
         self._split: Any = None
         self._trainer: Any = None
         self._clustering: Any = None
+        self._final: FinalEvaluation | None = None
 
     @property
     def stage(self) -> Stage:
@@ -245,6 +249,8 @@ class AIDataFacade:
         # in-sample -- it means the partition has been found and measured.
         if self._clustering is not None:
             return Stage.EVALUATED
+        if self._final is not None:
+            return Stage.FINAL_EVALUATED
         if self._evaluation is not None:
             return Stage.EVALUATED
         if self._training is not None:
@@ -282,6 +288,8 @@ class AIDataFacade:
             "trained": self._training is not None,
             "evaluated": self._evaluation is not None,
             "predicted": self._predictions is not None,
+            "validation_used_for_selection": self._validation_used_for_selection(),
+            "final_evaluated": self._final is not None,
         }
 
     def _reported_task(self) -> str | None:
@@ -711,6 +719,7 @@ class AIDataFacade:
         """
         self._require(self._train, "compare models", "no data is loaded")
         self._require_supervised("compare models")
+        self._refuse_if_frozen("compare models")
         self._refuse_if_blocked("compare models")
 
         result = ModelComparator(
@@ -775,6 +784,7 @@ class AIDataFacade:
         """
         self._require_supervised("select a model")
         self._require(self._target_profile, "select a model", "no data is loaded")
+        self._refuse_if_frozen("select a model")
         entry = ModelFactory.registration(model, task=self.task)
         entry.require_available()
         # Checked against the resolved target, not merely the task family, so a
@@ -819,6 +829,7 @@ class AIDataFacade:
         self._require(self._train, "train", "no data is loaded")
         self._require_supervised("train")
         self._require(self._selected, "train", "no model has been selected")
+        self._refuse_if_frozen("train")
         self._refuse_if_blocked("train")
 
         from aidatasetkit.training import split_rows
@@ -849,12 +860,17 @@ class AIDataFacade:
         )
 
     def evaluate(self) -> Any:
-        """Measure the trained model on rows it did not learn from.
+        """Measure the trained model on the validation rows.
 
-        The evaluation rows are the held-out side of the split the training layer
+        The validation rows are the held-out side of the split the training layer
         drew -- **not** the training rows, and **not** the external test frame.
-        External test data is for final prediction; letting it choose or score a
-        model would make it part of development, and it would stop being a test.
+        The model was not fitted on them. But if :meth:`compare_models` ranked
+        models on the same split -- the same seed and fraction draw the same rows
+        -- then these rows also *chose* the model, and this score is a
+        development measurement, optimistic by however much the ranking
+        exploited them. :attr:`status` reports that as
+        ``validation_used_for_selection``. The independent estimate is
+        :meth:`evaluate_final`, on an external test frame nothing else touched.
 
         Repeat calls recompute against the same held-out rows and return the same
         answer.
@@ -878,6 +894,85 @@ class AIDataFacade:
         return self._require(
             self._evaluation, "report an evaluation", "no evaluation has been run"
         )
+
+    def evaluate_final(self) -> FinalEvaluation:
+        """Measure the trained model, once, on the external test frame.
+
+        This is the one independent estimate a session produces. The test frame
+        has taken part in nothing before this call: not in profiling or the
+        quality verdict (both read the training frame), not in planning or
+        fitting a preprocessor (fitted on the training side of the split), not in
+        comparison or ranking (validation rows only), not in selection (a
+        person's choice from that ranking), and not in fitting the estimator.
+        The library performs no hyperparameter search, no threshold search and
+        no cross-validation, so there is no other route by which it could.
+
+        **Calling this freezes the experiment.** A score seen on the test rows
+        that could still send you back to compare, select or retrain would make
+        those rows part of development, and the next score on them would no
+        longer be a test. After this call :meth:`compare_models`,
+        :meth:`select_model` and :meth:`train` refuse until new data is loaded.
+        Repeat calls return the same result without measuring again.
+
+        The fitted preprocessor is applied, never refitted. Test rows that are
+        exact copies of training rows are counted and reported, because a model
+        scored on rows it may have learned is not being tested on them.
+
+        Raises:
+            WorkflowStateError: If no model has been trained, or no test frame
+                was loaded.
+            TrainingError: If the test frame does not carry the target.
+        """
+        self._require_supervised("run the final evaluation")
+        self._require(self._training, "run the final evaluation", "no model has been trained")
+        self._require(
+            self._test,
+            "run the final evaluation",
+            "no test frame was loaded -- pass one to load(train, test)",
+        )
+        if self._final is not None:
+            return self._final
+
+        report = self._trainer.evaluate(self._training, self._test, target=self._target)
+        final = FinalEvaluation(
+            model_name=self._selected,  # type: ignore[arg-type]
+            report=report,
+            test_rows=int(len(self._test)),
+            rows_also_in_training=_rows_shared_with(self._test, self._train),
+            validation_used_for_selection=self._validation_used_for_selection(),
+        )
+        # Only now: an evaluation that raised leaves the session unfrozen.
+        self._final = final
+        self._frozen = True
+        return final
+
+    @property
+    def final_evaluation(self) -> FinalEvaluation:
+        """The final evaluation, once it has been run."""
+        return self._require(
+            self._final, "report the final evaluation", "evaluate_final has not been run"
+        )
+
+    def _validation_used_for_selection(self) -> bool:
+        """Whether the trained model's validation rows also ranked the comparison.
+
+        Row identity, not configuration, decides it: the two splits are compared
+        by fingerprint, so a comparison run under a different seed or fraction is
+        correctly reported as not having seen these rows.
+        """
+        if self._comparison is None or self._split is None:
+            return False
+        return self._comparison.split.fingerprint == self._split.fingerprint
+
+    def _refuse_if_frozen(self, operation: str) -> None:
+        """Stop anything that could choose or refit a model after the final test."""
+        if self._frozen:
+            raise WorkflowStateError(
+                f"Cannot {operation}: the final evaluation has been run, so the "
+                "test rows have been seen. Choosing or refitting a model now would "
+                "make them part of development, and a later score on them would "
+                "not be a test. Load new data to start a new experiment."
+            )
 
     # ------------------------------------------------------------------ #
     # Inference
@@ -1067,3 +1162,24 @@ class AIDataFacade:
             "is no override here, because a bypass on the convenient path is a "
             "bypass everybody takes."
         )
+
+
+def _rows_shared_with(test: pd.DataFrame, train: pd.DataFrame) -> int | None:
+    """How many test rows are exact copies of some training row.
+
+    Compared on the columns the two frames share, in the training frame's order,
+    by pandas' row hash -- values and dtypes both. A test row identical to a
+    training row is one the model may have memorised, so the count bounds how
+    optimistic a final score can be for that reason. ``None`` when the frames
+    share no column or hold a value that cannot be hashed; the count is then
+    unknown rather than zero.
+    """
+    shared = [column for column in train.columns if column in test.columns]
+    if not shared:
+        return None
+    try:
+        seen = set(pd.util.hash_pandas_object(train[shared], index=False).tolist())
+        hashes = pd.util.hash_pandas_object(test[shared], index=False).tolist()
+    except TypeError:
+        return None
+    return sum(1 for value in hashes if value in seen)
