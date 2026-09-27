@@ -76,9 +76,10 @@ preprocessing plans · feature lineage · audit artifacts · a CI-usable CLI.
 
 The **declared floors** in `pyproject.toml` are exactly the minimum column: they
 say what was run, not what might work. There are no upper bounds; versions newer
-than the reference column have not been run. Platforms: the runs behind this table
-were made on Windows. A Linux job is defined in `.github/workflows/ci.yml`; until
-it has produced a passing run, Linux is not claimed. See
+than the reference column have not been run. Platforms: every cell of the table
+passed on Windows and on Linux (GitHub Actions run 36328760194: `windows-latest`
+and `ubuntu-latest`, with and without extras, plus build, install and smoke from
+the wheel and the sdist). macOS has not been run and is not claimed. See
 `docs/supported-environments.md` for the reason behind each floor.
 
 ## Not yet a complete public workflow

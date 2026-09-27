@@ -67,11 +67,13 @@ both behaviours of the dependency rather than assuming one.
 
 | Platform | Status |
 |---|---|
-| Windows 11 | Run: minimum, reference, reference with extras, minimum with extras. |
-| Linux | Defined in `.github/workflows/ci.yml`; **not claimed** until a run of it passes. |
+| Windows | Run: minimum, reference, and both with extras -- locally on Windows 11 and on GitHub's `windows-latest` (CI run 36328760194, commit `79e7cc8`), plus build/install/smoke. |
+| Linux | Run: minimum, reference, and both with extras on GitHub's `ubuntu-latest` (Ubuntu 24.04; CI run 36328760194, commit `79e7cc8`), plus build/install/smoke. |
 | macOS | Not run, not claimed. |
 
-A workflow file is not evidence. The table changes when a run log exists.
+A workflow file is not evidence; these rows name the run that is. The first Linux
+run found a real defect -- tied counts ordered by a CPU-dispatched unstable sort
+on pandas 2.1 -- fixed in `core/counting.py` before the run above.
 
 ## Windows notes
 
