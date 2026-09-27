@@ -38,7 +38,8 @@ consulted is the three answers.
 penalty reads the unit a column was recorded in; ordinary least squares because
 ``scipy.linalg.lstsq`` truncates a small singular value and silently discards a
 real feature at a column-magnitude ratio around ``1e6`` -- which a dollar amount
-beside a proportion reaches easily. See
+beside a proportion reaches easily. That was measured on scikit-learn 1.9.0;
+1.5.2 through 1.8.0 keep full rank, where the declaration is harmless. See
 :mod:`aidatasetkit.models.regression.linear`; the second reason was found by
 adversarial review after an earlier version of this catalog declared OLS
 scale-free on the strength of a frame that sat just under the cliff.

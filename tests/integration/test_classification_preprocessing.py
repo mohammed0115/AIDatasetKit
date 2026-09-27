@@ -790,10 +790,22 @@ class TestS4ProtectsTheBinningEdge:
         )
 
     def test_the_raw_estimator_really_does_die_on_it(self, with_a_dead_column):
+        """Measured per version; the protection below holds on every one.
+
+        scikit-learn 1.9.0 dies with numpy's ``window shape`` ValueError; 1.5.2
+        through 1.8.0 fit the all-missing column without complaint. Whichever the
+        installed version does is asserted precisely -- the only error accepted is
+        that one -- and the two tests that follow assert, unconditionally, that
+        S4 never hands the column over.
+        """
         values = with_a_dead_column.to_numpy(dtype="float64")
         y = (values[:, 0] > 0).astype(int)
-        with pytest.raises(ValueError, match="window shape"):
-            make_estimator("hist_gradient_boosting_classifier").fit(values, y)
+        try:
+            fitted = make_estimator("hist_gradient_boosting_classifier").fit(values, y)
+        except ValueError as error:
+            assert "window shape" in str(error)
+        else:
+            assert fitted.predict(values).shape == y.shape
 
     def test_but_the_plan_excludes_the_column_with_a_reason(self, with_a_dead_column):
         capabilities = ModelFactory.registration(

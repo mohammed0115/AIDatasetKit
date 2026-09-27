@@ -53,6 +53,16 @@ fit. A model that stopped short because of a condition nobody was told about is
 the failure this project exists to prevent, and ``lstsq`` truncating a column is
 that failure with no warning attached at all.
 
+.. rubric:: Which scikit-learn does this
+
+The truncation is a property of the solver scikit-learn uses, and it has not
+always been there. It was measured on scikit-learn 1.9.0. On 1.5.2, 1.6.1,
+1.7.0-1.7.2 and 1.8.0 the same frames keep full rank and the unscaled and scaled
+fits predict identically, so on those versions the declaration protects against
+nothing -- and costs nothing, because scaling cannot change an OLS prediction.
+``True`` is therefore correct on every supported version: necessary on some,
+harmless on the rest. The tests assert both outcomes rather than assuming one.
+
 A fitted estimator reports ``rank_`` and ``singular_``, so the condition remains
 detectable by anyone who wants to check a fit they ran themselves.
 """

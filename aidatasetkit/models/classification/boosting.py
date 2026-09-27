@@ -106,7 +106,9 @@ class HistGradientBoostingClassifierStrategy(ModelStrategy):
     that binning pass. A single observed value is enough to avoid it, so the
     capability itself stands. A user never meets it because S4 excludes an
     all-missing column before planning -- asserted in the integration tests
-    rather than assumed here.
+    rather than assumed here. The failure was measured on scikit-learn 1.9.0;
+    1.5.2 through 1.8.0 fit such a column without complaint. The exclusion is
+    right on every version, because a column with nothing in it carries nothing.
     """
 
     name: ClassVar[str] = "hist_gradient_boosting_classifier"

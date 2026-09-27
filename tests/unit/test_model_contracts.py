@@ -694,11 +694,25 @@ class TestBaselineBehaviour:
 
 class TestLogisticRegressionSpecifics:
     def test_the_removed_multi_class_parameter_is_never_passed(self):
-        """It was removed from scikit-learn; passing it now raises TypeError."""
-        from aidatasetkit.models import ModelFactory
+        """This strategy never sets it, on any supported scikit-learn.
 
+        The parameter was deprecated and then removed: scikit-learn 1.8.0 no
+        longer has it and passing it raises ``TypeError``, while 1.6.1 through
+        1.7.2 still list it in ``get_params()`` with the placeholder value
+        ``"deprecated"`` (all measured). The earlier form of this test asserted
+        the key was absent from ``get_params()`` -- a property of the installed
+        scikit-learn, which failed on 1.7 although this library passes nothing.
+
+        What this library controls is what it resolves and hands over, so that is
+        what is asserted: nothing named ``multi_class`` is resolved, and the
+        estimator's value is either absent or scikit-learn's untouched default.
+        """
+        from aidatasetkit.models import ModelFactory, default_registry
+
+        strategy = default_registry().resolve("logistic_regression").strategy_type()
+        assert "multi_class" not in strategy.resolve_params()
         params = ModelFactory.create("logistic_regression").get_params()
-        assert "multi_class" not in params
+        assert params.get("multi_class", "deprecated") == "deprecated"
 
     def test_multiclass_needs_no_wrapper(self, multiclass):
         from aidatasetkit.models import ModelFactory
@@ -1028,18 +1042,32 @@ class TestTheRegressionScalingDeclarations:
     def test_the_solver_silently_discards_a_real_column_unscaled(
         self, dollars_and_a_rate
     ):
-        """The defect the declaration exists to prevent, pinned exactly.
+        """What the unscaled solve does, for both behaviours scikit-learn has had.
 
-        Not an accuracy wobble: ``rank_`` drops, and the discarded feature's
-        coefficient comes back as numerical zero. scikit-learn raises nothing.
+        Measured on scikit-learn 1.9.0: ``rank_`` drops to 1 and the rate's
+        coefficient comes back as numerical zero -- not an accuracy wobble, a
+        smaller model, with nothing raised. Measured on 1.5.2 through 1.8.0: the
+        same solve keeps full rank, and the fit is scale-equivariant.
+
+        Neither behaviour is assumed. Whichever one the installed version has,
+        its consequences are asserted, so a solver change is noticed rather than
+        silently absorbed -- and the declaration's protection is asserted
+        unconditionally by the next test.
         """
         from aidatasetkit.models import ModelFactory
 
         features, target = dollars_and_a_rate
         fitted = ModelFactory.create("linear_regression").fit(features, target)
-        assert fitted.rank_ == 1, "the truncation this test exists for did not happen"
-        assert abs(fitted.coef_[1]) < 1e-12, "the rate coefficient should be zero"
-        assert _r2(target, fitted.predict(features)) < 0.7
+        if fitted.rank_ < features.shape[1]:
+            assert fitted.rank_ == 1
+            assert abs(fitted.coef_[1]) < 1e-12, "the rate coefficient should be zero"
+            assert _r2(target, fitted.predict(features)) < 0.7
+        else:
+            scaled_features = StandardScaler().fit_transform(features)
+            scaled = ModelFactory.create("linear_regression").fit(scaled_features, target)
+            np.testing.assert_allclose(
+                fitted.predict(features), scaled.predict(scaled_features), rtol=1e-6
+            )
 
     def test_and_the_scaler_the_declaration_asks_for_recovers_it(
         self, dollars_and_a_rate
@@ -1053,7 +1081,13 @@ class TestTheRegressionScalingDeclarations:
         assert _r2(target, fitted.predict(scaled)) > 0.99
 
     def test_the_truncation_threshold_is_where_it_is_claimed_to_be(self):
-        """Sweeping the spread: identical below ~1e6, diverging above."""
+        """Sweeping the spread: identical below ~1e6; above it, version-dependent.
+
+        Below the threshold every measured scikit-learn keeps full rank. Above it
+        scikit-learn 1.9.0 truncates (``rank_`` 1, R2 below 0.9) and 1.5.2
+        through 1.8.0 do not. The ordinary case is asserted unconditionally; the
+        extreme case asserts the consequences of whichever behaviour is installed.
+        """
         from aidatasetkit.models import ModelFactory
 
         rng = np.random.default_rng(31)
@@ -1067,9 +1101,12 @@ class TestTheRegressionScalingDeclarations:
         assert _r2(target, fitted.predict(ordinary)) > 0.99
 
         extreme = np.column_stack([first, second * 1e8])
-        truncated = ModelFactory.create("linear_regression").fit(extreme, target)
-        assert truncated.rank_ == 1
-        assert _r2(target, truncated.predict(extreme)) < 0.9
+        solved = ModelFactory.create("linear_regression").fit(extreme, target)
+        if solved.rank_ < 2:
+            assert solved.rank_ == 1
+            assert _r2(target, solved.predict(extreme)) < 0.9
+        else:
+            assert _r2(target, solved.predict(extreme)) > 0.99
 
     def test_knn_needs_scaling_because_a_distance_has_units(self):
         from aidatasetkit.models import default_registry
@@ -1396,10 +1433,13 @@ class TestTheRegressionCapabilityTestsCanActuallyFail:
     def test_claiming_linear_regression_needs_no_scaling_would_be_a_measurable_lie(self):
         """The declaration adversarial review corrected, pinned against reverting.
 
-        If ``requires_scaling`` went back to ``False``, S4 would hand this matrix
-        to the estimator unscaled and a real feature would vanish. The assertion
-        is on ``rank_``, not on accuracy, because the defect is structural: the
-        solver did not fit a worse model, it fitted a smaller one.
+        Where the solver truncates -- scikit-learn 1.9.0 -- ``requires_scaling``
+        going back to ``False`` would let S4 hand this matrix over unscaled and a
+        real feature would vanish; the assertion is on ``rank_``, because the
+        defect is structural. Where it does not -- 1.5.2 through 1.8.0 -- the
+        declaration must still be free: scaling cannot change an OLS prediction,
+        so ``True`` is never the wrong answer. Both are asserted; neither assumed.
+        The scaled fit keeps full rank on every version, unconditionally.
         """
         from sklearn.linear_model import LinearRegression
 
@@ -1409,11 +1449,18 @@ class TestTheRegressionCapabilityTestsCanActuallyFail:
         rate = rng.normal(0.03, 0.006, n)
         target = 1e-6 * revenue + 50.0 * rate + rng.normal(0, 1e-3, n)
         features = np.column_stack([revenue, rate])
+        scaled_features = StandardScaler().fit_transform(features)
+
+        scaled = LinearRegression().fit(scaled_features, target)
+        assert scaled.rank_ == 2, "the scaler the declaration asks for must keep every feature"
 
         unscaled = LinearRegression().fit(features, target)
-        assert unscaled.rank_ == 1
-        scaled = LinearRegression().fit(StandardScaler().fit_transform(features), target)
-        assert scaled.rank_ == 2, "if this ever fails, the declaration is unnecessary"
+        if unscaled.rank_ < 2:
+            assert unscaled.rank_ == 1
+        else:
+            np.testing.assert_allclose(
+                unscaled.predict(features), scaled.predict(scaled_features), rtol=1e-6
+            )
 
     def test_claiming_native_nan_where_there_is_none_would_be_caught(self, continuous):
         """If linear_regression declared handles_missing_values=True, this fails."""

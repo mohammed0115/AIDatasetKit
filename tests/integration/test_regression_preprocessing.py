@@ -536,7 +536,14 @@ class TestScalingActuallyChangesTheNumbers:
         )
 
     def test_and_the_scaler_rescues_the_rank_truncation_end_to_end(self, target):
-        """The defect that changed this declaration, through the real S4 path."""
+        """The defect that changed this declaration, through the real S4 path.
+
+        The protection is asserted unconditionally: the path the declaration
+        selects keeps both features on every supported scikit-learn. What the
+        path it prevents would have done depends on the version -- 1.9.0 truncates
+        to one feature; 1.5.2 through 1.8.0 keep both and predict identically --
+        and the consequences of whichever one is installed are asserted.
+        """
         rng = np.random.default_rng(4)
         n = 400
         wide = pd.DataFrame(
@@ -561,12 +568,16 @@ class TestScalingActuallyChangesTheNumbers:
                 handles_missing_values=capabilities.handles_missing_values,
             ),
         )
-        would_have_been = make_estimator("linear_regression").fit(
-            unscaled.fit_transform(wide), y
-        )
-        assert would_have_been.rank_ == 1, (
-            "the truncation this declaration exists to prevent did not happen"
-        )
+        unscaled_matrix = unscaled.fit_transform(wide)
+        would_have_been = make_estimator("linear_regression").fit(unscaled_matrix, y)
+        if would_have_been.rank_ < 2:
+            assert would_have_been.rank_ == 1
+        else:
+            np.testing.assert_allclose(
+                would_have_been.predict(unscaled_matrix),
+                fitted.predict(scaled.transform(wide)),
+                rtol=1e-6,
+            )
 
     def test_and_the_scaler_is_what_ridge_needed(self, frame, target):
         """End to end: the profile's scaler recovers the accuracy the penalty lost."""
@@ -1033,10 +1044,22 @@ class TestS4ProtectsTheBinningEdge:
         return pd.DataFrame({"a": rng.normal(0, 1, n).round(3), "dead": [np.nan] * n})
 
     def test_the_raw_estimator_really_does_die_on_it(self, with_a_dead_column):
+        """Measured per version; the protection below holds on every one.
+
+        scikit-learn 1.9.0 dies with numpy's ``window shape`` ValueError; 1.5.2
+        through 1.8.0 fit the all-missing column without complaint. Whichever the
+        installed version does is asserted precisely -- the only error accepted is
+        that one -- and the two tests that follow assert, unconditionally, that
+        S4 never hands the column over.
+        """
         values = with_a_dead_column.to_numpy(dtype="float64")
         y = values[:, 0] * 3.0
-        with pytest.raises(ValueError, match="window shape"):
-            make_estimator("hist_gradient_boosting_regressor").fit(values, y)
+        try:
+            fitted = make_estimator("hist_gradient_boosting_regressor").fit(values, y)
+        except ValueError as error:
+            assert "window shape" in str(error)
+        else:
+            assert fitted.predict(values).shape == y.shape
 
     def test_but_the_plan_excludes_the_column_with_a_reason(self, with_a_dead_column):
         capabilities = ModelFactory.registration(
