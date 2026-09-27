@@ -374,7 +374,7 @@ The repository includes a reproducible [comparative research lab](https://github
 
 ## Status
 
-Public alpha (`0.1.0a1`), Apache-2.0 licensed. The artifact schema is versioned independently of the
+An unreleased alpha (`0.1.0a1`): not published to PyPI, TestPyPI or as a GitHub release, and no version is tagged. Apache-2.0 licensed. The artifact schema is versioned independently of the
 package (`1.0`) so that stored artifacts stay readable as the library changes.
 Interfaces may still move. Feedback on the audit artifact — what is missing, what
 is unclear, what you would want to fail a build on — is the most useful thing you

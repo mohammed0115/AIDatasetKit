@@ -1,6 +1,6 @@
 # Contributing
 
-The project is in public alpha. The most useful contribution right now is
+The project is an unreleased alpha (`0.1.0a1`): not published to PyPI, TestPyPI or as a GitHub release, and no version is tagged. The most useful contribution right now is
 feedback on the audit artifact: what is missing, what is unclear, what you would
 want to fail a build on.
 

@@ -2,7 +2,7 @@
 
 ## Reporting
 
-This is a public alpha with no production users. If you find a security issue,
+This is an unreleased alpha (`0.1.0a1`): not published to PyPI, TestPyPI or as a GitHub release, and no version is tagged, with no production users. If you find a security issue,
 open an issue describing it, or contact the maintainer privately if you believe
 disclosure would put someone's data at risk.
 

@@ -1,4 +1,4 @@
-# AIDatasetKit 0.1.0a1 — Public Alpha
+# AIDatasetKit 0.1.0a1 — Alpha (unreleased)
 
 **The safety and audit layer for tabular machine learning.**
 
@@ -6,11 +6,20 @@ This release exists to answer one question, in a form a machine and a person can
 both read: *what happened between your data and your model, and why?*
 
 ```bash
-pip install aidatasetkit
+pip install -e .     # from a checkout; 0.1.0a1 is not on any package index yet
 aidatasetkit audit train.csv --target Churn --task classification --output ./aidk-audit/
 ```
 
-You get three files, a readable summary, and an exit code your CI can act on.
+You get three files, published together as one run, a readable summary, and an
+exit code your CI can act on.
+
+## Release status
+
+**Nothing has been published.** Checked on 2026-09-27: PyPI and TestPyPI answer
+404 for `aidatasetkit`, the GitHub repository has no releases, and no version is
+tagged locally or on the remote. Other channels -- a private index, a wheel
+shared directly -- were not checked and are not claimed either way. These notes
+describe what 0.1.0a1 will contain when it is released.
 
 ## What is included
 

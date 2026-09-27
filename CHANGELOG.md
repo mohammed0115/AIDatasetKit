@@ -6,7 +6,8 @@ Versions before `1.0` may change public interfaces and the artifact schema; see
 
 ## 0.1.0a1 — unreleased
 
-First public alpha. Everything below is new, because nothing was public before.
+First alpha, not yet released: nothing has been published to PyPI, TestPyPI or
+as a GitHub release, and no version is tagged. Everything below is new.
 
 ### The guided workflow
 

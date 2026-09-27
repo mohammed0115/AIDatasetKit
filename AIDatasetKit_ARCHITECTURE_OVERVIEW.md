@@ -1,6 +1,6 @@
 # AIDatasetKit — Architecture Overview
 
-> ## Status — public alpha `0.1.0a1`
+> ## Status — unreleased alpha `0.1.0a1` (not published to any index; no release, no tag)
 >
 > **AIDatasetKit is the safety and audit layer for tabular machine learning.**
 > *Prove what happened between your data and your model.*

@@ -379,3 +379,47 @@ class TestTheLongDescriptionRendersOnAPackageIndex:
         """Dropping the links must not drop the reader's way to the docs."""
         for path in ("docs/privacy.md", "docs/getting-started.md"):
             assert path in readme
+
+
+class TestReleaseClaimsMatchTheEvidence:
+    """G0-03 and the release wording: nothing may claim what no record shows.
+
+    As checked on 2026-09-27 and recorded in RELEASE_NOTES: 0.1.0a1 is on no
+    package index, has no GitHub release and no tag. Nothing signs an artifact.
+    """
+
+    DOCUMENTS = (
+        "README.md",
+        "CHANGELOG.md",
+        "RELEASE_NOTES_0.1.0a1.md",
+        "CONTRIBUTING.md",
+        "SECURITY.md",
+        "AIDatasetKit_ARCHITECTURE_OVERVIEW.md",
+        "docs/getting-started.md",
+        "examples/public_alpha/README.md",
+    )
+
+    def test_the_package_description_claims_no_signature(self):
+        import tomllib
+
+        with open(ROOT / "pyproject.toml", "rb") as handle:
+            description = tomllib.load(handle)["project"]["description"]
+        assert "sign" not in description.lower()
+
+    @pytest.mark.parametrize("name", DOCUMENTS)
+    def test_no_document_installs_from_an_index(self, name):
+        """``pip install aidatasetkit`` would fetch from PyPI, where there is nothing."""
+        import re
+
+        text = (ROOT / name).read_text(encoding="utf-8")
+        assert not re.search(r"pip install aidatasetkit(?![\w\[-])", text), name
+
+    @pytest.mark.parametrize("name", DOCUMENTS)
+    def test_no_document_calls_it_released_to_the_public(self, name):
+        text = (ROOT / name).read_text(encoding="utf-8").lower()
+        assert "public alpha" not in text, name
+
+    def test_the_release_notes_state_the_publication_status(self):
+        notes = (ROOT / "RELEASE_NOTES_0.1.0a1.md").read_text(encoding="utf-8")
+        assert "Nothing has been published." in notes
+        assert "not claimed either way" in notes

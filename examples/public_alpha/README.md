@@ -1,4 +1,4 @@
-# Public alpha demo
+# Alpha demo
 
 A synthetic customer table with four planted problems, and the audit that finds
 them. Everything here is generated from a fixed seed; no real data appears.
