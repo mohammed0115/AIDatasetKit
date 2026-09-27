@@ -57,11 +57,15 @@ def moment_of_values(values: np.ndarray, order: int, center: float | None) -> fl
     if constant:
         return _constant_sample_moment(float(values[0]), order, center)
 
+    # The order is passed positionally. SciPy renamed that keyword from ``moment``
+    # to ``order`` in 1.12, so ``order=`` raised TypeError on SciPy 1.11 -- inside
+    # the declared ``scipy>=1.11`` -- while the second positional argument means
+    # the order on every version. ``center`` is a keyword on 1.11 and later.
     with strict_numerics(f"moment of order {order}"):
         if center is None:
-            result = stats.moment(values, order=order)
+            result = stats.moment(values, order)
         else:
-            result = stats.moment(values, order=order, center=center)
+            result = stats.moment(values, order, center=center)
     return float(result)
 
 

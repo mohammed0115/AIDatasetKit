@@ -115,18 +115,34 @@ class TestEstimatorProtocol:
         """Documents the real boundary between our contract and scikit-learn's.
 
         Our protocol is deliberately narrow, but pipeline composition is
-        scikit-learn machinery, and since scikit-learn 1.6 that machinery requires
-        estimator tags. A raw duck-typed object survives ``fit`` and then fails on
-        ``predict``; inside cross-validation it degrades to silent NaN scores
-        instead of raising. That is why every strategy must return an adapter, as
-        the next test demonstrates.
+        scikit-learn machinery, and that machinery relies on estimator tags a raw
+        duck-typed object does not have. How loudly it says so depends on the
+        version, measured: scikit-learn 1.8.0 and 1.9.0 raise ``AttributeError``
+        naming ``__sklearn_tags__`` on ``predict``; 1.6.1 and 1.7.0 complete the
+        call and only warn -- that the object lacks tags, or that the pipeline
+        "is not fitted yet" although it was, because the fitted check reads the
+        tags. Either way the object is not a first-class estimator, and inside
+        cross-validation the quiet form degrades to silent NaN scores. That is why
+        every strategy must return an adapter, as the next test demonstrates.
+        Both forms are asserted; neither is assumed.
         """
+        import warnings
+
         features = np.array([[1.0], [2.0], [3.0]])
         target = np.array([1.0, 2.0, 3.0])
-        pipeline = Pipeline([("model", FakeBackendRegressor())]).fit(features, target)
-
-        with pytest.raises(AttributeError, match="__sklearn_tags__"):
-            pipeline.predict(features)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            pipeline = Pipeline([("model", FakeBackendRegressor())]).fit(features, target)
+            try:
+                pipeline.predict(features)
+            except AttributeError as error:
+                assert "__sklearn_tags__" in str(error)
+                return
+        complaints = [str(w.message) for w in caught]
+        assert any(
+            "__sklearn_tags__" in message or "not fitted" in message
+            for message in complaints
+        ), complaints
 
     def test_a_foreign_backend_adapter_composes_clones_and_cross_validates(self):
         """The proof that a future PyTorch strategy needs no architectural change.

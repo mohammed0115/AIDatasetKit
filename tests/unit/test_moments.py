@@ -58,7 +58,7 @@ class TestAgainstReferences:
     @pytest.mark.parametrize("order", [0, 1, 2, 3, 4, 5])
     def test_central_moment_matches_scipy(self, order):
         assert central_moment(SAMPLE, order) == pytest.approx(
-            stats.moment(ARRAY, order=order)
+            stats.moment(ARRAY, order)  # positional: the keyword is order= only from SciPy 1.12
         )
 
     @pytest.mark.parametrize("order", [0, 1, 2, 3, 4, 5])
