@@ -74,6 +74,18 @@ def main() -> None:
     artifact = build_artifact(frame)
     payload = artifact.to_dict()
 
+    # The semantic fixture records pandas dtype names, which differ between
+    # pandas majors (``str`` in 3, ``object`` in 2). The reference environment is
+    # pandas 3 and writes every file; pandas 2 writes only its own fixture, so the
+    # illustrative files never mix environments.
+    if int(pd.__version__.split(".")[0]) == 2:
+        target = HERE / "expected_audit_semantic.pandas2.json"
+        target.write_text(canonical_json(artifact.semantic_dict()), encoding="utf-8")
+        print(f"verdict: {artifact.verdict.value}")
+        print(f"evidence fingerprint: {artifact.semantic_fingerprint[:16]}")
+        print(f"  wrote {target}")
+        return
+
     (HERE / "audit.json").write_text(canonical_json(payload), encoding="utf-8")
     (HERE / "lineage.json").write_text(
         canonical_json(artifact.lineage_dict()), encoding="utf-8"

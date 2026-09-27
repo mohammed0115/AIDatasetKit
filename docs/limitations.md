@@ -132,7 +132,11 @@ is future work.
 
 **A dataset fingerprint is comparable within one environment.** It is built on
 pandas' row hasher, so a different pandas major version can change the digest for
-identical data. Every artifact records the versions that produced it.
+identical data. Every artifact records the versions that produced it. The same
+holds for recorded dtype names: pandas 3 reports a text column as `str` where
+pandas 2 reports `object`, so the same file audited under the two majors yields
+two different, equally correct artifacts. The test suite keeps one exact fixture
+per supported major and asserts that they differ in those fields and no others.
 
 **A dataset fingerprint identifies content, not provenance.** It cannot show
 where the data came from, who collected it, or whether that was lawful.

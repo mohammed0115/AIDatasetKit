@@ -258,7 +258,7 @@
     }
   ],
   "config": {
-    "fingerprint": "8171fb67203c5661d6a6ec491c897398af73549f535ac43ab9d663a805aa1b15",
+    "fingerprint": "e34dd2664d496a4edd29e742d37ae5ede35e77ecb96552d7b97003d456414ea4",
     "settings": {
       "categorical_sentinel": "__missing__",
       "model": "logistic_regression",
@@ -296,6 +296,7 @@
         "imbalance_threshold": 0.2,
         "leakage_correlation_threshold": 0.98,
         "missing_warning_threshold": 0.2,
+        "multicollinearity_vif_threshold": 10.0,
         "near_constant_threshold": 0.98,
         "numeric_text_ratio_threshold": 0.75,
         "outlier_iqr_multiplier": 1.5,
@@ -886,7 +887,7 @@
       "scikit_learn": "1.9.0",
       "scipy": "1.18.0"
     },
-    "semantic_fingerprint": "b8581966475da37125414a12afc3144d6b1468258ff3dcb3149368406b884852"
+    "semantic_fingerprint": "1c449f10c3f9b826e6c166522122f77cc602348a349d11b662ddfe540af5f470"
   },
   "schema_version": "1.0",
   "stage": "prepared",

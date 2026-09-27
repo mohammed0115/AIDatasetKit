@@ -22,6 +22,8 @@ from aidatasetkit.cli import EXIT_CODES
 from aidatasetkit.evidence import AuditBuilder, Verdict, canonical_json
 from aidatasetkit.profiling import DataProfiler, DataQualityInspector
 
+from tests.golden import semantic_fixture_path
+
 #: The synthetic frame lives beside its generator so the fixture and the example
 #: a reader runs are the same file.
 EXAMPLE = Path(__file__).resolve().parents[2] / "examples" / "audit_churn" / "train.csv"
@@ -486,7 +488,9 @@ class TestTheGoldenSemanticArtifact:
     time anyone upgraded pandas.
     """
 
-    EXPECTED = EXAMPLE.with_name("expected_audit_semantic.json")
+    #: The fixture for the running pandas major; see tests/golden.py for why there
+    #: are two and what is allowed to differ between them.
+    EXPECTED = semantic_fixture_path()
 
     @pytest.fixture(scope="class")
     @staticmethod

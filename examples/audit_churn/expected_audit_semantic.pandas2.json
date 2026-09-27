@@ -17,7 +17,7 @@
         "name": "CustomerID"
       },
       "numeric": null,
-      "pandas_dtype": "str",
+      "pandas_dtype": "object",
       "source": "profiling",
       "unique_count": 600,
       "unique_ratio": 1.0
@@ -101,7 +101,7 @@
         "name": "City"
       },
       "numeric": null,
-      "pandas_dtype": "str",
+      "pandas_dtype": "object",
       "source": "profiling",
       "unique_count": 3,
       "unique_ratio": 0.005
@@ -123,7 +123,7 @@
         "name": "ContractType"
       },
       "numeric": null,
-      "pandas_dtype": "str",
+      "pandas_dtype": "object",
       "source": "profiling",
       "unique_count": 3,
       "unique_ratio": 0.005
@@ -145,7 +145,7 @@
         "name": "Education"
       },
       "numeric": null,
-      "pandas_dtype": "str",
+      "pandas_dtype": "object",
       "source": "profiling",
       "unique_count": 3,
       "unique_ratio": 0.005
@@ -189,7 +189,7 @@
         "name": "HighCardinalityFeature"
       },
       "numeric": null,
-      "pandas_dtype": "str",
+      "pandas_dtype": "object",
       "source": "profiling",
       "unique_count": 220,
       "unique_ratio": 0.36666666666666664
@@ -358,9 +358,9 @@
       }
     ],
     "duplicate_row_count": 0,
-    "fingerprint": "8135be14ca667643b0782e42924942e87a659b27c519e72b01dacb57f1b16ec2",
+    "fingerprint": "59316cbf5fbbbce50f92da83ec6c4a2b0af0f577612c61608d2e4335f95b70e9",
     "row_count": 600,
-    "schema_fingerprint": "0eea20c4ff0ce51284984518bd45bc7c1014991c2e48a8e431b7bde9deebe156",
+    "schema_fingerprint": "6c0f17c687a4c064faeac7e2f8c78c51bccede76eb344b90335673a16361d749",
     "total_missing_count": 55
   },
   "decisions": [
