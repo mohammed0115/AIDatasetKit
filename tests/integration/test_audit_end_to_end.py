@@ -19,7 +19,7 @@ import pandas as pd
 import pytest
 
 from aidatasetkit.cli import EXIT_CODES
-from aidatasetkit.evidence import AuditBuilder, Verdict, canonical_json
+from aidatasetkit.evidence import AuditBuilder, Verdict, canonical_json, read_current
 from aidatasetkit.profiling import DataProfiler, DataQualityInspector
 
 from tests.golden import semantic_fixture_path
@@ -71,7 +71,7 @@ def audited(tmp_path_factory) -> tuple[subprocess.CompletedProcess, Path]:
 @pytest.fixture(scope="module")
 def artifact(audited) -> dict:
     _, output = audited
-    return json.loads((output / "audit.json").read_text(encoding="utf-8"))
+    return json.loads(read_current(output).text("audit.json"))
 
 
 class TestTheGoldenDatasetExists:
@@ -110,8 +110,7 @@ class TestTheCommandRuns:
 
     def test_it_writes_all_three_artifacts(self, audited):
         _, output = audited
-        for name in ("audit.json", "lineage.json", "report.html"):
-            assert (output / name).exists(), name
+        assert set(read_current(output).contents) == {"audit.json", "lineage.json", "report.html"}
 
     def test_the_summary_is_short_enough_to_read(self, audited):
         result, _ = audited
@@ -206,13 +205,13 @@ class TestGoldenDecisionsAndLineage:
 
     def test_lineage_records_the_one_hot_outputs(self, audited):
         _, output = audited
-        lineage = json.loads((output / "lineage.json").read_text(encoding="utf-8"))
+        lineage = json.loads(read_current(output).text("lineage.json"))
         city = next(e for e in lineage["features"] if e["source"]["name"] == "City")
         assert set(city["outputs"]) == {"City_Dammam", "City_Jeddah", "City_Riyadh"}
 
     def test_lineage_records_what_produced_nothing(self, audited):
         _, output = audited
-        lineage = json.loads((output / "lineage.json").read_text(encoding="utf-8"))
+        lineage = json.loads(read_current(output).text("lineage.json"))
         held = next(
             e for e in lineage["features"] if e["source"]["name"] == "CustomerID"
         )
@@ -221,7 +220,7 @@ class TestGoldenDecisionsAndLineage:
 
     def test_lineage_carries_its_own_schema_and_dataset_identity(self, audited, artifact):
         _, output = audited
-        lineage = json.loads((output / "lineage.json").read_text(encoding="utf-8"))
+        lineage = json.loads(read_current(output).text("lineage.json"))
         assert lineage["schema_version"] == artifact["schema_version"]
         assert lineage["dataset_fingerprint"] == artifact["dataset"]["fingerprint"]
 
@@ -229,28 +228,28 @@ class TestGoldenDecisionsAndLineage:
 class TestReportAndJsonAgree:
     def test_the_report_shows_the_same_verdict(self, audited, artifact):
         _, output = audited
-        html = (output / "report.html").read_text(encoding="utf-8")
+        html = read_current(output).text("report.html")
         assert artifact["verdict"].replace("_", " ").upper() in html
 
     def test_the_report_shows_the_same_fingerprint(self, audited, artifact):
         _, output = audited
-        assert artifact["dataset"]["fingerprint"] in (output / "report.html").read_text(encoding="utf-8")
+        assert artifact["dataset"]["fingerprint"] in read_current(output).text("report.html")
 
     def test_every_finding_reaches_the_page(self, audited, artifact):
         _, output = audited
-        html = (output / "report.html").read_text(encoding="utf-8")
+        html = read_current(output).text("report.html")
         for finding in artifact["findings"]:
             assert finding["code"] in html
 
     def test_every_decision_reaches_the_page(self, audited, artifact):
         _, output = audited
-        html = (output / "report.html").read_text(encoding="utf-8")
+        html = read_current(output).text("report.html")
         for decision in artifact["decisions"]:
             assert decision["feature"]["name"] in html
 
     def test_the_page_needs_no_network(self, audited):
         _, output = audited
-        html = (output / "report.html").read_text(encoding="utf-8")
+        html = read_current(output).text("report.html")
         assert "http://" not in html and "https://" not in html
 
 
@@ -346,14 +345,14 @@ class TestAuditWithoutAModelOrTarget:
     def bare(tmp_path_factory):
         output = tmp_path_factory.mktemp("bare")
         result = run_cli("audit", str(EXAMPLE), "--output", str(output))
-        return result, json.loads((output / "audit.json").read_text(encoding="utf-8"))
+        return result, json.loads(read_current(output).text("audit.json"))
 
     @pytest.fixture(scope="class")
     @staticmethod
     def targeted(tmp_path_factory):
         output = tmp_path_factory.mktemp("targeted")
         run_cli("audit", str(EXAMPLE), "--target", "Churn", "--output", str(output))
-        return json.loads((output / "audit.json").read_text(encoding="utf-8"))
+        return json.loads(read_current(output).text("audit.json"))
 
     def test_a_bare_audit_still_produces_artifacts(self, bare):
         result, artifact = bare
@@ -410,7 +409,7 @@ class TestBlockedAnalysisStillProducesEvidence:
             "audit", str(unpreparable), "--target", "label", "--model",
             "logistic_regression", "--output", str(output),
         )
-        return result, output, json.loads((output / "audit.json").read_text(encoding="utf-8"))
+        return result, output, json.loads(read_current(output).text("audit.json"))
 
     def test_the_command_does_not_crash(self, blocked):
         result, _, _ = blocked
@@ -418,8 +417,7 @@ class TestBlockedAnalysisStillProducesEvidence:
 
     def test_artifacts_are_still_written(self, blocked):
         _, output, _ = blocked
-        for name in ("audit.json", "lineage.json", "report.html"):
-            assert (output / name).exists(), name
+        assert set(read_current(output).contents) == {"audit.json", "lineage.json", "report.html"}
 
     def test_the_verdict_explains_what_stopped_it(self, blocked):
         _, _, artifact = blocked
@@ -556,7 +554,7 @@ class TestTheSummaryNeverUnderstatesTheArtifact:
         pd.DataFrame(columns).to_csv(path, index=False)
         output = directory / "out"
         result = run_cli("audit", str(path), "--target", "label", "--output", str(output))
-        return result, json.loads((output / "audit.json").read_text(encoding="utf-8"))
+        return result, json.loads(read_current(output).text("audit.json"))
 
     def test_the_dataset_really_does_overflow_the_summary(self, crowded):
         _, artifact = crowded
@@ -614,9 +612,9 @@ class TestEveryFailureStillProducesAnArtifact:
             "--output", str(output),
         )
         assert "Traceback" not in result.stderr
-        for artifact_name in ("audit.json", "lineage.json", "report.html"):
-            assert (output / artifact_name).exists(), f"{name}: {artifact_name}"
-        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
+        published = set(read_current(output).contents)
+        assert published == {"audit.json", "lineage.json", "report.html"}, name
+        artifact = json.loads(read_current(output).text("audit.json"))
         assert artifact["verdict"] == "blocked"
         assert artifact["verdict_reasons"]
 
@@ -625,7 +623,7 @@ class TestEveryFailureStillProducesAnArtifact:
         pd.DataFrame({"a": [1.0, 2.0] * 100, "label": [None] * 200}).to_csv(path, index=False)
         output = tmp_path / "o"
         run_cli("audit", str(path), "--target", "label", "--output", str(output))
-        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
+        artifact = json.loads(read_current(output).text("audit.json"))
         assert len(artifact["columns"]) == 2
 
 
@@ -637,7 +635,8 @@ class TestInputsTheAuditMustRefuse:
         result = run_cli("audit", str(path), "--target", "label", "--output", str(tmp_path / "o"))
         assert result.returncode == EXIT_CODES["usage"]
         assert "duplicate column headers" in result.stderr
-        assert not (tmp_path / "o" / "audit.json").exists()
+        assert not (tmp_path / "o" / "CURRENT").exists()
+        assert not (tmp_path / "o" / "runs").exists()
 
     def test_output_pointing_at_a_file_is_refused_before_the_work(self, tmp_path):
         existing = tmp_path / "not_a_dir"
@@ -687,7 +686,7 @@ class TestExitCodeTwoMeansThresholdMet:
             "audit", str(path), "--target", "label", "--fail-on", "warning",
             "--output", str(tmp_path / "b"),
         )
-        artifact = json.loads((tmp_path / "b" / "audit.json").read_text(encoding="utf-8"))
+        artifact = json.loads(read_current(tmp_path / "b").text("audit.json"))
         assert artifact["verdict"] == "ready_with_warnings"
 
     def test_the_documented_table_matches_the_code(self):
@@ -734,10 +733,65 @@ class TestUsageErrorsDoNotCollideWithPolicyCodes:
 
 
 class TestArtifactsAreWrittenTogetherOrNotAtAll:
+    """The CLI's side of the publication contract; the contract itself is
+    exercised step by step in tests/unit/test_publication.py."""
+
     def test_all_three_appear(self, tmp_path):
         run_cli("audit", str(EXAMPLE), "--target", "Churn", "--output", str(tmp_path / "o"))
-        written = sorted(p.name for p in (tmp_path / "o").iterdir())
-        assert written == ["audit.json", "lineage.json", "report.html"]
+        layout = sorted(p.name for p in (tmp_path / "o").iterdir())
+        assert layout == [".staging", "CURRENT", "runs"]
+        run = read_current(tmp_path / "o")
+        assert sorted(run.contents) == ["audit.json", "lineage.json", "report.html"]
+        assert sorted(p.name for p in run.directory.iterdir()) == [
+            "audit.json", "lineage.json", "manifest.json", "report.html",
+        ]
+
+    def test_nothing_is_written_at_the_root_that_could_pass_for_a_run(self, tmp_path):
+        run_cli("audit", str(EXAMPLE), "--target", "Churn", "--output", str(tmp_path / "o"))
+        for name in ("audit.json", "lineage.json", "report.html"):
+            assert not (tmp_path / "o" / name).exists(), name
+
+    def test_legacy_root_files_are_left_alone_and_named(self, tmp_path):
+        output = tmp_path / "o"
+        output.mkdir()
+        (output / "audit.json").write_text("{}", encoding="utf-8")
+        result = run_cli("audit", str(EXAMPLE), "--target", "Churn", "--output", str(output))
+        assert (output / "audit.json").read_text(encoding="utf-8") == "{}"
+        assert "came from an older version" in result.stdout
+        assert json.loads(read_current(output).text("audit.json"))["verdict"]
+
+    def test_two_audits_at_once_each_publish_a_complete_run(self, tmp_path):
+        output = tmp_path / "shared"
+        command = [
+            sys.executable, "-c",
+            "from aidatasetkit.cli.main import main; raise SystemExit(main())",
+            "audit", str(EXAMPLE), "--target", "Churn", "--output", str(output),
+            "--fail-on", "never",
+        ]
+        first = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        second = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        assert first.wait(timeout=300) == 0, first.stderr.read().decode()
+        assert second.wait(timeout=300) == 0, second.stderr.read().decode()
+        runs = sorted((output / "runs").iterdir())
+        assert len(runs) == 2
+        assert read_current(output).run_id in {run.name for run in runs}
+
+    def test_a_publication_failure_leaves_the_previous_run_current(self, tmp_path, monkeypatch, capsys):
+        from aidatasetkit.cli.main import main
+        from aidatasetkit.evidence import publication
+
+        output = tmp_path / "o"
+        assert main(["audit", str(EXAMPLE), "--target", "Churn", "--output", str(output), "--fail-on", "never"]) == 0
+        before = read_current(output).run_id
+
+        def refuse(source, target):
+            raise OSError("injected: disk full")
+
+        monkeypatch.setattr(publication, "_replace", refuse)
+        code = main(["audit", str(EXAMPLE), "--target", "Churn", "--output", str(output), "--fail-on", "never"])
+        assert code == EXIT_CODES["usage"]
+        assert "PublicationError" in capsys.readouterr().err
+        assert read_current(output).run_id == before
 
     def test_rendering_happens_before_anything_is_written(self):
         """A directory holding audit.json without the report is worse than one
@@ -753,18 +807,22 @@ class TestArtifactsAreWrittenTogetherOrNotAtAll:
         module = sys.modules["aidatasetkit.cli.main"]
         source = inspect.getsource(module._write)
         render_at = source.index("rendered = {")
-        mkdir_at = source.index("output.mkdir")
-        assert render_at < mkdir_at
+        publish_at = source.index("publish_run(output")
+        assert render_at < publish_at
 
-    def test_rerunning_overwrites_cleanly(self, tmp_path):
+    def test_rerunning_publishes_a_second_complete_run(self, tmp_path):
+        """Nothing is overwritten: the first run stays whole, the second is current."""
         output = tmp_path / "twice"
-        for _ in range(2):
-            run_cli("audit", str(EXAMPLE), "--target", "Churn", "--output", str(output))
-        assert sorted(p.name for p in output.iterdir()) == [
-            "audit.json",
-            "lineage.json",
-            "report.html",
-        ]
+        run_cli("audit", str(EXAMPLE), "--target", "Churn", "--output", str(output))
+        first = read_current(output)
+        # A different flag, so run_cli's per-arguments cache really runs it again.
+        run_cli("audit", str(EXAMPLE), "--target", "Churn", "--output", str(output), "--fail-on", "never")
+        second = read_current(output)
+        assert first.run_id != second.run_id
+        assert sorted(p.name for p in (output / "runs").iterdir()) == sorted(
+            [first.run_id, second.run_id]
+        )
+        assert (first.directory / "audit.json").read_bytes() == first.contents["audit.json"]
 
 
 class TestAnUnverifiedTaskSaysSo:
@@ -775,7 +833,7 @@ class TestAnUnverifiedTaskSaysSo:
             "--output", str(output),
         )
         assert "Note:" in result.stdout
-        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
+        artifact = json.loads(read_current(output).text("audit.json"))
         assert any("regression" in w for w in artifact["warnings"])
 
     def test_the_warning_no_longer_claims_the_models_are_unverified(self, tmp_path):
@@ -789,7 +847,7 @@ class TestAnUnverifiedTaskSaysSo:
             "audit", str(EXAMPLE), "--target", "Churn", "--task", "regression",
             "--output", str(output),
         )
-        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
+        artifact = json.loads(read_current(output).text("audit.json"))
         note = next(w for w in artifact["warnings"] if "regression task" in w)
         assert "has not been verified" in note
         assert "readiness verdict" in note
@@ -801,7 +859,7 @@ class TestAnUnverifiedTaskSaysSo:
             "audit", str(EXAMPLE), "--target", "Churn", "--task", "classification",
             "--output", str(output),
         )
-        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
+        artifact = json.loads(read_current(output).text("audit.json"))
         assert not any("not been verified" in w for w in artifact["warnings"])
 
 
@@ -821,7 +879,7 @@ class TestRegressionModelsAreReachableFromTheCommandLine:
             "audit", str(EXAMPLE), "--target", "Churn", "--task", "regression",
             "--model", "ridge_regression", "--output", str(output),
         )
-        return result, json.loads((output / "audit.json").read_text(encoding="utf-8"))
+        return result, json.loads(read_current(output).text("audit.json"))
 
     def test_a_regression_model_context_produces_a_full_artifact(self, ridge):
         result, artifact = ridge
@@ -866,7 +924,7 @@ class TestRegressionModelsAreReachableFromTheCommandLine:
             "--model", "random_forest", "--output", str(output),
         )
         assert result.returncode != EXIT_CODES["usage"], result.stderr
-        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
+        artifact = json.loads(read_current(output).text("audit.json"))
         assert artifact["model"]["canonical_name"] == "random_forest_regressor"
 
     def test_the_same_alias_under_the_other_task_gives_the_classifier(self, tmp_path):
@@ -875,7 +933,7 @@ class TestRegressionModelsAreReachableFromTheCommandLine:
             "audit", str(EXAMPLE), "--target", "Churn", "--task", "classification",
             "--model", "random_forest", "--output", str(output),
         )
-        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
+        artifact = json.loads(read_current(output).text("audit.json"))
         assert artifact["model"]["canonical_name"] == "random_forest_classifier"
 
     def test_an_ambiguous_alias_is_refused_clearly_rather_than_guessed(self, tmp_path):
@@ -941,7 +999,7 @@ class TestAModelMustMatchTheTargetTheDetectorFound:
             "audit", str(EXAMPLE), "--target", "Churn",
             "--model", "ridge_regression", "--output", str(output),
         )
-        return result, json.loads((output / "audit.json").read_text(encoding="utf-8"))
+        return result, json.loads(read_current(output).text("audit.json"))
 
     def test_the_run_completes_rather_than_aborting(self, mismatched):
         result, artifact = mismatched
@@ -978,7 +1036,7 @@ class TestAModelMustMatchTheTargetTheDetectorFound:
             "audit", str(EXAMPLE), "--target", "Churn",
             "--model", "logistic_regression", "--output", str(output),
         )
-        artifact = json.loads((output / "audit.json").read_text(encoding="utf-8"))
+        artifact = json.loads(read_current(output).text("audit.json"))
         assert not any(
             "does not match the detected target" in w for w in artifact["warnings"]
         )

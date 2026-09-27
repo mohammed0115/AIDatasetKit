@@ -42,17 +42,20 @@ for KIND in wheel sdist; do
   say "Installing the $KIND into a clean environment"
   ENV="$WORK/$KIND"
   python -m venv "$ENV"
+  # A venv keeps its executables in bin/ on POSIX and Scripts/ on Windows.
+  BIN="$ENV/bin"
+  [ -d "$ENV/Scripts" ] && BIN="$ENV/Scripts"
   case "$KIND" in
-    wheel) "$ENV/bin/pip" install -q "$WHEEL" ;;
-    sdist) "$ENV/bin/pip" install -q "$SDIST" ;;
+    wheel) "$BIN/pip" install -q "$WHEEL" ;;
+    sdist) "$BIN/pip" install -q "$SDIST" ;;
   esac
 
-  "$ENV/bin/python" -c "import aidatasetkit" || fail "$KIND: import"
-  "$ENV/bin/aidatasetkit" --version || fail "$KIND: --version"
-  "$ENV/bin/aidatasetkit" audit --help >/dev/null || fail "$KIND: audit --help"
+  "$BIN/python" -c "import aidatasetkit" || fail "$KIND: import"
+  "$BIN/aidatasetkit" --version || fail "$KIND: --version"
+  "$BIN/aidatasetkit" audit --help >/dev/null || fail "$KIND: audit --help"
 
   # matplotlib is optional and must not be pulled in by a core install.
-  "$ENV/bin/python" - <<'PY' || exit 1
+  "$BIN/python" - <<'PY' || exit 1
 import importlib.util, sys
 import aidatasetkit  # noqa: F401
 if "matplotlib" in sys.modules:
@@ -60,7 +63,7 @@ if "matplotlib" in sys.modules:
 PY
 
   say "Auditing a synthetic dataset with the installed $KIND"
-  "$ENV/bin/python" - "$WORK/$KIND.csv" <<'PY'
+  "$BIN/python" - "$WORK/$KIND.csv" <<'PY'
 import sys
 import numpy as np, pandas as pd
 i = np.arange(400); churn = (i % 5 == 0).astype(int)
@@ -76,19 +79,21 @@ pd.DataFrame({
 PY
 
   set +e
-  "$ENV/bin/aidatasetkit" audit "$WORK/$KIND.csv" --target Churn \
+  "$BIN/aidatasetkit" audit "$WORK/$KIND.csv" --target Churn \
       --task classification --output "$WORK/out-$KIND" >/dev/null
   CODE=$?
   set -e
   [ "$CODE" -eq 3 ] || fail "$KIND: expected exit 3 (blocked), got $CODE"
 
-  for ARTIFACT in audit.json lineage.json report.html; do
-    [ -s "$WORK/out-$KIND/$ARTIFACT" ] || fail "$KIND: missing or empty $ARTIFACT"
-  done
-
-  "$ENV/bin/python" - "$WORK/out-$KIND/audit.json" <<'PY' || exit 1
-import json, sys
-a = json.load(open(sys.argv[1]))
+  # Through the published reader, from the installed package: CURRENT, the
+  # manifest, and every file's size and digest, or a refusal.
+  "$BIN/python" - "$WORK/out-$KIND" <<'PY' || exit 1
+import sys
+from aidatasetkit.evidence import read_current
+run = read_current(sys.argv[1])
+assert sorted(run.contents) == ["audit.json", "lineage.json", "report.html"], sorted(run.contents)
+assert all(run.contents.values()), "an artifact is empty"
+a = run.json("audit.json")
 assert a["schema_version"] == "1.0", a["schema_version"]
 assert a["verdict"] == "blocked", a["verdict"]
 assert a["columns"] and a["findings"], "artifact is empty"

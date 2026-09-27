@@ -18,7 +18,8 @@ python examples/audit_churn/make_dataset.py
 aidatasetkit audit examples/audit_churn/train.csv --target Churn
 ```
 
-That prints a summary and writes three files to `./aidk-audit/`. The dataset is
+That prints a summary and publishes three files as one run under
+`./aidk-audit/runs/<run_id>/`; `./aidk-audit/CURRENT` names the latest run. The dataset is
 synthetic and deliberately broken, so the audit has something to say.
 
 Add a model context to find out how the data would be *prepared* for a specific
@@ -102,9 +103,19 @@ what it found. Only `1` means the audit itself failed.
     path: aidk-audit/
 ```
 
-Commit `aidk-audit/audit.json` and the diff on the next run shows exactly what
-changed about your data — the file is canonical JSON with sorted keys, so a git
-diff is readable rather than noise.
+Commit the current run's `audit.json` and the diff on the next run shows exactly
+what changed about your data — the file is canonical JSON with sorted keys, so a
+git diff is readable rather than noise:
+
+```python
+from aidatasetkit.evidence import read_current
+
+run = read_current("aidk-audit")          # CURRENT -> manifest -> every file checked
+open("audit.json", "w", encoding="utf-8").write(run.text("audit.json"))
+```
+
+Read runs through `read_current`, not by guessing a path: it follows `CURRENT`,
+checks the manifest and every file's digest, and refuses anything incomplete.
 
 ## From Python
 

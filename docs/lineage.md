@@ -68,7 +68,9 @@ file.
 ```python
 import json
 
-lineage = json.load(open("aidk-audit/lineage.json"))
+from aidatasetkit.evidence import read_current
+
+lineage = read_current("aidk-audit").json("lineage.json")
 for feature in lineage["features"]:
     if feature["action"] != "include":
         print(f"{feature['source']['name']}: {feature['reason']}")

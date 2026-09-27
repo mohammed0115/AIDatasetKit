@@ -16,6 +16,38 @@ will not change the shape of a recorded field; the ones that do must be
 identifiable without consulting a changelog. `0.1.0a1` writes schema `1.0`, and a
 later `0.4.0` may still write `1.0`.
 
+## Where a run is published
+
+The CLI never writes the artifacts straight into `--output`. Each audit is one run:
+
+```
+<output>/
+  CURRENT                   {"run_id": ..., "manifest_sha256": ..., "publication_schema_version": "1.0"}
+  runs/<run_id>/
+    audit.json  lineage.json  report.html
+    manifest.json           {"run_id", "created_at", "files": {name: {"bytes", "sha256"}}}
+  .staging/                 private to writers in progress; never read
+```
+
+The files are written in full and synced in a staging directory of their own,
+re-read against the manifest, moved into `runs/<run_id>/`, and only then made
+current: a new `CURRENT` is written beside the old one and replaces it with
+`os.replace`, the single commit point. Before that step any failure leaves the
+previous run current; the step itself either happens or does not. Two audits
+into one directory each publish a complete run and the later commit is current;
+there is no lock to be left behind by a killed process.
+
+`aidatasetkit.evidence.read_current(output)` is the reader. It follows `CURRENT`,
+checks the manifest's digest against it, and checks that the run holds exactly
+the listed files at the listed sizes and digests, returning the bytes it checked.
+Anything else raises `CorruptPublicationError`; no run yet raises
+`NoPublishedRunError`. Finished runs are never deleted, and a staging directory
+left by a killed writer is never swept, because either may belong to a process
+still using it.
+
+The layout is versioned separately (`publication_schema_version`), from the
+artifact schema below and from the package.
+
 ## Top-level shape
 
 | Key | What it holds |

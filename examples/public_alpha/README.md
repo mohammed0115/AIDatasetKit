@@ -20,9 +20,12 @@ Exit code **3** — the audit found something that stops a build.
 
 ```
 aidk-audit/
-├── audit.json      the canonical machine-readable record
-├── lineage.json    each input column and what it became
-└── report.html     the same evidence, rendered for a person
+├── CURRENT                     which run is current, and its manifest digest
+└── runs/<run_id>/
+    ├── audit.json              the canonical machine-readable record
+    ├── lineage.json            each input column and what it became
+    ├── report.html             the same evidence, rendered for a person
+    └── manifest.json           size and SHA-256 of each file above
 ```
 
 `lineage.json` is populated only when a preprocessing plan exists, which needs a

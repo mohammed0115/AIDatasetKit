@@ -61,6 +61,15 @@ from aidatasetkit.evidence.types import (
     Verdict,
 )
 
+from aidatasetkit.evidence.publication import (
+    CURRENT_NAME,
+    MANIFEST_NAME,
+    PUBLICATION_SCHEMA_VERSION,
+    PublishedRun,
+    publish_run,
+    read_current,
+)
+
 __all__ = [
     "ALGORITHM",
     "ARTIFACT_SCHEMA_VERSION",
@@ -75,9 +84,13 @@ __all__ = [
     "FeatureLineage",
     "FindingEvidence",
     "FitScope",
+    "CURRENT_NAME",
     "KNOWN_LIMITATIONS",
+    "MANIFEST_NAME",
+    "PUBLICATION_SCHEMA_VERSION",
     "LabelRef",
     "ModelEvidence",
+    "PublishedRun",
     "TargetEvidence",
     "VERDICT_ORDER",
     "Verdict",
@@ -87,6 +100,8 @@ __all__ = [
     "dataset_fingerprint",
     "decide_verdict",
     "label_token",
+    "publish_run",
+    "read_current",
     "render_report",
     "schema_fingerprint",
     "verdict_at_least",

@@ -39,6 +39,9 @@ __all__ = [
     "UnsupportedChartError",
     "EvidenceError",
     "SerializationError",
+    "PublicationError",
+    "NoPublishedRunError",
+    "CorruptPublicationError",
     "TrainingError",
     "WorkflowStateError",
     "PredictionValidationError",
@@ -225,6 +228,29 @@ class SerializationError(EvidenceError):
     Almost always an object that should never have reached the artifact at all --
     an estimator, a DataFrame, an array. Coercing it to text would put something
     that looks like a record into a document whose whole purpose is to be one.
+    """
+
+
+class PublicationError(EvidenceError):
+    """Raised when a run's artifacts could not be published as one complete set.
+
+    Whatever was published before is left exactly as it was: the failure happened
+    before the single step that makes a new run current, or that step itself did
+    not complete.
+    """
+
+
+class NoPublishedRunError(PublicationError):
+    """Raised when an output directory has no completed run to read."""
+
+
+class CorruptPublicationError(PublicationError):
+    """Raised when the current run does not match its own manifest.
+
+    A missing, extra, resized or altered file, a manifest that is not the one the
+    pointer names, or a pointer that cannot be read. The set is refused whole: a
+    reader handed part of a run, or a run from two generations, would be handed a
+    record that never existed.
     """
 
 

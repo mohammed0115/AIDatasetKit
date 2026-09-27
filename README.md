@@ -34,10 +34,10 @@ Key issues:
 
 Needs review: possible_id_like (CustomerID), possible_target_leakage (HighCardinalityFeature), high_cardinality (HighCardinalityFeature)
 
-Artifacts:
-  ./aidk-audit/audit.json
-  ./aidk-audit/lineage.json
-  ./aidk-audit/report.html
+Artifacts (now current in aidk-audit/CURRENT):
+  aidk-audit/runs/20260927T101530123456Z-…/audit.json
+  aidk-audit/runs/20260927T101530123456Z-…/lineage.json
+  aidk-audit/runs/20260927T101530123456Z-…/report.html
 ```
 
 Exit code `3`. Your CI job just caught a target leak before anyone trained on it.
@@ -88,8 +88,17 @@ aidatasetkit audit examples/audit_churn/train.csv \
     --output ./aidk-audit/
 ```
 
-Open `aidk-audit/report.html` in a browser. Commit `aidk-audit/audit.json` to
-your repository and the next run will diff against it.
+Open the `report.html` the summary names in a browser. Every audit is published
+as a complete run under `aidk-audit/runs/<run_id>/`, and `aidk-audit/CURRENT`
+names the latest; read it through the verifying reader rather than by path. To
+diff audits over time, commit the current run's `audit.json`:
+
+```python
+from aidatasetkit.evidence import read_current
+
+run = read_current("aidk-audit")          # CURRENT -> manifest -> every file checked
+open("audit.json", "w", encoding="utf-8").write(run.text("audit.json"))
+```
 
 In CI — the exit code gates the build:
 
@@ -232,8 +241,18 @@ Three things about it are worth knowing before you read a number it produces:
 | `audit.json` | The artifact. Canonical, versioned, deterministic, diffable. |
 | `lineage.json` | Every input column and what it became. |
 | `report.html` | The same evidence for a human. No server, no network. |
+| `manifest.json` | Run id, time, and the size and SHA-256 of each file above. |
+| `CURRENT` (one level up) | Which run is current, and the digest of its manifest. |
 
 `audit.json` is the record; the HTML is a rendering of it. They cannot disagree.
+
+**The three files are published together or not at all.** They are written into a
+private staging directory, checked against the manifest, moved into
+`runs/<run_id>/`, and only then made current by replacing `CURRENT` in one atomic
+step. A crash, a full disk, or a second audit writing into the same directory at
+the same moment leaves `CURRENT` naming a complete run — the old one or the new
+one, never a mixture. `read_current()` checks every file against the manifest
+before returning it and refuses a set that does not match.
 
 ## The safety philosophy
 

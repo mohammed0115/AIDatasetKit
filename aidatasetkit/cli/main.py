@@ -167,7 +167,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--output",
         type=Path,
         default=Path("./aidk-audit"),
-        help="Directory for the artifacts. Created if missing.",
+        help=(
+            "Directory for the artifacts. Created if missing. Each audit is "
+            "published as a complete run under runs/<run_id>/ and CURRENT names "
+            "the latest one; read CURRENT, not a file you found in a runs folder."
+        ),
     )
     audit.add_argument(
         "--fail-on",
@@ -436,31 +440,40 @@ def _audit(args: argparse.Namespace) -> int:
     )
 
     written = _write(artifact, args.output)
-    _print_summary(artifact, written)
+    _print_summary(artifact, written, args.output)
     return _exit_code(artifact.verdict, args.fail_on)
 
 
 def _write(artifact: Any, output: Path) -> dict[str, Path]:
-    """Write the three artifacts, or leave the directory as it was found.
+    """Publish the three artifacts as one run, or leave the previous run current.
 
-    Everything is rendered into memory before anything reaches disk. Rendering is
-    where a failure is plausible -- a label that breaks an assumption, a value
-    that will not serialise -- and a directory holding audit.json without the
-    report is worse than one holding nothing: the next reader cannot tell a
-    finished run from a half-written one.
+    Everything is rendered into memory before anything reaches disk, because
+    rendering is where a failure is plausible -- a label that breaks an
+    assumption, a value that will not serialise. Then the set is published by
+    :func:`~aidatasetkit.evidence.publish_run`: written into a staging directory
+    of its own, checked against a manifest, moved to ``runs/<run_id>``, and made
+    current by replacing ``CURRENT`` in one step. A failure at any point leaves
+    whatever was current before exactly as it was, and two audits into the same
+    directory each publish a complete run; the later one is current.
+
+    Earlier versions wrote the three files straight into ``output``. Those are
+    never updated or removed here -- they belong to the user -- and the summary
+    says so when it finds them, so nobody mistakes them for this run.
     """
+    from aidatasetkit.evidence import publish_run
+
     payload = artifact.to_dict()
     rendered = {
         "audit.json": canonical_json(payload),
         "lineage.json": canonical_json(artifact.lineage_dict()),
         "report.html": render_report(payload),
     }
+    run = publish_run(output, rendered, created_at=artifact.created_at)
+    return {name: run.path(name) for name in rendered}
 
-    output.mkdir(parents=True, exist_ok=True)
-    paths = {name: output / name for name in rendered}
-    for name, text in rendered.items():
-        paths[name].write_text(text, encoding="utf-8")
-    return paths
+
+#: The files earlier versions wrote directly into ``--output``.
+_LEGACY_ROOT_FILES = ("audit.json", "lineage.json", "report.html")
 
 
 #: How many items the summary shows before saying how many it left out. A screen
@@ -468,7 +481,7 @@ def _write(artifact: Any, output: Path) -> dict[str, Path]:
 _SHOWN = 5
 
 
-def _print_summary(artifact: Any, written: dict[str, Path]) -> None:
+def _print_summary(artifact: Any, written: dict[str, Path], output: Path) -> None:
     """One screen, and honest about what it left off it.
 
     Every list here is truncated, and every truncation says so. A summary that
@@ -518,9 +531,17 @@ def _print_summary(artifact: Any, written: dict[str, Path]) -> None:
         more = f", and {remaining} more" if remaining > 0 else ""
         print(f"Needs review: {shown}{more}")
     print()
-    print("Artifacts:")
+    print("Artifacts (now current in " + str(output / "CURRENT") + "):")
     for path in written.values():
         print(f"  {path}")
+    legacy = [name for name in _LEGACY_ROOT_FILES if (output / name).is_file()]
+    if legacy:
+        print()
+        print(
+            f"Note:     {', '.join(legacy)} directly in {output} came from an older "
+            "version and were not updated. The current run is the one CURRENT "
+            "names."
+        )
     print()
 
 
