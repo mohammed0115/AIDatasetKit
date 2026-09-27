@@ -51,7 +51,10 @@ def moment_of_values(values: np.ndarray, order: int, center: float | None) -> fl
         deviation is then exactly zero, which SciPy reports as catastrophic
         cancellation even though the answer is exact and uninteresting.
     """
-    if values.size and float(np.ptp(values)) == 0.0:
+    # See require_variation: an overflowing ptp is infinity, correctly not zero.
+    with np.errstate(over="ignore"):
+        constant = bool(values.size) and float(np.ptp(values)) == 0.0
+    if constant:
         return _constant_sample_moment(float(values[0]), order, center)
 
     with strict_numerics(f"moment of order {order}"):

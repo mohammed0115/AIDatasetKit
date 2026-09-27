@@ -226,7 +226,9 @@ class DataProfiler:
             std=_optional(engine.std),
             q25=quartiles.q1,
             q75=quartiles.q3,
-            iqr=quartiles.q3 - quartiles.q1,
+            # Through the engine rather than subtracted here, so a range too wide
+            # for float64 is recorded as undefined instead of as infinity.
+            iqr=_optional(engine.iqr),
         )
 
     # ------------------------------------------------------------------ #

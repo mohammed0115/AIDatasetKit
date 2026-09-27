@@ -82,7 +82,12 @@ def require_variation(values: np.ndarray, operation: str) -> None:
     Raises:
         DomainError: If every observation is identical.
     """
-    if values.size and float(np.ptp(values)) == 0.0:
+    # ``ptp`` subtracts the extremes, which overflows for values near the float64
+    # ceiling; the overflowed answer is infinity, which is not zero, which is the
+    # right verdict -- so the warning is silenced rather than acted on.
+    with np.errstate(over="ignore"):
+        constant = bool(values.size) and float(np.ptp(values)) == 0.0
+    if constant:
         raise DomainError(
             f"{operation} is undefined for a constant input; every one of the "
             f"{values.size} observations equals {values.flat[0]!r}."

@@ -70,11 +70,11 @@ class DescriptiveSummary:
     mean: float
     minimum: float
     maximum: float
-    range: float
+    range: float | None
     median: float
     q25: float
     q75: float
-    iqr: float
+    iqr: float | None
     variance: float | None
     std: float | None
     skewness: float | None
@@ -160,12 +160,22 @@ class StatisticsEngine:
     # ------------------------------------------------------------------ #
 
     def mean(self) -> float:
-        """Return the arithmetic mean, :math:`\\bar{x} = \\frac{1}{n} \\sum x_i`."""
-        return float(np.mean(self._values))
+        """Return the arithmetic mean, :math:`\\bar{x} = \\frac{1}{n} \\sum x_i`.
+
+        Finite values near the float64 ceiling make the *sum* overflow even when
+        the mean itself is an ordinary number: ``[1e308, 1e308]`` sums to
+        infinity, and with a negative value in the mix ``inf - inf`` returns
+        ``nan`` -- which reached the profile, and from there an artifact that is
+        not strict JSON. When that happens the mean is recomputed as
+        ``m * mean(x / m)`` with ``m = max |x|``, which is the same quantity
+        without the overflow. Ordinary data never takes that path, so its answer
+        is unchanged to the last bit.
+        """
+        return float(_overflow_safe(self._values, np.mean))
 
     def median(self) -> float:
         """Return the median, interpolating between the two central values."""
-        return float(np.median(self._values))
+        return float(_overflow_safe(self._values, np.median))
 
     def mode(self) -> tuple[float, ...]:
         """Return every most-frequent value, in ascending order.
@@ -194,8 +204,16 @@ class StatisticsEngine:
         return float(np.max(self._values))
 
     def range(self) -> float:
-        """Return the range, :math:`\\max(x) - \\min(x)`."""
-        return float(np.ptp(self._values))
+        """Return the range, :math:`\\max(x) - \\min(x)`.
+
+        Raises:
+            DomainError: If the range exceeds what float64 can represent, as it
+                does for ``[1e308, -1e308]``. Returning ``inf`` would put a number
+                in a report that is not the range and is not JSON.
+        """
+        with np.errstate(over="ignore"):
+            spread = float(np.ptp(self._values))
+        return _representable(spread, "the range")
 
     def sum(self) -> float:
         """Return the sum of the observations."""
@@ -256,8 +274,13 @@ class StatisticsEngine:
         require_minimum_size(
             self._values, validated_ddof + 1, f"standard deviation with ddof={validated_ddof}"
         )
+        # Squared deviations of values near 1e308 overflow although the standard
+        # deviation itself fits. The rescaled form, as in ``mean``, is the same
+        # quantity and is used only when the direct one overflows.
         with strict_numerics(f"standard deviation with ddof={validated_ddof}"):
-            return float(np.std(self._values, ddof=validated_ddof))
+            return float(
+                _overflow_safe(self._values, lambda v: np.std(v, ddof=validated_ddof))
+            )
 
     def mean_absolute_deviation(self, center: Center = "mean") -> float:
         """Return the mean absolute deviation about the mean or the median.
@@ -375,18 +398,31 @@ class StatisticsEngine:
                 f"q must lie between 0 and 100 inclusive, got {q!r}."
             )
 
-        result = np.percentile(self._values, requested)
+        result = _overflow_safe(self._values, lambda v: np.percentile(v, requested))
         return float(result) if requested.ndim == 0 else np.asarray(result)
 
     def quartiles(self) -> Quartiles:
-        """Return the first, second, and third quartiles."""
-        q1, q2, q3 = np.percentile(self._values, [25.0, 50.0, 75.0])
+        """Return the first, second, and third quartiles.
+
+        Linear interpolation between two finite values near the float64 ceiling
+        subtracts them first, and that difference can overflow: the median of
+        ``[1e308, -1e308]`` came back as ``-inf`` rather than ``0.0``. When the
+        direct result is not finite although every input is, the quartiles are
+        recomputed on the rescaled data, as in :meth:`mean`.
+        """
+        q1, q2, q3 = _overflow_safe(
+            self._values, lambda v: np.percentile(v, [25.0, 50.0, 75.0])
+        )
         return Quartiles(float(q1), float(q2), float(q3))
 
     def iqr(self) -> float:
-        """Return the interquartile range, :math:`Q_3 - Q_1`."""
+        """Return the interquartile range, :math:`Q_3 - Q_1`.
+
+        Raises:
+            DomainError: If the range exceeds what float64 can represent.
+        """
         quartiles = self.quartiles()
-        return quartiles.q3 - quartiles.q1
+        return _representable(quartiles.q3 - quartiles.q1, "the interquartile range")
 
     def z_scores(self, ddof: int = 0) -> np.ndarray:
         """Return the standardised observations.
@@ -515,16 +551,53 @@ class StatisticsEngine:
             mean=self.mean(),
             minimum=self.min(),
             maximum=self.max(),
-            range=self.range(),
+            range=_or_none(self.range),
             median=quartiles.q2,
             q25=quartiles.q1,
             q75=quartiles.q3,
-            iqr=quartiles.q3 - quartiles.q1,
+            iqr=_or_none(self.iqr),
             variance=_or_none(self.variance),
             std=_or_none(self.std),
             skewness=_or_none(self.skewness),
             kurtosis=_or_none(self.kurtosis),
         )
+
+
+def _overflow_safe(values: np.ndarray, statistic: Any) -> Any:
+    """``statistic(values)``, recomputed without overflow if the direct form overflows.
+
+    The direct computation runs with numpy's overflow flag raised as an error.
+    That flag is the signal rather than the result: depending on the numpy
+    version an overflowed intermediate comes back as ``inf``, as ``nan`` after
+    ``inf - inf``, or as a finite but untrustworthy number with a warning. When
+    it fires and every input is finite, the statistic is recomputed as
+    ``m * statistic(values / m)`` with ``m = max |values|`` -- exact for the
+    mean, the standard deviation and the quantiles, which all scale linearly --
+    so no intermediate sum, square or difference can overflow. Data that does
+    not overflow never reaches the fallback, and its answer is unchanged to the
+    last bit.
+    """
+    try:
+        with np.errstate(over="raise"):
+            return statistic(values)
+    except FloatingPointError:
+        if not np.isfinite(values).all():
+            # Infinities were admitted by the caller's policy; the answer is the
+            # one numpy gives for them, exactly as before this guard existed.
+            with np.errstate(over="ignore"):
+                return statistic(values)
+        magnitude = float(np.max(np.abs(values)))
+        return magnitude * statistic(values / magnitude)
+
+
+def _representable(value: float, what: str) -> float:
+    """Return ``value``, or raise if a finite computation overflowed to infinity."""
+    if not np.isfinite(value):
+        raise DomainError(
+            f"{what} of this sample exceeds the largest float64 "
+            f"({np.finfo(float).max:.3e}), so it has no representable value."
+        )
+    return value
 
 
 def _or_none(measure: Any) -> float | None:
