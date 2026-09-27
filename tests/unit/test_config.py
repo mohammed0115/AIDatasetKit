@@ -14,7 +14,6 @@ class TestDefaults:
     def test_defaults_are_usable(self):
         config = KitConfig()
         assert config.random_state == 42
-        assert config.cv_folds == 5
         assert 0.0 < config.validation_size < 1.0
 
     def test_config_is_immutable(self):
@@ -33,10 +32,6 @@ class TestValidation:
         with pytest.raises(ConfigurationError, match="validation_size"):
             KitConfig(validation_size=value)
 
-    @pytest.mark.parametrize("value", [1, 0, -3])
-    def test_cross_validation_needs_at_least_two_folds(self, value):
-        with pytest.raises(ConfigurationError, match="cv_folds"):
-            KitConfig(cv_folds=value)
 
     @pytest.mark.parametrize(
         "field",
@@ -95,14 +90,47 @@ class TestValidation:
 class TestReplace:
     def test_replace_returns_a_new_validated_config(self):
         original = KitConfig()
-        updated = original.replace(cv_folds=10)
-        assert updated.cv_folds == 10
-        assert original.cv_folds == 5
+        updated = original.replace(high_cardinality_threshold=10)
+        assert updated.high_cardinality_threshold == 10
+        assert original.high_cardinality_threshold == 50
 
     def test_replace_revalidates(self):
         with pytest.raises(ConfigurationError):
-            KitConfig().replace(cv_folds=1)
+            KitConfig().replace(validation_size=1.5)
 
     def test_replace_rejects_unknown_options(self):
         with pytest.raises(ConfigurationError, match="Unknown configuration options"):
             KitConfig().replace(learning_rate=0.1)
+
+
+class TestCvFoldsIsGone:
+    """G0-06: a setting documented as steering cross-validation, which nothing ran.
+
+    ``cv_folds`` was declared, validated and recorded in every artifact's config
+    fingerprint, and no code path read it: there is no cross-validation in the
+    package. A configured value that changes nothing is the silent failure this
+    library refuses elsewhere, so it is removed rather than left to be believed.
+    The fingerprint migration is recorded in test_capability_fingerprint_migration.
+    """
+
+    def test_it_is_not_a_field(self):
+        assert "cv_folds" not in KitConfig().to_dict()
+
+    def test_constructing_with_it_is_refused(self):
+        with pytest.raises(TypeError):
+            KitConfig(cv_folds=5)
+
+    def test_replacing_it_is_refused_by_name(self):
+        with pytest.raises(ConfigurationError, match="cv_folds"):
+            KitConfig().replace(cv_folds=5)
+
+    def test_nothing_in_the_package_mentions_it(self):
+        from pathlib import Path
+
+        package = Path(__file__).resolve().parents[2] / "aidatasetkit"
+        offenders = [
+            str(path.relative_to(package))
+            for path in package.rglob("*.py")
+            if "cv_folds" in path.read_text(encoding="utf-8")
+        ]
+        assert offenders == []

@@ -258,7 +258,7 @@
     }
   ],
   "config": {
-    "fingerprint": "e34dd2664d496a4edd29e742d37ae5ede35e77ecb96552d7b97003d456414ea4",
+    "fingerprint": "03a79ae16ffa080b15e8f75ff8a0082ce968e4822d956c5d5658ced267d38dc6",
     "settings": {
       "categorical_sentinel": "__missing__",
       "model": "logistic_regression",
@@ -289,7 +289,6 @@
       "task": "classification",
       "task_hint": null,
       "thresholds": {
-        "cv_folds": 5,
         "dense_encoding_warning_categories": 1000,
         "high_cardinality_threshold": 50,
         "id_uniqueness_threshold": 0.95,

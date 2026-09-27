@@ -31,6 +31,13 @@ match the fingerprint.
 example has no numeric feature with a VIF at or above 10. The schema version does
 not move, because no existing field changed shape or meaning; an artifact written
 before this step is recognisable by the absent threshold and by its identity.
+
+**G0 -- cv_folds removed.** The setting was declared, validated and recorded
+under ``config.settings.thresholds`` while no code path read it: the package runs
+no cross-validation. It is gone from ``KitConfig``, so it is gone from the record,
+and ``config.fingerprint`` moved again. Nothing else changed, and the schema
+version stays: an artifact that records ``cv_folds`` recorded a value that
+steered nothing, which is exactly what this step stops asserting.
 """
 
 from __future__ import annotations
@@ -66,6 +73,17 @@ def _rollback_s9(semantic: dict) -> None:
         SCOPE_BEFORE if entry.startswith("Only the classification") else entry
         for entry in semantic["known_limitations"]
     ]
+
+
+def _restore_threshold(name: str, value: object) -> Callable[[dict], None]:
+    """Undo the removal of one recorded threshold, and nothing else."""
+
+    def rollback(semantic: dict) -> None:
+        settings = semantic["config"]["settings"]
+        settings["thresholds"][name] = value
+        semantic["config"]["fingerprint"] = config_fingerprint(settings)
+
+    return rollback
 
 
 def _rollback_threshold(name: str) -> Callable[[dict], None]:
@@ -110,6 +128,12 @@ CHAIN: tuple[Step, ...] = (
         before="b8581966475da37125414a12afc3144d6b1468258ff3dcb3149368406b884852",
         after="1c449f10c3f9b826e6c166522122f77cc602348a349d11b662ddfe540af5f470",
         rollback=_rollback_threshold("multicollinearity_vif_threshold"),
+    ),
+    Step(
+        "G0 cv_folds removed from the recorded configuration",
+        before="1c449f10c3f9b826e6c166522122f77cc602348a349d11b662ddfe540af5f470",
+        after="0f0fd1d5e9785d46351d7d28dc15d2d4eda4cc7fbc54bf0509a2a76eb3b471a5",
+        rollback=_restore_threshold("cv_folds", 5),
     ),
 )
 
@@ -229,6 +253,15 @@ class TestS9:
             in semantic["model"]["capabilities"]
         )
         assert semantic["model"]["task_type"] == "classification"
+
+
+class TestTheCvFoldsStep:
+    def test_the_setting_is_no_longer_recorded(self, semantic):
+        assert "cv_folds" not in semantic["config"]["settings"]["thresholds"]
+
+    def test_the_config_fingerprint_describes_the_recorded_settings(self, semantic):
+        config = semantic["config"]
+        assert config["fingerprint"] == config_fingerprint(config["settings"])
 
 
 class TestTheMulticollinearityStep:

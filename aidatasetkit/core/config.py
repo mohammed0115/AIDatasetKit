@@ -23,7 +23,6 @@ class KitConfig:
     Attributes:
         random_state: Seed used for every splitter and every stochastic model.
         validation_size: Fraction of the training data held out for evaluation.
-        cv_folds: Number of folds used by cross-validation and model comparison.
         shuffle: Whether splitters shuffle before splitting.
         missing_warning_threshold: Missing-value fraction above which a column is
             reported as a quality issue.
@@ -63,7 +62,6 @@ class KitConfig:
 
     random_state: int = 42
     validation_size: float = 0.2
-    cv_folds: int = 5
     shuffle: bool = True
 
     missing_warning_threshold: float = 0.2
@@ -98,8 +96,6 @@ class KitConfig:
             "numeric_text_ratio_threshold", self.numeric_text_ratio_threshold
         )
 
-        if self.cv_folds < 2:
-            raise ConfigurationError(f"cv_folds must be at least 2, got {self.cv_folds}.")
         if self.high_cardinality_threshold < 1:
             raise ConfigurationError(
                 f"high_cardinality_threshold must be at least 1, got {self.high_cardinality_threshold}."
