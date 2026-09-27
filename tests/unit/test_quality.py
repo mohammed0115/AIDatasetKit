@@ -347,6 +347,160 @@ class TestMulticollinearity:
             assert issue.code == "possible_multicollinearity"
 
 
+class TestMulticollinearityIsRobust:
+    """The hardening around the WIP check: magnitude, types, gaps, cost, identity."""
+
+    def _issues(self, frame, config=None):
+        from aidatasetkit.profiling.checks import check_multicollinearity
+
+        return check_multicollinearity(frame, context_for(frame, config=config or KitConfig()))
+
+    @staticmethod
+    def _vifs(issues):
+        return {
+            issue.column: issue.details["vif"]
+            for issue in issues
+            if issue.code == "possible_multicollinearity"
+        }
+
+    # --- magnitude -------------------------------------------------------- #
+
+    def test_values_near_the_float_ceiling_give_finite_vifs(self):
+        """Squaring 1e300 overflows; the unguarded fit turned that into NaN."""
+        frame = _multicollinear_frame() * 1e300
+        issues = self._issues(frame)
+        assert {"a", "b", "c"} <= {issue.column for issue in issues}
+        assert "d" not in {issue.column for issue in issues}
+        assert all(np.isfinite(vif) for vif in self._vifs(issues).values())
+
+    def test_the_answer_does_not_depend_on_units(self):
+        frame = _multicollinear_frame()
+        rescaled = frame.assign(a=frame["a"] * 1e6, b=frame["b"] * 1e-6 + 40.0)
+        original, moved = self._vifs(self._issues(frame)), self._vifs(self._issues(rescaled))
+        assert original.keys() == moved.keys()
+        for column, vif in original.items():
+            assert moved[column] == pytest.approx(vif, rel=1e-6)
+
+    def test_a_finding_is_strict_json(self):
+        for frame in (_multicollinear_frame(), _multicollinear_frame(exact=True) * 1e300):
+            for issue in self._issues(frame):
+                json.dumps(issue.to_dict(), allow_nan=False)
+
+    def test_a_value_beyond_float64_is_left_out_rather_than_raised(self):
+        from aidatasetkit.profiling.checks import _as_finite_float
+
+        assert _as_finite_float(pd.Series([10**400, 1, 2], dtype=object)) is None
+
+    def test_an_infinity_after_conversion_is_left_out(self):
+        from aidatasetkit.profiling.checks import _as_finite_float
+
+        assert _as_finite_float(pd.Series(["1e999", "2", "3"], dtype=object)) is None
+
+    # --- types and gaps --------------------------------------------------- #
+
+    def test_nullable_dtypes_with_gaps_are_fitted(self):
+        frame = _multicollinear_frame()
+        nullable = frame.astype("Float64")
+        nullable.loc[3, "a"] = pd.NA
+        nullable.loc[7, "d"] = pd.NA
+        flagged = {issue.column for issue in self._issues(nullable)}
+        assert {"a", "b", "c"} <= flagged
+        assert "d" not in flagged
+
+    def test_nullable_integers_are_fitted(self):
+        rng = np.random.default_rng(5)
+        a = rng.integers(0, 1000, 200)
+        b = rng.integers(0, 1000, 200)
+        frame = pd.DataFrame({"a": a, "b": b, "c": a + b}).astype("Int64")
+        assert {"a", "b", "c"} <= {issue.column for issue in self._issues(frame)}
+
+    def test_rows_with_a_gap_are_excluded_and_the_frame_is_untouched(self):
+        frame = _multicollinear_frame()
+        frame.loc[:9, "a"] = np.nan
+        before = frame.copy()
+        issue = next(i for i in self._issues(frame) if i.column == "c")
+        assert issue.details["rows_available"] == len(frame) - 10
+        pd.testing.assert_frame_equal(frame, before)
+
+    def test_mixed_object_columns_are_not_fitted(self):
+        frame = _multicollinear_frame()
+        frame["mixed"] = ["x" if i % 3 else i for i in range(len(frame))]
+        issues = self._issues(frame)
+        assert "mixed" not in {issue.column for issue in issues}
+        assert all("mixed" not in i.details.get("other_numeric_features", []) for i in issues)
+
+    def test_no_more_complete_rows_than_columns_reports_nothing(self):
+        frame = _multicollinear_frame().head(4)
+        assert self._issues(frame) == []
+
+    # --- bounded cost ----------------------------------------------------- #
+
+    def test_too_many_columns_declines_and_says_so(self):
+        from aidatasetkit.profiling.checks import _VIF_MAX_COLUMNS
+
+        rng = np.random.default_rng(9)
+        wide = pd.DataFrame(
+            rng.normal(0, 1, (120, _VIF_MAX_COLUMNS + 1)),
+            columns=[f"f{i}" for i in range(_VIF_MAX_COLUMNS + 1)],
+        )
+        issues = self._issues(wide)
+        assert [issue.code for issue in issues] == ["multicollinearity_not_assessed"]
+        assert issues[0].severity is Severity.INFO
+        assert issues[0].details == {
+            "eligible_columns": _VIF_MAX_COLUMNS + 1,
+            "column_limit": _VIF_MAX_COLUMNS,
+        }
+
+    def test_exactly_at_the_column_limit_is_still_assessed(self):
+        from aidatasetkit.profiling.checks import _VIF_MAX_COLUMNS
+
+        rng = np.random.default_rng(9)
+        wide = pd.DataFrame(
+            rng.normal(0, 1, (200, _VIF_MAX_COLUMNS)),
+            columns=[f"f{i}" for i in range(_VIF_MAX_COLUMNS)],
+        )
+        codes = {issue.code for issue in self._issues(wide)}
+        assert "multicollinearity_not_assessed" not in codes
+
+    def test_a_long_frame_is_fitted_on_a_recorded_deterministic_subset(self):
+        from aidatasetkit.profiling.checks import _VIF_MAX_ROWS
+
+        rng = np.random.default_rng(11)
+        n = _VIF_MAX_ROWS + 5_000
+        a, b = rng.normal(0, 1, n), rng.normal(0, 1, n)
+        frame = pd.DataFrame({"a": a, "b": b, "c": a + b + rng.normal(0, 0.01, n)})
+        first, second = self._issues(frame), self._issues(frame)
+        issue = next(i for i in first if i.column == "c")
+        assert issue.details["rows_used"] == _VIF_MAX_ROWS
+        assert issue.details["rows_available"] == n
+        assert [i.to_dict() for i in first] == [i.to_dict() for i in second]
+
+    # --- identity --------------------------------------------------------- #
+
+    def test_the_same_frame_gives_the_same_findings(self):
+        frame = _multicollinear_frame()
+        assert [i.to_dict() for i in self._issues(frame)] == [
+            i.to_dict() for i in self._issues(frame.copy())
+        ]
+
+    def test_column_order_changes_no_vif(self):
+        frame = _multicollinear_frame()
+        reordered = frame[["d", "c", "b", "a"]]
+        original, moved = self._vifs(self._issues(frame)), self._vifs(self._issues(reordered))
+        assert original.keys() == moved.keys()
+        for column, vif in original.items():
+            assert moved[column] == pytest.approx(vif, rel=1e-9)
+
+    def test_the_threshold_boundary_is_inclusive(self):
+        """``at or above`` the threshold, as the message says."""
+        frame = _multicollinear_frame()
+        vif = self._vifs(self._issues(frame))["c"]
+        at = KitConfig(multicollinearity_vif_threshold=vif)
+        above = KitConfig(multicollinearity_vif_threshold=float(np.nextafter(vif, np.inf)))
+        assert "c" in self._vifs(self._issues(frame, config=at))
+        assert "c" not in self._vifs(self._issues(frame, config=above))
+
+
 class TestOutlierEdgeCases:
     def _outliers(self, values) -> list[QualityIssue]:
         from aidatasetkit.profiling.checks import check_outliers

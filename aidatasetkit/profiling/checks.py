@@ -77,6 +77,18 @@ _TEXT_SAMPLE_SIZE = 1000
 #: and, at ``1 / 1e-10``, unmistakably large -- so the artifact stays strict JSON.
 _MIN_UNEXPLAINED_VARIANCE = 1e-10
 
+#: Most numeric columns the variance-inflation check will fit. The work is one
+#: least-squares solve per column, each over every other column, so it grows with
+#: the cube of the column count. Past this limit the check declines and says so
+#: rather than run for an unbounded time on a wide frame.
+_VIF_MAX_COLUMNS = 50
+
+#: Most rows the variance-inflation check fits on. Beyond it an evenly spaced,
+#: deterministic subset is used and the finding records how many rows that was.
+#: Evenly spaced rather than the first rows: a frame sorted by time or by any
+#: column would otherwise be judged on one end of itself.
+_VIF_MAX_ROWS = 20_000
+
 
 # --------------------------------------------------------------------------- #
 # A. Missing values
@@ -510,22 +522,48 @@ def check_multicollinearity(
     Fewer than two eligible columns, or no more rows than columns after the
     exclusions, leaves nothing to compare, and the check reports nothing rather
     than fit a regression with no degrees of freedom left to test it.
+
+    The cost is bounded. More than ``_VIF_MAX_COLUMNS`` eligible columns and the
+    check declines with an informational finding naming the count, instead of
+    running a cubic amount of work; more than ``_VIF_MAX_ROWS`` complete rows and
+    an evenly spaced deterministic subset is fitted, recorded in the finding.
+
+    Each column is centred and divided by its largest absolute deviation before
+    the fit. A VIF is invariant to the scale of every column, so this changes no
+    answer, and it keeps values near ``1e300`` from overflowing to infinity when
+    squared. A column whose values cannot be represented as finite float64 at all
+    -- a Python integer beyond its range, say -- is left out of the fit, since no
+    number computed from it would mean anything.
     """
-    columns = [
+    candidates = [
         profile.name
         for profile in context.feature_profiles
         if profile.detected_kind in (ColumnKind.NUMERIC, ColumnKind.BOOLEAN)
         and not profile.is_constant
         and not profile.infinite_count
     ]
+    if len(candidates) > _VIF_MAX_COLUMNS:
+        return [_multicollinearity_not_assessed(len(candidates))]
+
+    converted: dict[Hashable, np.ndarray] = {}
+    for column in candidates:
+        values = _as_finite_float(frame[column])
+        if values is not None:
+            converted[column] = values
+    columns = list(converted)
     if len(columns) < 2:
         return []
 
-    sample = frame[columns].dropna()
-    if len(sample) <= len(columns):
+    raw = np.column_stack([converted[column] for column in columns])
+    complete = raw[~np.isnan(raw).any(axis=1)]
+    available_rows = len(complete)
+    if available_rows > _VIF_MAX_ROWS:
+        positions = np.linspace(0, available_rows - 1, _VIF_MAX_ROWS).round().astype("int64")
+        complete = complete[positions]
+    if len(complete) <= len(columns):
         return []
 
-    matrix = sample.to_numpy(dtype="float64")
+    matrix = _centred_and_bounded(complete)
     threshold = context.config.multicollinearity_vif_threshold
     issues: list[QualityIssue] = []
 
@@ -538,10 +576,15 @@ def check_multicollinearity(
         residuals = target_values - design @ coefficients
 
         total_variance = float(np.sum((target_values - target_values.mean()) ** 2))
-        if total_variance == 0.0:
+        if not np.isfinite(total_variance) or total_variance == 0.0:
             continue
 
-        r_squared = min(max(1.0 - float(np.sum(residuals**2)) / total_variance, 0.0), 1.0)
+        unexplained = float(np.sum(residuals**2)) / total_variance
+        if not np.isfinite(unexplained):
+            # Never reached on centred, bounded data; kept so that a NaN can only
+            # ever mean "not measured" and never be written as a VIF.
+            continue
+        r_squared = min(max(1.0 - unexplained, 0.0), 1.0)
         vif = 1.0 / max(1.0 - r_squared, _MIN_UNEXPLAINED_VARIANCE)
         if vif < threshold:
             continue
@@ -563,6 +606,8 @@ def check_multicollinearity(
                     "threshold": threshold,
                     "r_squared": r_squared,
                     "other_numeric_features": [name for name in columns if name != column],
+                    "rows_used": int(len(complete)),
+                    "rows_available": int(available_rows),
                 },
                 recommendation=(
                     "High collinearity does not hurt a model's predictions by "
@@ -574,6 +619,58 @@ def check_multicollinearity(
             )
         )
     return issues
+
+
+def _as_finite_float(series: pd.Series) -> np.ndarray | None:
+    """The column as float64 with gaps as NaN, or ``None`` if it cannot be.
+
+    ``None`` is returned when a value does not fit in a float64 at all (a Python
+    integer beyond its range raises ``OverflowError`` on conversion) or converts
+    to an infinity. Such a column has no finite number to contribute, and letting
+    one infinity into the matrix would turn every fit it touches into NaN.
+    Nullable dtypes are converted with their missing values as NaN, so a gap is
+    excluded row-wise like any other.
+    """
+    try:
+        values = series.to_numpy(dtype="float64", na_value=np.nan)
+    except (OverflowError, TypeError, ValueError):
+        return None
+    if np.isinf(values).any():
+        return None
+    return values
+
+
+def _centred_and_bounded(matrix: np.ndarray) -> np.ndarray:
+    """Bring every column into ``[-1, 1]``, then centre it, then rescale it.
+
+    The first division comes before any sum: taking the mean of values near
+    ``1e308`` would itself overflow to infinity. After it every value is at most
+    1 in magnitude, so neither the mean nor any later square can overflow. The
+    VIF is invariant to the location and scale of every column, so no answer
+    changes.
+    """
+    magnitude = np.abs(matrix).max(axis=0)
+    magnitude[magnitude == 0.0] = 1.0
+    bounded = matrix / magnitude
+    centred = bounded - bounded.mean(axis=0)
+    spread = np.abs(centred).max(axis=0)
+    spread[spread == 0.0] = 1.0
+    return centred / spread
+
+
+def _multicollinearity_not_assessed(eligible: int) -> QualityIssue:
+    """Say that the check declined, rather than say nothing."""
+    return QualityIssue(
+        code="multicollinearity_not_assessed",
+        severity=Severity.INFO,
+        message=(
+            f"Multicollinearity was not assessed: {eligible} numeric features "
+            f"exceed the {_VIF_MAX_COLUMNS} this check fits, and the work grows "
+            "with the cube of that count. No finding here is not evidence that "
+            "the features are independent."
+        ),
+        details={"eligible_columns": eligible, "column_limit": _VIF_MAX_COLUMNS},
+    )
 
 
 # --------------------------------------------------------------------------- #

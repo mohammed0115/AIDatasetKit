@@ -16,8 +16,9 @@ You get three files, a readable summary, and an exit code your CI can act on.
 
 - **Dataset profiling** — every column measured: kind, dtype, missingness,
   cardinality, dominance, infinities.
-- **Quality and leakage diagnostics** — eleven checks, each with a severity, a
-  reason, and the numbers behind it. A feature exactly equal to the target is
+- **Quality and leakage diagnostics** — twelve checks, each with a severity, a
+  reason, and the numbers behind it; the twelfth measures multicollinearity
+  among numeric features as a variance inflation factor. A feature exactly equal to the target is
   reported as an error; a heuristic finding is marked as needing review rather
   than acted on.
 - **Preprocessing planning** — what would be done to each column, and why. Driven

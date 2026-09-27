@@ -121,7 +121,25 @@ class KitConfig:
             raise ConfigurationError(
                 f"outlier_zscore_threshold must be positive, got {self.outlier_zscore_threshold}."
             )
-        if self.multicollinearity_vif_threshold <= 1.0:
+        import math
+        import numbers
+
+        vif_threshold = self.multicollinearity_vif_threshold
+        if isinstance(vif_threshold, bool) or not isinstance(vif_threshold, numbers.Real):
+            raise ConfigurationError(
+                "multicollinearity_vif_threshold must be a number, got "
+                f"{type(vif_threshold).__name__} ({vif_threshold!r})."
+            )
+        if not math.isfinite(vif_threshold):
+            # NaN compares false with everything, so every VIF would pass a
+            # "below the threshold" test as not-below and be flagged; infinity
+            # would silently switch the check off. Neither is a threshold.
+            raise ConfigurationError(
+                "multicollinearity_vif_threshold must be finite, got "
+                f"{vif_threshold!r}. To stop the check from running, leave it out "
+                "of the inspector's checks instead."
+            )
+        if vif_threshold <= 1.0:
             raise ConfigurationError(
                 "multicollinearity_vif_threshold must be greater than 1, got "
                 f"{self.multicollinearity_vif_threshold}. A variance inflation "

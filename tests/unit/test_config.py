@@ -62,6 +62,26 @@ class TestValidation:
         with pytest.raises(ConfigurationError, match="multicollinearity_vif_threshold"):
             KitConfig(multicollinearity_vif_threshold=value)
 
+    @pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+    def test_multicollinearity_threshold_must_be_finite(self, value):
+        """NaN would flag every column; infinity would silently flag none."""
+        with pytest.raises(ConfigurationError, match="must be finite"):
+            KitConfig(multicollinearity_vif_threshold=value)
+
+    @pytest.mark.parametrize("value", ["10", True, None])
+    def test_multicollinearity_threshold_must_be_a_number(self, value):
+        with pytest.raises(ConfigurationError, match="must be a number"):
+            KitConfig(multicollinearity_vif_threshold=value)
+
+    def test_multicollinearity_threshold_just_above_one_is_accepted(self):
+        import math
+
+        value = math.nextafter(1.0, 2.0)
+        assert KitConfig(multicollinearity_vif_threshold=value).multicollinearity_vif_threshold == value
+
+    def test_an_integer_threshold_is_accepted(self):
+        assert KitConfig(multicollinearity_vif_threshold=5).multicollinearity_vif_threshold == 5
+
     def test_task_detection_needs_at_least_two_classes(self):
         with pytest.raises(ConfigurationError, match="task_detection_max_classes"):
             KitConfig(task_detection_max_classes=1)
