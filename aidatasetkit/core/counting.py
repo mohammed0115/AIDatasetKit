@@ -27,18 +27,58 @@ __all__ = ["value_counts"]
 
 
 def value_counts(series: pd.Series, *, dropna: bool = True) -> pd.Series:
-    """``series.value_counts(dropna=dropna)``, surviving values float64 cannot hold.
+    """``series.value_counts(dropna=dropna)`` in a fixed order, surviving huge ints.
 
-    pandas' own implementation is used whenever it works, so ordinary columns are
-    counted exactly as before. Only the ``OverflowError`` that pandas 2.x raises
-    while inferring the index type is caught; any other error propagates, and in
-    particular the ``TypeError`` of an unhashable value still reaches callers that
-    translate it into a message about the column.
+    pandas' own tally is used whenever it works, so every count is pandas' count.
+    Only the ``OverflowError`` that pandas 2.x raises while inferring the index
+    type is caught; any other error propagates, and in particular the
+    ``TypeError`` of an unhashable value still reaches callers that translate it
+    into a message about the column.
+
+    **The order is fixed here, not inherited.** pandas 2.1 sorts the counts with
+    an unstable quicksort, and numpy dispatches that sort at runtime to a
+    CPU-specific implementation (AVX-512 where available), so the order of *tied*
+    values depends on the machine. The profiler records the first entry as a
+    column's dominant value, and for a column of unique identifiers every value
+    ties -- so the audit of one file differed between two CI runners with the same
+    versions installed. Ties are therefore put in order of first appearance, which
+    is what pandas 3 returns; a tally with no ties is returned untouched.
     """
     try:
-        return series.value_counts(dropna=dropna)
+        counted = series.value_counts(dropna=dropna)
     except OverflowError:
         return exact_tally(series, dropna=dropna)
+    if len(counted) > 1 and counted.duplicated().any():
+        counted = _ties_in_order_of_appearance(series, counted)
+    return counted
+
+
+class _Missing:
+    """One key for every missing value, which never compares equal to itself."""
+
+
+_MISSING = _Missing()
+
+
+def _ties_in_order_of_appearance(series: pd.Series, counted: pd.Series) -> pd.Series:
+    """Reorder ``counted``: count descending, then first appearance in ``series``.
+
+    A label that never appears -- an unobserved category, counted as zero -- sorts
+    after every label that does, in the order pandas listed it.
+    """
+    first_seen: dict[Any, int] = {}
+    for position, value in enumerate(series.tolist()):
+        key = _MISSING if _is_missing(value) else value
+        if key not in first_seen:
+            first_seen[key] = position
+    unseen = len(first_seen)
+
+    def rank(index: int) -> tuple[int, int, int]:
+        label = counted.index[index]
+        key = _MISSING if _is_missing(label) else label
+        return (-int(counted.iloc[index]), first_seen.get(key, unseen), index)
+
+    return counted.iloc[sorted(range(len(counted)), key=rank)]
 
 
 def exact_tally(series: pd.Series, *, dropna: bool = True) -> pd.Series:

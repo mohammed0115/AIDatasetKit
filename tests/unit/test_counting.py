@@ -8,6 +8,9 @@ fallback on pandas 2 and the native path on pandas 3 agree.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -49,9 +52,78 @@ class TestTheFallbackAgreesWithPandas:
         assert _as_pairs(exact_tally(series)) == _as_pairs(series.value_counts())
 
     @pytest.mark.parametrize("name", sorted(ORDINARY))
-    def test_the_wrapper_is_pandas_itself_when_pandas_works(self, name):
+    def test_the_wrapper_counts_exactly_what_pandas_counts(self, name):
+        """Every count is pandas' count; only the order of ties is fixed here."""
         series = ORDINARY[name]
-        pd.testing.assert_series_equal(value_counts(series), series.value_counts())
+        ours, theirs = value_counts(series), series.value_counts()
+        assert sorted(_as_pairs(ours), key=repr) == sorted(_as_pairs(theirs), key=repr)
+        assert ours.index.dtype == theirs.index.dtype
+
+    @pytest.mark.parametrize("name", sorted(ORDINARY))
+    def test_the_wrapper_orders_ties_by_first_appearance(self, name):
+        series = ORDINARY[name]
+        assert _as_pairs(value_counts(series)) == _as_pairs(exact_tally(series))
+
+
+class TestTieOrderDoesNotDependOnTheMachine:
+    """Found on Linux CI: pandas 2.1 breaks ties with an unstable, CPU-dispatched sort.
+
+    Two ubuntu runners with identical packages recorded different dominant values
+    for a column of unique identifiers, because every value tied and pandas 2.1's
+    quicksort (AVX-512 where the CPU has it) ordered the ties differently. Here
+    pandas is made to return its ties in reverse, as such a sort may, and nothing
+    downstream is allowed to notice.
+    """
+
+    @pytest.fixture
+    @staticmethod
+    def unstable(monkeypatch):
+        original = pd.Series.value_counts
+
+        def reversed_ties(self, *args, **kwargs):
+            counted = original(self, *args, **kwargs)
+            order = sorted(range(len(counted)), key=lambda i: (-int(counted.iloc[i]), -i))
+            return counted.iloc[order]
+
+        monkeypatch.setattr(pd.Series, "value_counts", reversed_ties)
+
+    def test_the_simulation_really_reverses_ties(self, unstable):
+        """Otherwise the tests below could pass against a no-op."""
+        assert list(pd.Series(["a", "b", "c"]).value_counts().index) == ["c", "b", "a"]
+
+    def test_the_tally_keeps_first_appearance(self, unstable):
+        series = pd.Series(["b", "a", "c", "a", "b", "d"])
+        assert list(value_counts(series).index) == ["b", "a", "c", "d"]
+
+    def test_missing_values_take_their_first_position(self, unstable):
+        series = pd.Series([np.nan, 2.0, 1.0, np.nan, 1.0, 2.0])
+        labels = ["<missing>" if pd.isna(v) else v for v in value_counts(series, dropna=False).index]
+        assert labels == ["<missing>", 2.0, 1.0]
+
+    def test_unobserved_categories_come_last(self, unstable):
+        series = pd.Series(pd.Categorical(["y", "x"], categories=["z", "x", "y"]))
+        assert list(value_counts(series).index) == ["y", "x", "z"]
+
+    def test_a_unique_identifier_column_has_the_same_dominant_value(self, unstable):
+        frame = pd.DataFrame({"CustomerID": [f"C{i:04d}" for i in range(600, 0, -1)]})
+        column = DataProfiler().profile(frame).column_profiles[0]
+        assert column.dominant_value == "C0600"
+
+    def test_the_golden_audit_is_unchanged(self, unstable):
+        import json
+
+        from aidatasetkit.evidence.fingerprint import config_fingerprint
+        from tests.golden import semantic_fixture_path
+
+        root = str(Path(__file__).resolve().parents[2])
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        from examples.audit_churn.generate_artifacts import build_artifact
+
+        example = Path(root) / "examples" / "audit_churn" / "train.csv"
+        rebuilt = build_artifact(pd.read_csv(example)).semantic_dict()
+        stored = json.loads(semantic_fixture_path().read_text(encoding="utf-8"))
+        assert config_fingerprint(rebuilt) == config_fingerprint(stored)
 
     def test_missing_values_are_counted_when_asked(self):
         series = pd.Series([np.nan, 1.0, np.nan, 2.0, np.nan])
