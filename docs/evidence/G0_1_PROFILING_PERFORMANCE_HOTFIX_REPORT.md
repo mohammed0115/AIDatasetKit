@@ -3,7 +3,7 @@
 ```text
 CURRENT_WAVE                 = G0.1
 G0_STATUS                    = PASS
-G0_1_STATUS                  = PASS on the branch; main integration recorded in §8
+G0_1_STATUS                  = PASS
 P0_1_STATUS                  = CLOSED
 P0_2_STATUS                  = OPEN (CSV delimiter; a G1 item, not touched here)
 G0_1_PROGRESS_PERCENT        = 100% (15/15 acceptance criteria, §9)
@@ -170,7 +170,7 @@ ALGORITHMIC_GUARD = fails on 2dc8ece (576,002 / 545,291 / 315,002 extra calls), 
 RELATIVE_GUARD    = fails on 2dc8ece (ratio 65 / 20 / 75 > 6), passes on the fix (≈ 2)
 FULL_TESTS        = CI run 36388055537 on 9065f25: 10/10 success
 CI_RUN_BRANCH     = 36388055537 — https://github.com/mohammed0115/AIDatasetKit/actions/runs/36388055537
-CI_RUN_MAIN       = §8
+CI_RUN_MAIN       = 36389509136 on 764351e — 10/10 success
 FAILURES          = 0
 ERRORS            = 0
 SKIPPED           = Linux 47 / 44 with extras; Windows 46 / 43 (as before G0.1)
@@ -207,9 +207,18 @@ SKIPPED           = Linux 47 / 44 with extras; Windows 46 / 43 (as before G0.1)
 - `aidatasetkit/visualization/preparation.py:463` يستدعي `.astype(str).value_counts()` مباشرة، متجاوزًا `core.counting`. ترتيب التعادلات فيه يعتمد على pandas وCPU. أثره على بيانات الرسوم فقط (ترتيب الأعمدة عند الاقتطاع)، لا على `audit.json`.
 - `profiler.py:290` (`_looks_like_a_counter`) يُصدر `RuntimeWarning: overflow encountered in scalar subtract` على قيم قرب 1e308. هذا موجود منذ `fd4cdd2`، ولا يغيّر النتيجة (`span` يصبح inf فلا يُعَد counter).
 
-## 8. Main integration
+## 8. Main integration (addendum)
 
-يُسجَّل في addendum توثيقي بعد CI على `main`.
+| البند | القيمة |
+|---|---|
+| `origin/main` قبل الدمج | `2dc8ece5d4cf9923f20d0d2f275632d953a90c4e`، لم يتغير أثناء العمل |
+| divergence | `origin/main...g0.1-profiling-performance` = `0 6` |
+| الدمج | `git merge --ff-only g0.1-profiling-performance` |
+| push | `2dc8ece..764351e  main -> main`، push عادي بلا force |
+| CI على main | **run 36389509136، success، 10/10** على `764351e62cc6ff5300921cce4e412b1c062e1109`: https://github.com/mohammed0115/AIDatasetKit/actions/runs/36389509136 |
+| الفرع | `g0.1-profiling-performance` باقٍ ولم يُحذف |
+
+`764351e` يضيف هذا التقرير وتحديث التدقيق فوق `9065f25`، الذي اختبره CI الفرع 10/10. هذا الـaddendum توثيق فقط، ويُدمج في `main` بالطريقة نفسها.
 
 ## 9. Gate
 
@@ -223,8 +232,8 @@ SKIPPED           = Linux 47 / 44 with extras; Windows 46 / 43 (as before G0.1)
 | 6 | Golden لم يتغير | ✓ |
 | 7 | fingerprints لم تتغير | ✓ |
 | 8 | CI الفرع 10/10 | ✓ (36388055537) |
-| 9 | main محدث بـfast-forward | §8 |
-| 10 | CI main 10/10 | §8 |
+| 9 | main محدث بـfast-forward | ✓ (§8) |
+| 10 | CI main 10/10 | ✓ (36389509136) |
 | 11 | P0-1 مغلق | ✓ |
 | 12 | P0-2 مفتوح | ✓ |
 | 13 | worktree نظيف | ✓ |
@@ -249,7 +258,7 @@ FORCE_PUSH / HISTORY_REWRITE = NO
 | Gate | المجال | Proven | Applicable | Certified % | الحالة | الخطوة التالية |
 |---|---|---:|---:|---:|---|---|
 | G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
-| G0.1 | Profiling performance hotfix | 15 | 15 | 100.00% (معايير القبول) | PASS بعد §8 | مغلق |
+| G0.1 | Profiling performance hotfix | 15 | 15 | 100.00% (معايير القبول) | PASS | مغلق |
 | G1 | Ingestion | 5 | 26 | 19.23% | AUDIT | G1-W1 بتفويض |
 | G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | بعد G1 |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | — |
@@ -266,7 +275,7 @@ FORCE_PUSH / HISTORY_REWRITE = NO
 ```text
 CURRENT_WAVE                 = G0.1
 G0_STATUS                    = PASS
-G0_1_STATUS                  = PASS (after §8)
+G0_1_STATUS                  = PASS
 P0_1_STATUS                  = CLOSED
 P0_2_STATUS                  = OPEN
 G0_1_PROGRESS_PERCENT        = 100%
