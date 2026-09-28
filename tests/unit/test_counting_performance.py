@@ -91,8 +91,9 @@ class TestTheTallyIsVectorised:
     @pytest.mark.parametrize("dropna", [True, False])
     def test_python_calls_do_not_grow_with_the_rows(self, shape, dropna):
         small, large = SHAPES[shape](2_000), SHAPES[shape](20_000)
-        value_counts(small, dropna=dropna)  # warm any lazy imports
-        growth = _python_calls(value_counts, large, dropna) - _python_calls(value_counts, small, dropna)
+        tally = lambda series: value_counts(series, dropna=dropna)  # noqa: E731
+        tally(small)  # warm any lazy imports
+        growth = _python_calls(tally, large) - _python_calls(tally, small)
         assert growth < MAX_CALL_GROWTH, (
             f"{shape}: {growth} more Python calls for 18,000 more rows -- the tally "
             "is doing Python work per element again"
