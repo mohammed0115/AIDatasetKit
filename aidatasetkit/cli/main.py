@@ -34,6 +34,12 @@ from aidatasetkit.core.exceptions import (
     AmbiguousModelAliasError,
     IncompatibleModelError,
 )
+from aidatasetkit.ingestion import (
+    SUPPORTED_ENCODINGS,
+    LoadOptions,
+    UnsupportedFormatError,
+    resolve_format,
+)
 from aidatasetkit.evidence import (
     AuditBuilder,
     Verdict,
@@ -77,6 +83,10 @@ _FAIL_ON: dict[str, Verdict] = {
 
 #: Every accepted ``--fail-on`` value, including the one that never fails.
 _FAIL_ON_CHOICES: tuple[str, ...] = ("never", "warning", "review", "error")
+
+#: ``--delimiter`` spellings -> the character. A tab cannot be typed reliably on
+#: a command line, so it has a name.
+_DELIMITER_CHOICES: dict[str, str] = {",": ",", ";": ";", "|": "|", "tab": "\t"}
 
 
 class _Parser(argparse.ArgumentParser):
@@ -123,9 +133,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     audit = subparsers.add_parser(
         "audit",
-        help="Inspect a CSV file and write audit.json, lineage.json, and report.html.",
+        help="Inspect a CSV or TSV file and write audit.json, lineage.json, and report.html.",
         description=(
-            "Audit one CSV file. Writes three artifacts: audit.json (the canonical "
+            "Audit one CSV or TSV file. Writes three artifacts: audit.json (the canonical "
             "machine-readable record), lineage.json (each input column and what it "
             "became), and report.html (the same evidence rendered for a person). "
             "Nothing is trained, and your data is never modified."
@@ -139,7 +149,7 @@ def build_parser() -> argparse.ArgumentParser:
             "before sharing it outside your team."
         ),
     )
-    audit.add_argument("path", type=Path, help="Path to a CSV file.")
+    audit.add_argument("path", type=Path, help="Path to a .csv or .tsv file.")
     audit.add_argument(
         "--target", default=None, help="Column holding the label, if there is one."
     )
@@ -195,6 +205,26 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     audit.add_argument(
+        "--encoding",
+        default="utf-8",
+        choices=list(SUPPORTED_ENCODINGS),
+        help=(
+            "Encoding the file was written in. Defaults to utf-8 (a UTF-8 "
+            "byte-order mark is honoured). Never guessed: an undecodable file "
+            "is refused, not read as something else."
+        ),
+    )
+    audit.add_argument(
+        "--delimiter",
+        default=None,
+        choices=sorted(_DELIMITER_CHOICES),
+        help=(
+            "Field delimiter: ',', ';', '|' or 'tab'. Detected when omitted; a "
+            "file that splits consistently under more than one is refused and "
+            "needs this flag."
+        ),
+    )
+    audit.add_argument(
         "--debug", action="store_true", help="Show the full traceback on failure."
     )
     return parser
@@ -240,12 +270,10 @@ def _audit(args: argparse.Namespace) -> int:
     if not path.exists():
         print(f"error: no such file: {path}", file=sys.stderr)
         return EXIT_CODES["usage"]
-    if path.suffix.lower() != ".csv":
-        print(
-            f"error: {path.suffix or 'that file type'} is not supported yet. "
-            "The alpha reads CSV only.",
-            file=sys.stderr,
-        )
+    try:
+        resolve_format(path)
+    except UnsupportedFormatError as error:
+        print(f"error: {error}", file=sys.stderr)
         return EXIT_CODES["usage"]
 
     if args.output.exists() and not args.output.is_dir():
@@ -255,32 +283,24 @@ def _audit(args: argparse.Namespace) -> int:
         )
         return EXIT_CODES["usage"]
 
-    import pandas as pd
-
     from aidatasetkit.core import KitConfig
+    from aidatasetkit.ingestion import load_table
     from aidatasetkit.models import ModelFactory
     from aidatasetkit.preprocessing import PreprocessingPlanner, PreprocessorBuilder
     from aidatasetkit.profiling import DataProfiler, DataQualityInspector, TaskDetector
 
-    frame = pd.read_csv(path)
-    # pandas turns a repeated header into a.1, a.2 and carries on, so the raw
-    # header line is read separately to see what the file actually says.
-    raw_header = pd.read_csv(path, header=None, nrows=1)
-    names = [str(name) for name in raw_header.iloc[0]] if len(raw_header) else []
-    duplicated = sorted({name for name in names if names.count(name) > 1})
-    if duplicated:
-        # pandas turns a repeated header into a.1, a.2 and carries on. The audit
-        # would then describe columns the file does not contain, and its
-        # fingerprint would identify a frame nobody has.
-        print(
-            "error: the file has duplicate column headers "
-            f"({', '.join(duplicated)}), which pandas "
-            "renamed to make them unique. An audit of renamed columns would "
-            "describe a dataset that does not exist. Give each column its own "
-            "name first.",
-            file=sys.stderr,
-        )
-        return EXIT_CODES["usage"]
+    # The one reading authority. Every refusal -- an ambiguous or inconsistent
+    # delimiter, broken quoting, an undecodable byte, a header with no rows,
+    # duplicate headers -- is an IngestionError, which main() reports as one
+    # line and exit 1 before anything is published.
+    loaded = load_table(
+        path,
+        options=LoadOptions(
+            encoding=args.encoding,
+            delimiter=None if args.delimiter is None else _DELIMITER_CHOICES[args.delimiter],
+        ),
+    )
+    frame = loaded.frame
 
     if args.target is not None and args.target not in frame.columns:
         print(
@@ -428,6 +448,7 @@ def _audit(args: argparse.Namespace) -> int:
         lineage=lineage,
         model=registration,
         kit_config=kit_config,
+        ingestion=loaded.metadata,
         # Deliberately excludes --fail-on: it decides this process's exit code
         # and changes nothing about what was found. Two audits that differ only
         # in that flag are the same audit, and the config fingerprint has to say

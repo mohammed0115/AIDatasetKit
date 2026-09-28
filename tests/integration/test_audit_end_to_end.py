@@ -268,7 +268,8 @@ class TestExitCodes:
         path.write_text("not really parquet", encoding="utf-8")
         result = run_cli("audit", str(path))
         assert result.returncode == EXIT_CODES["usage"]
-        assert "CSV only" in result.stderr
+        assert "not a supported format" in result.stderr
+        assert ".csv and .tsv" in result.stderr
 
     def test_an_unknown_target_lists_the_real_columns(self, tmp_path):
         result = run_cli("audit", str(EXAMPLE), "--target", "Nope", "--output", str(tmp_path))
