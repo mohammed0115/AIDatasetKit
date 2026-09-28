@@ -278,7 +278,9 @@ says *no known blocker found*, *review required*, *possible leakage*,
 
 ## Scope of this alpha
 
-Supported: pandas DataFrames and CSV files · tabular data · binary and multiclass
+Supported: `.csv` and `.tsv` files (comma, semicolon, tab or pipe, detected or
+named; utf-8, utf-8-sig, latin-1 or cp1256, never guessed), pandas DataFrames
+and lists of records · tabular data · binary and multiclass
 classification readiness · regression model contexts · scikit-learn model
 contexts · profiling · quality and leakage diagnostics · capability-driven
 preprocessing plans · feature lineage · audit artifacts.
@@ -288,7 +290,8 @@ Also merged, unreleased: model training, evaluation, model comparison, the
 
 Not supported yet: anomaly detection, dimensionality reduction, time series,
 text, images, hyperparameter tuning, cross-validation, model persistence,
-databases, cloud storage, Parquet, Excel.
+databases, cloud storage, Parquet, Excel, JSON, automatic encoding detection,
+input size limits, date inference, chunked reading.
 
 Regression models and their preprocessing are held to the same executed
 capability contracts as the classifiers. The *readiness verdict* is not: its

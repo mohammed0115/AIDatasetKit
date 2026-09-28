@@ -57,6 +57,7 @@ artifact schema below and from the package.
 | `verdict` | `ready`, `ready_with_warnings`, `review_required`, `blocked`. |
 | `verdict_reasons` | Why, in the order the policy applied them. |
 | `dataset` | Identity: fingerprints, shape, column list. No values. |
+| `ingestion` | How the table was read: source kind, format, encoding, delimiter and whether it was detected, named or fixed by the format, header, rows, columns, memory, warnings. `null` when the caller built the frame itself. No path, no values. |
 | `config` | The settings that steered the run, and their fingerprint. |
 | `target` | What the task detector concluded, if a target was named. |
 | `model` | The capability context, if one was supplied. No estimator. |
@@ -68,6 +69,27 @@ artifact schema below and from the package.
 | `warnings` | Non-fatal problems from the run itself. |
 | `known_limitations` | What this library cannot establish. |
 | `provenance` | Timestamp, environment versions, evidence fingerprint. |
+
+## How the table was read
+
+The CLI reads every file through `aidatasetkit.ingestion.load_table`, and the
+`ingestion` record says what it did (a 60-row semicolon file; `memory_bytes` is pandas'
+deep memory estimate and differs between pandas versions):
+
+```json
+"ingestion": {"source_kind": "file", "format": "csv", "encoding": "utf-8",
+  "delimiter": ";", "delimiter_source": "detected", "header": true,
+  "row_count": 60, "column_count": 4, "memory_bytes": 8512, "warnings": []}
+```
+
+`delimiter_source` is `detected`, `explicit` (the caller named it) or `format`
+(a `.tsv` is tab-separated). A single-column file has `delimiter: null` and a
+warning. Fields that do not apply — the encoding of a DataFrame — are `null`, not
+invented. `AuditBuilder.build(..., ingestion=loaded.metadata)` records it and
+refuses metadata whose row or column count disagrees with the frame. The HTML
+report shows it as its *Input* section. The record was added in G1-W1, which
+moved the semantic fingerprint; `tests/unit/test_capability_fingerprint_migration.py`
+records the step and reproduces the previous fingerprint by removing the key.
 
 ## Stages
 

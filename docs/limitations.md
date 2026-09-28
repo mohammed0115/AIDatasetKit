@@ -44,9 +44,20 @@ The readiness verdict has not been verified for a clustering run either. Its
 thresholds and its leakage checks were built against a target, and a clustering
 frame has none.
 
-**CSV only, from the command line.** The Python API accepts any pandas
-DataFrame. The CLI reads CSV and nothing else — no Parquet, Excel, databases, or
-cloud storage.
+**CSV and TSV only, from files.** `aidatasetkit.ingestion.load_table` — which
+the CLI uses — reads `.csv` and `.tsv` files, a pandas DataFrame, or a list of
+records, and nothing else: no JSON, JSONL, Parquet, Feather, Excel, databases,
+URLs or cloud storage. A `.txt` file is refused even when it holds CSV.
+
+- **Encodings are never guessed.** utf-8 (default), utf-8-sig, latin-1 and
+  cp1256 are read when named; anything else — UTF-16 included — is refused.
+- **Delimiters** `,` `;` tab `|` are detected from the first 64 KiB, and the
+  whole file is then validated. A file that is consistent under two delimiters
+  is refused as ambiguous; a row with too few or too many fields is refused, not
+  padded.
+- **Not implemented yet:** input size limits (a file is loaded whole into
+  memory), date inference, chunked reading. Reading costs two full passes over
+  the file (a validation pass and the pandas parse) plus the sample.
 
 ## Detection
 

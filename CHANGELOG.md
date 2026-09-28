@@ -9,6 +9,30 @@ Versions before `1.0` may change public interfaces and the artifact schema; see
 First alpha, not yet released: nothing has been published to PyPI, TestPyPI or
 as a GitHub release, and no version is tagged. Everything below is new.
 
+### G1-W1 ingestion foundation
+
+Evidence: `docs/evidence/G1_W1_INGESTION_FOUNDATION_REPORT.md`.
+
+- **`aidatasetkit.ingestion.load_table`** — the one table-reading authority:
+  `.csv` and `.tsv` paths (`pathlib.Path`, never a bare string), pandas
+  DataFrames and lists of records, returning `LoadedTable(frame, metadata)`.
+  Every input is read correctly or refused with an `IngestionError`; nothing is
+  read into a wrong table silently.
+- **Fixed — a semicolon CSV was read as one column** (audit P0-2). Delimiters
+  `,` `;` tab `|` are detected with quoting honoured; an ambiguous file is
+  refused, a named delimiter the file does not use is refused, and every row's
+  field count is validated — pandas pads a short row, this refuses it.
+- **Explicit encodings**: utf-8, utf-8-sig (or a byte-order mark), latin-1,
+  cp1256. No detection; an undecodable byte is `EncodingError`, never a raw
+  `UnicodeDecodeError`.
+- **CLI**: reads `.tsv` as well as `.csv`; new `--encoding` and `--delimiter`
+  (`tab` for a tab). Duplicate-header detection moved into ingestion.
+- **Artifact**: a new `ingestion` record in `audit.json` and an *Input* section in
+  `report.html`. The semantic fingerprint moved (`0f0fd1d5…` → `00783893…`); the
+  migration is recorded. Schema version unchanged at `1.0`: the key is additive.
+- Not yet: automatic encoding detection, input size limits, date inference,
+  chunked reading, JSON, Excel, Parquet.
+
 ### G0 baseline stabilisation
 
 Evidence for every item: `docs/evidence/G0_FINAL_CERTIFICATION_REPORT.md`.
@@ -233,7 +257,8 @@ Evidence for every item: `docs/evidence/G0_FINAL_CERTIFICATION_REPORT.md`.
 
 ### Command line
 
-- `aidatasetkit audit` — profile, check, plan, and write three artifacts.
+- `aidatasetkit audit` — read a `.csv` or `.tsv`, profile, check, plan, and write
+  three artifacts.
 - Documented exit codes for CI: `0` below threshold, `1` could not run,
   `2` threshold met, `3` blocked.
 - `--fail-on never|warning|review|error`, defaulting to `review`.

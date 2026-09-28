@@ -38,7 +38,9 @@ step names the capability that asked for it.
 
 | Argument | Effect |
 |---|---|
-| `path` | A CSV file. The only format the alpha reads. |
+| `path` | A `.csv` or `.tsv` file. The only formats the alpha reads. |
+| `--encoding` | `utf-8` (default), `utf-8-sig`, `latin-1` or `cp1256`. Never guessed: a file that does not decode is refused with `EncodingError`. A UTF-8 byte-order mark is honoured. |
+| `--delimiter` | `,` `;` `\|` or `tab`. Omit it and the delimiter is detected; a file that splits consistently under two delimiters is refused as ambiguous rather than guessed. A named delimiter the file does not use is refused too. |
 | `--target` | The label column. Without it you get dataset evidence only. |
 | `--task` | `classification` or `regression`. Detected from the target if omitted. |
 | `--model` | A model name or alias. Adds capability-driven preprocessing evidence. **Requires `--target`.** Nothing is trained. |
