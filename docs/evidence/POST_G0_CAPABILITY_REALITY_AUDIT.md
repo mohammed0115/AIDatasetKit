@@ -9,8 +9,8 @@ GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
 OVERALL_CERTIFIED_PROGRESS   = 40.95%   (95 proven / 232 applicable, G0–G12)
 AUDIT_GATE                   = PASS     (the audit is complete with evidence; G1–G12 are not)
-READY_FOR_G1_IMPLEMENTATION  = NO       (one P0 regression in the profiling path G1 feeds; §9)
-NEXT_AUTHORIZED_ACTION       = owner decision on the G0.1 hotfix wave (§12)
+READY_FOR_G1_IMPLEMENTATION  = YES      (updated after G0.1: P0-1 closed; was NO at audit time, §9)
+NEXT_AUTHORIZED_ACTION       = owner authorisation of G1-W1 (G0.1 closed, §0)
 ```
 
 **حدود هذا المستند:**
@@ -22,6 +22,28 @@ NEXT_AUTHORIZED_ACTION       = owner decision on the G0.1 hotfix wave (§12)
 - **التصنيف:** يتبع سُلَّم §5 من التكليف حرفيًا.
 
 ---
+
+## 0. Updates after the audit (append-only)
+
+**تصحيح 1 — عدد الصفوف:**
+
+```text
+AUDIT_CAPABILITY_ROWS = 222
+COMMIT_MESSAGE_237    = HISTORICAL_TYPO
+AUDIT_DOCUMENTS       = CORRECT
+```
+
+- رسالة الـcommit `2dc8ece` تقول «237 capability rows». العدد الصحيح في جدول §5 هو 222 صفًا عبر G1–G12: 216 بندًا منطبقًا، و6 بين NOT_APPLICABLE وOUT_OF_SCOPE.
+- المستندات كانت صحيحة من البداية، والنسبة `95/232` لم تتغير بسبب هذا الخطأ.
+- لم يُعدَّل التاريخ (لا amend ولا rebase)؛ التصحيح هنا فقط.
+
+**تحديث 2 — G0.1 (profiling performance hotfix):**
+
+- **P0-1: CLOSED.** الإثبات في `docs/evidence/G0_1_PROFILING_PERFORMANCE_HOTFIX_REPORT.md`.
+- **P0-2** (فاصل CSV): ما زال **OPEN**، ويبقى ضمن G1.
+- **بنود G11:** انتقلت أربعة بنود من `MISSING` إلى `PARTIAL`: G11-02، G11-04، G11-11، G11-21. **لم ينتقل أي بند إلى `SUPPORTED_AND_TESTED`**، لأن benchmark واحدًا وحراسة مسار واحد لا يغلقان فجوات الأداء.
+- **النسب:** G11 بقي 5/21 = 23.81%، والنسبة الكلية بقيت 95/232 = **40.95%**.
+- **G12-14:** خُفِّضت شدته من P0 إلى P1.
 
 ## 1. Main integration
 
@@ -289,16 +311,16 @@ G0_MAIN_INTEGRATION = PASS
 | G10-30 | G10 | Value redaction, opt-in disclosure | `SUPPORTED_AND_TESTED` | AuditBuilder(redact_values=True) default | test_evidence_artifact.py | — | — |
 | G10-31 | G10 | Offline deterministic core | `SUPPORTED_AND_TESTED` | no I/O beyond given paths | determinism tests | — | — |
 | G11-01 | G11 | Benchmark suite | `MISSING` | — | — | None | P1 |
-| G11-02 | G11 | Small / medium / large timings on record | `MISSING` | only this audit's exploratory numbers | probe_profile_perf.py | None committed | P1 |
+| G11-02 | G11 | Small / medium / large timings on record | `PARTIAL` | G0.1: 10k and 100k timings committed in G0_1_PROFILING_PERFORMANCE_HOTFIX_REPORT.md | scripts/benchmark_profiling.py | No 1M or large-file record; not per release | P2 |
 | G11-03 | G11 | Ingestion time | `MISSING` | — | — | None | P2 |
-| G11-04 | G11 | Profiling time | `MISSING` | measured here: 100k x 20 = 2.34 s at fd4cdd2, 21.48 s at 79e7cc8 | probe_regression.py | Regression P0-1 undetected by any test | P0 |
+| G11-04 | G11 | Profiling time | `PARTIAL` | G0.1: counting hot path guarded; 100k x 20 = 1.50 s (fd4cdd2 1.08 s, 79e7cc8 16.39 s) | test_counting_performance.py (call growth, ratio to pandas) | No guard on whole-frame profiling time | P2 |
 | G11-05 | G11 | Report time | `MISSING` | measured here only | probe_profile_perf.py | None | P2 |
 | G11-06 | G11 | Memory usage | `MISSING` | measured here only (tracemalloc) | probe_profile_perf.py | None | P2 |
 | G11-07 | G11 | Chunking | `MISSING` | — | — | None | P1 |
 | G11-08 | G11 | Sampling where budgets demand it | `SUPPORTED_AND_TESTED` | visualization sampling; VIF row cap | test_visualization_preparation.py, test_quality.py | — | — |
 | G11-09 | G11 | Timeouts / resource limits | `MISSING` | — | — | None | P1 |
 | G11-10 | G11 | Graceful degradation | `SUPPORTED_AND_TESTED` | VIF declines past 50 columns; silhouette row limit | test_quality.py, test_clustering_metrics.py | — | — |
-| G11-11 | G11 | Deterministic benchmarks | `MISSING` | — | — | None | P2 |
+| G11-11 | G11 | Deterministic benchmarks | `PARTIAL` | scripts/benchmark_profiling.py (seeded, warm-up, median, digest) | run by hand, recorded in the G0.1 report | Not run in CI | P2 |
 | G11-12 | G11 | CI platforms (Windows, Linux) | `SUPPORTED_AND_TESTED` | .github/workflows/ci.yml | runs 36331952431, 36337340274 (10/10) | — | — |
 | G11-13 | G11 | Dependency matrix (minimum, reference, extras) | `SUPPORTED_AND_TESTED` | constraints/*.txt | CI 8 cells; test_dependency_contract.py | — | — |
 | G11-14 | G11 | Package build and install | `SUPPORTED_AND_TESTED` | scripts/release_smoke_test.sh | CI smoke jobs | — | — |
@@ -308,7 +330,7 @@ G0_MAIN_INTEGRATION = PASS
 | G11-18 | G11 | Warnings clean (-W error) | `MISSING` | one external warning seen (matplotlib 3.9.0) | — | Not enforced | P3 |
 | G11-19 | G11 | Lint | `MISSING` | no tool configured | — | None | P3 |
 | G11-20 | G11 | Type checking | `PARTIAL` | py.typed shipped, annotations present | — | No type check run | P2 |
-| G11-21 | G11 | Performance regression guard | `MISSING` | — | — | Let P0-1 through | P1 |
+| G11-21 | G11 | Performance regression guard | `PARTIAL` | test_counting_performance.py | fails on 79e7cc8 (576,002 extra calls; ratio 65-75), passes on the fix, all CI cells | Counting/profiling path only | P1 |
 | G12-01 | G12 | Q1 Structured opportunity data can be analysed | `PARTIAL` | profiling, quality, statistics on a DataFrame | G2/G4 tests | Needs G1 records adapter and G3 group-by | P1 |
 | G12-02 | G12 | Q2 History and pattern discovery | `MISSING` | no time trends | — | G5 | P1 |
 | G12-03 | G12 | Q3 Successful vs unsuccessful comparison | `PARTIAL` | classification training, leakage and imbalance on an outcome label | test_training_and_comparison.py | No descriptive segment comparison (G5/G6) | P1 |
@@ -322,7 +344,7 @@ G0_MAIN_INTEGRATION = PASS
 | G12-11 | G12 | Q11 Results traceable to evidence | `SUPPORTED_AND_TESTED` | findings, lineage, fingerprints | test_evidence_artifact.py | — | — |
 | G12-12 | G12 | Q12 Works without sending data to an LLM | `SUPPORTED_AND_TESTED` | no network code | test_it_is_a_standalone_page_with_no_external_requests | — | — |
 | G12-13 | G12 | Q13 Several datasets safely | `MISSING` | one frame per call | — | G7 | P1 |
-| G12-14 | G12 | Q14 Realistic data sizes | `PARTIAL` | measured, see Performance | probe_profile_perf.py | P0-1 regression; no limits | P0 |
+| G12-14 | G12 | Q14 Realistic data sizes | `PARTIAL` | measured, see Performance; P0-1 closed in G0.1 | probe_profile_perf.py, G0.1 report | No limits, no chunking | P1 |
 | G12-15 | G12 | Q15 What must stay in Masari / MWIE | `NOT_APPLICABLE` | boundary definition, not a capability | docs/MASARI_INTEGRATION.md | — | — |
 
 ## 6. Format support matrix
@@ -415,7 +437,7 @@ G0_MAIN_INTEGRATION = PASS
 
 ### P0 (متميزتان)
 
-1. **P0-1: تراجع أداء الـprofiling بنحو 9× (و30× على الأعمدة المتميزة القيم).**
+1. **P0-1: تراجع أداء الـprofiling بنحو 9× (و30× على الأعمدة المتميزة القيم).** **الحالة: CLOSED في G0.1** (انظر §0 و`G0_1_PROFILING_PERFORMANCE_HOTFIX_REPORT.md`).
    - أدخله `79e7cc8`، وهو إصلاح ترتيب المتعادلات الذي أغلق G0.
    - `core/counting._ties_in_order_of_appearance` يمر على كل الصفوف في حلقة Python، ويستدعي `counted.index[i]` و`counted.iloc[i]` لكل عنصر.
    - في عمود رقمي متصل كل القيم متعادلة، فيصبح كل عمود من هذا النوع مسار O(n) بطيئًا.
@@ -523,7 +545,8 @@ G0_MAIN_INTEGRATION = PASS
 
 | Gate | المجال | Proven | Applicable | Certified % | الحالة | الخطوة التالية |
 |---|---|---:|---:|---:|---|---|
-| G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق؛ G0.1 hotfix لـP0-1 |
+| G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
+| G0.1 | Profiling performance hotfix | — | — | — | PASS | P0-1 مغلق (انظر §0) |
 | G1 | Ingestion | 5 | 26 | 19.23% | AUDIT | الموجة 1 بعد G0.1 (الـroadmap) |
 | G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | تواريخ ونص وقيم |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | عمليات جدولية |
@@ -534,7 +557,7 @@ G0_MAIN_INTEGRATION = PASS
 | G8 | Visualization & Reporting | 15 | 23 | 65.22% | AUDIT | line/time series وتصدير |
 | G9 | AI-ready Context | 8 | 12 | 66.67% | AUDIT | أقسام context |
 | G10 | Provenance/Security/Privacy/Errors | 16 | 28 | 57.14% | AUDIT | أخطاء الموارد والمدخلات |
-| G11 | Performance & Certification | 5 | 21 | 23.81% | AUDIT | benchmarks وحراسة الأداء |
+| G11 | Performance & Certification | 5 | 21 | 23.81% | AUDIT | 4 بنود MISSING→PARTIAL في G0.1؛ benchmarks في CI |
 | G12 | Masari Consumer Integration | 2 | 14 | 14.29% | AUDIT | بعد G1–G9 |
 | **All** | G0–G12 | **95** | **232** | **40.95%** | — | — |
 
@@ -553,7 +576,7 @@ G0_MAIN_INTEGRATION = PASS
 | G8 | 15 | 0 | 1 | 7 | 0 | 0 | 0 |
 | G9 | 8 | 1 | 2 | 1 | 0 | 0 | 0 |
 | G10 | 16 | 4 | 6 | 2 | 0 | 3 | 0 |
-| G11 | 5 | 0 | 2 | 14 | 0 | 0 | 0 |
+| G11 | 5 | 0 | 6 | 10 | 0 | 0 | 0 |
 | G12 | 2 | 0 | 7 | 5 | 0 | 1 | 0 |
 
 ```text
@@ -564,7 +587,7 @@ G0_MAIN_INTEGRATION          = PASS
 GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
 OVERALL_CERTIFIED_PROGRESS   = 40.95%
-READY_FOR_G1_IMPLEMENTATION  = NO (pending G0.1 hotfix for P0-1)
+READY_FOR_G1_IMPLEMENTATION  = YES after G0.1 (P0-1 closed; P0-2 is a G1 item)
 NEXT_AUTHORIZED_ACTION       = owner authorisation of G0.1, then G1 wave 1
 ```
 
