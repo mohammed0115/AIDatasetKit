@@ -29,7 +29,14 @@ Evidence: `docs/evidence/G1_W1_INGESTION_FOUNDATION_REPORT.md`.
   (`tab` for a tab). Duplicate-header detection moved into ingestion.
 - **Artifact**: a new `ingestion` record in `audit.json` and an *Input* section in
   `report.html`. The semantic fingerprint moved (`0f0fd1d5…` → `00783893…`); the
-  migration is recorded. Schema version unchanged at `1.0`: the key is additive.
+  migration is recorded.
+- **Artifact schema `1.1`** (G1-W1 closure). As first merged (`90ecfae`), G1-W1
+  added the `ingestion` key but left `schema_version` at `1.0`, against the
+  contract that a change of shape is identifiable from the version alone. It is
+  now `1.1`, a minor bump because the change is additive; `lineage.json` carries
+  the same version. `publication_schema_version` stays `1.0` — the run layout
+  did not change — and so does the package version. The fingerprint moved again
+  (`00783893…` → `3e93dd5e…`), recorded as its own migration step.
 - Not yet: automatic encoding detection, input size limits, date inference,
   chunked reading, JSON, Excel, Parquet.
 

@@ -8,13 +8,23 @@ and an audit that disagrees with itself is worthless.
 ## Schema version
 
 ```json
-{ "schema_version": "1.0" }
+{ "schema_version": "1.1" }
 ```
 
 The artifact format is versioned **separately from the package**. Most releases
-will not change the shape of a recorded field; the ones that do must be
-identifiable without consulting a changelog. `0.1.0a1` writes schema `1.0`, and a
-later `0.4.0` may still write `1.0`.
+will not change the shape of the record; the ones that do must be identifiable
+without consulting a changelog. Adding, removing or redefining a field bumps the
+version: an additive change is a minor bump, anything else a major one. A later
+`0.4.0` may still write `1.1`. `lineage.json` carries the same version.
+
+| Version | Change |
+|---|---|
+| `1.0` | The first published contract. |
+| `1.1` | G1-W1: the top-level `ingestion` record. |
+
+An artifact with an `ingestion` key and `schema_version` `1.0` exists: `main` at
+`90ecfae` wrote it, before the version was corrected. Read it as `1.1`; nothing
+else differs.
 
 ## Where a run is published
 
@@ -87,9 +97,11 @@ deep memory estimate and differs between pandas versions):
 warning. Fields that do not apply — the encoding of a DataFrame — are `null`, not
 invented. `AuditBuilder.build(..., ingestion=loaded.metadata)` records it and
 refuses metadata whose row or column count disagrees with the frame. The HTML
-report shows it as its *Input* section. The record was added in G1-W1, which
-moved the semantic fingerprint; `tests/unit/test_capability_fingerprint_migration.py`
-records the step and reproduces the previous fingerprint by removing the key.
+report shows it as its *Input* section. The record was added in G1-W1, and the
+schema moved to `1.1` with it. Each moved the semantic fingerprint, and
+`tests/unit/test_capability_fingerprint_migration.py` records both as separate
+steps: setting the version back to `1.0` reproduces the intermediate identity,
+and then removing the key reproduces the one before G1-W1.
 
 ## Stages
 

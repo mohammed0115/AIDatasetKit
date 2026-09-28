@@ -128,9 +128,23 @@ flowchart LR
   `header`, `row_count`, `column_count`, `memory_bytes`, `warnings`. ما لا ينطبق
   يُكتب `null` ولا يُختلق. لا مسار مطلق ولا قيمة خلية.
 - إذا بُني الإطار بيد المستدعي دون `load_table`، فالقيمة `"ingestion": null`.
-- إضافة المفتاح غيّرت الـ semantic fingerprint من `0f0fd1d5…` إلى `00783893…`؛
-  الخطوة مسجلة في `tests/unit/test_capability_fingerprint_migration.py`، وحذف
-  المفتاح يعيد البصمة السابقة بالضبط.
+- إضافة المفتاح غيّرت الـ semantic fingerprint من `0f0fd1d5…` إلى `00783893…`، ثم
+  رفع `schema_version` إلى `1.1` غيّرها إلى `3e93dd5e…`. الخطوتان مسجلتان
+  منفصلتين في `tests/unit/test_capability_fingerprint_migration.py`: إعادة الإصدار
+  إلى `1.0` تعيد البصمة الوسيطة، ثم حذف المفتاح يعيد بصمة ما قبل G1-W1.
+
+### 5.1 أربعة أرقام مختلفة، لا يُستنتج أحدها من الآخر
+
+| المعرّف | أين | ماذا يصف | متى يتغير |
+|---|---|---|---|
+| **artifact schema version** | `ARTIFACT_SCHEMA_VERSION` في `evidence/types.py`؛ `schema_version` في `audit.json` و`lineage.json` | شكل السجل ومعنى حقوله | عند إضافة حقل أو حذفه أو تغيير معناه: إضافي ← minor (`1.0` ← `1.1`)، وغير ذلك ← major. |
+| **publication schema version** | `PUBLICATION_SCHEMA_VERSION` في `evidence/publication.py`؛ في `CURRENT` و`manifest.json` | تخطيط النشر: `runs/<run_id>/`، `manifest.json`، `CURRENT` | عند تغيّر التخطيط فقط. بقي `1.0` في G1-W1 لأن التخطيط لم يتغير. |
+| **package version** | `pyproject.toml` ← `aidatasetkit.__version__` | إصدار المكتبة (`0.1.0a1`) | عند الإصدار. لا علاقة له بالاثنين السابقين، واختبار `test_the_artifact_schema_is_versioned_separately` يمنع خلطهما. |
+| **semantic fingerprint** | `provenance.semantic_fingerprint` في `audit.json` | بصمة `semantic_dict()`: الأدلة نفسها دون الوقت والبيئة | عند تغيّر أي شيء في السجل، بما فيه `schema_version`. البصمة تقول *أن* السجل تغيّر، والإصدار يقول *أي عقد* يتبع. |
+
+**الدرس من G1-W1:** أُضيف `ingestion` أولاً وبقي الإصدار `1.0` (`main` = `90ecfae`)،
+فكان السجل الجديد لا يُميَّز عن القديم إلا بمقارنة البصمات، وهذا خلاف العقد. صُحح
+إلى `1.1` في موجة إغلاق مستقلة، وبقيت الخطوة الوسيطة مسجلة ولم تُمحَ.
 
 ## 6. الخطأ: من الاستثناء إلى رمز الخروج
 
@@ -169,5 +183,6 @@ XLS/XLSX، قواعد البيانات، XML/YAML، الروابط والتنز�
 | الإصدار / الموجة | ما يصفه هذا المستند |
 |---|---|
 | G0.1 (main `69303b35e30c8dda1b51490360e65bc22ff920ed`) | الـ CLI يقرأ CSV بـ `pd.read_csv(path)` الافتراضي: ملف مفصول بـ `;` يُقرأ عموداً واحداً بصمت (P0-2). |
-| G1-W1 (فرع `g1-w1-ingestion`) | كل ما في هذا المستند. commits التنفيذ: `5759522` العقود، `b8065c3` الاكتشاف والتحقق، `6353985` الدليل، `ed91a89` الـ CLI، `2c46646` التحقق من الفاصل الصريح. الـ SHA النهائي على main مسجل في `docs/evidence/G1_W1_INGESTION_FOUNDATION_REPORT.md`. |
+| G1-W1 (main `90ecfae778a5983d03f4b4fa664327c62b92cff0`) | كل ما في هذا المستند، لكن `schema_version` = `1.0` رغم وجود `ingestion`. commits التنفيذ: `5759522` العقود، `b8065c3` الاكتشاف والتحقق، `6353985` الدليل، `ed91a89` الـ CLI، `2c46646` التحقق من الفاصل الصريح. |
+| G1-W1 closure (فرع `g1-w1-schema-closure`) | `schema_version` = `1.1`. لا تغيير في سلوك القراءة. الـ SHA النهائي على main مسجل في ملحق `docs/evidence/G1_W1_INGESTION_FOUNDATION_REPORT.md`. |
 | G1-W2 وما بعدها | غير مصرح بها بعد. |
