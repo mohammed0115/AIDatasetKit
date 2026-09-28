@@ -42,6 +42,15 @@ __all__ = [
     "PublicationError",
     "NoPublishedRunError",
     "CorruptPublicationError",
+    "IngestionError",
+    "InputNotFoundError",
+    "UnsupportedFormatError",
+    "InvalidIngestionOptionsError",
+    "EncodingError",
+    "MalformedInputError",
+    "AmbiguousDelimiterError",
+    "EmptyInputError",
+    "DuplicateHeadersError",
     "TrainingError",
     "WorkflowStateError",
     "PredictionValidationError",
@@ -251,6 +260,65 @@ class CorruptPublicationError(PublicationError):
     pointer names, or a pointer that cannot be read. The set is refused whole: a
     reader handed part of a run, or a run from two generations, would be handed a
     record that never existed.
+    """
+
+
+# --------------------------------------------------------------------------- #
+# Ingestion
+# --------------------------------------------------------------------------- #
+
+
+class IngestionError(AIDatasetKitError):
+    """A table could not be loaded as the one it claims to be.
+
+    Every refusal of :func:`aidatasetkit.ingestion.load_table` is one of these.
+    Messages name the cause and what to do about it; none of them quotes a cell
+    value, because the input may be anyone's data.
+    """
+
+
+class InputNotFoundError(IngestionError):
+    """The path to load does not exist, or is not a regular file."""
+
+
+class UnsupportedFormatError(IngestionError):
+    """The source is of a kind or format this version cannot load."""
+
+
+class InvalidIngestionOptionsError(IngestionError, ConfigurationError):
+    """A :class:`~aidatasetkit.ingestion.LoadOptions` value is invalid or does not apply."""
+
+
+class EncodingError(IngestionError):
+    """The bytes could not be decoded with the encoding in force."""
+
+
+class MalformedInputError(IngestionError):
+    """The content is not a well-formed table of the declared format.
+
+    Inconsistent field counts, broken quoting, binary content, or two parsers
+    disagreeing about how many rows there are. Refused rather than repaired: a
+    table guessed out of a broken file would be evidence about a file nobody has.
+    """
+
+
+class AmbiguousDelimiterError(MalformedInputError):
+    """More than one supported delimiter yields a consistent table.
+
+    Picking one would be a guess with a coin-flip chance of silently producing
+    the wrong columns. The caller says which one instead.
+    """
+
+
+class EmptyInputError(IngestionError, EmptyDataError):
+    """There is no data row to load: no bytes, only whitespace, or only a header."""
+
+
+class DuplicateHeadersError(IngestionError, SchemaError):
+    """Two columns share a name.
+
+    Detected before pandas can rename them to ``a.1``, ``a.2``: an audit of
+    renamed columns would describe a dataset that does not exist.
     """
 
 

@@ -42,6 +42,9 @@ LAYERS: dict[str, int] = {
     "core": 0,
     "statistics": 1,
     "datasets": 1,
+    # Turns a source into a table and nothing more. It reads files and knows
+    # the core types; every layer that analyses data sits above it.
+    "ingestion": 1,
     "profiling": 2,
     "preprocessing": 3,
     "models": 3,
