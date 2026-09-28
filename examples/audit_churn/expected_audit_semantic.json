@@ -681,6 +681,7 @@
       "source": "quality"
     }
   ],
+  "ingestion": null,
   "known_limitations": [
     "Leakage detection is statistical. A feature that encodes the outcome for reasons the numbers do not show will not be found here.",
     "Only the classification readiness verdict has been verified end to end. Regression and clustering models and their preprocessing are verified; anomaly detection, dimensionality reduction, time series, text, and images remain out of scope.",

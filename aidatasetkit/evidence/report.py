@@ -92,6 +92,7 @@ def render_report(artifact: Mapping[str, Any]) -> str:
     sections = [
         _summary(artifact, dataset, verdict, name),
         _identity(artifact, dataset),
+        _ingestion(artifact),
         _columns(artifact),
         _findings(artifact),
         _decisions(artifact),
@@ -156,6 +157,36 @@ def _reasons(artifact) -> str:
     if not reasons:
         return ""
     return "<ul>" + "".join(f"<li>{_e(reason)}</li>" for reason in reasons) + "</ul>\n"
+
+
+_DELIMITER_NAMES = {",": "comma (,)", ";": "semicolon (;)", "\t": "tab", "|": "pipe (|)"}
+
+
+def _ingestion(artifact) -> str:
+    """How the table was read. Absent when the artifact has no ingestion record."""
+    record = artifact.get("ingestion")
+    if not record:
+        return ""
+    delimiter = record.get("delimiter")
+    rows = [
+        ("source", record.get("source_kind")),
+        ("format", record.get("format")),
+        ("encoding", record.get("encoding")),
+        (
+            "delimiter",
+            None
+            if delimiter is None
+            else f"{_DELIMITER_NAMES.get(delimiter, delimiter)}, {record.get('delimiter_source')}",
+        ),
+        ("header row", None if record.get("header") is None else ("yes" if record["header"] else "no")),
+        ("rows × columns", f"{record.get('row_count', 0):,} × {record.get('column_count', 0):,}"),
+        ("memory", f"{record.get('memory_bytes', 0):,} bytes"),
+    ]
+    body = "".join(
+        f"<tr><th>{_e(label)}</th><td>{_e(value)}</td></tr>" for label, value in rows if value is not None
+    )
+    notes = "".join(f"<li>{_e(note)}</li>" for note in record.get("warnings") or ())
+    return f"<h2>Input</h2>\n<table>{body}</table>\n" + (f"<ul>{notes}</ul>\n" if notes else "")
 
 
 def _identity(artifact, dataset) -> str:

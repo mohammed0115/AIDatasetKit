@@ -38,6 +38,14 @@ no cross-validation. It is gone from ``KitConfig``, so it is gone from the recor
 and ``config.fingerprint`` moved again. Nothing else changed, and the schema
 version stays: an artifact that records ``cv_folds`` recorded a value that
 steered nothing, which is exactly what this step stops asserting.
+
+**G1-W1 -- how the table was read.** The artifact gained a top-level
+``ingestion`` record, filled when the table came through
+:func:`aidatasetkit.ingestion.load_table` and ``null`` otherwise. The example is
+built from a frame, so its record is ``null``: the key is the whole change. The
+schema version stays 1.0 by the same rule as before -- a field was added, none
+changed shape or meaning -- and an artifact written before this step is
+recognisable by the absent key.
 """
 
 from __future__ import annotations
@@ -84,6 +92,10 @@ def _restore_threshold(name: str, value: object) -> Callable[[dict], None]:
         semantic["config"]["fingerprint"] = config_fingerprint(settings)
 
     return rollback
+
+
+def _rollback_ingestion(semantic: dict) -> None:
+    del semantic["ingestion"]
 
 
 def _rollback_threshold(name: str) -> Callable[[dict], None]:
@@ -134,6 +146,12 @@ CHAIN: tuple[Step, ...] = (
         before="1c449f10c3f9b826e6c166522122f77cc602348a349d11b662ddfe540af5f470",
         after="0f0fd1d5e9785d46351d7d28dc15d2d4eda4cc7fbc54bf0509a2a76eb3b471a5",
         rollback=_restore_threshold("cv_folds", 5),
+    ),
+    Step(
+        "G1-W1 ingestion record added to the artifact",
+        before="0f0fd1d5e9785d46351d7d28dc15d2d4eda4cc7fbc54bf0509a2a76eb3b471a5",
+        after="007838931330c91af0d430a3e90c8b5c98305f76d1f482a511302939d85e2c71",
+        rollback=_rollback_ingestion,
     ),
 )
 
@@ -253,6 +271,17 @@ class TestS9:
             in semantic["model"]["capabilities"]
         )
         assert semantic["model"]["task_type"] == "classification"
+
+
+class TestTheIngestionStep:
+    def test_the_key_is_present_and_null_for_a_frame_built_artifact(self, semantic):
+        assert "ingestion" in semantic
+        assert semantic["ingestion"] is None
+
+    def test_nothing_but_the_key_moved(self):
+        stored = _stored()
+        del stored["ingestion"]
+        assert config_fingerprint(stored) == CHAIN[-2].after
 
 
 class TestTheCvFoldsStep:

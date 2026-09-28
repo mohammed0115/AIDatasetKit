@@ -35,6 +35,7 @@ __all__ = [
     "FeatureLineage",
     "FindingEvidence",
     "FitScope",
+    "IngestionEvidence",
     "LabelRef",
     "ModelEvidence",
     "TargetEvidence",
@@ -405,6 +406,41 @@ class DatasetIdentity:
 
 
 @dataclass(frozen=True, slots=True)
+class IngestionEvidence:
+    """How the audited table was read, as :mod:`aidatasetkit.ingestion` recorded it.
+
+    Present only when the table came through ``load_table``; an artifact built
+    from a frame the caller loaded some other way records ``null`` rather than a
+    reconstruction. Holds no path and no cell value.
+    """
+
+    source_kind: str
+    format: str | None
+    encoding: str | None
+    delimiter: str | None
+    delimiter_source: str | None
+    header: bool | None
+    row_count: int
+    column_count: int
+    memory_bytes: int
+    warnings: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "source_kind": self.source_kind,
+            "format": self.format,
+            "encoding": self.encoding,
+            "delimiter": self.delimiter,
+            "delimiter_source": self.delimiter_source,
+            "header": self.header,
+            "row_count": self.row_count,
+            "column_count": self.column_count,
+            "memory_bytes": self.memory_bytes,
+            "warnings": list(self.warnings),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ConfigIdentity:
     """Which settings steered the run.
 
@@ -454,6 +490,7 @@ class AuditArtifact:
     warnings: tuple[str, ...] = ()
     known_limitations: tuple[str, ...] = ()
     verdict_reasons: tuple[str, ...] = ()
+    ingestion: IngestionEvidence | None = None
 
     # ---------------------------------------------------------------- #
     # Serialisation
@@ -486,6 +523,7 @@ class AuditArtifact:
             "verdict": self.verdict.value,
             "verdict_reasons": list(self.verdict_reasons),
             "dataset": self.dataset.to_dict(include_name=False),
+            "ingestion": self.ingestion.to_dict() if self.ingestion else None,
             "config": self.config.to_dict(),
             "target": self.target.to_dict() if self.target else None,
             "model": self.model.to_dict() if self.model else None,

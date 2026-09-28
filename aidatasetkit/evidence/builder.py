@@ -34,6 +34,7 @@ from typing import Any
 import pandas as pd
 
 from aidatasetkit.core.config import KitConfig
+from aidatasetkit.core.exceptions import EvidenceError
 from aidatasetkit.core.provenance import EnvironmentVersions, capture_environment
 from aidatasetkit.core.types import (
     DatasetProfile,
@@ -48,6 +49,7 @@ from aidatasetkit.evidence.fingerprint import (
     schema_fingerprint,
 )
 from aidatasetkit.evidence.policy import decide_verdict
+from aidatasetkit.ingestion.types import LoadMetadata
 from aidatasetkit.evidence.types import (
     ARTIFACT_SCHEMA_VERSION,
     AuditArtifact,
@@ -60,6 +62,7 @@ from aidatasetkit.evidence.types import (
     FeatureLineage,
     FindingEvidence,
     FitScope,
+    IngestionEvidence,
     LabelRef,
     ModelEvidence,
     TargetEvidence,
@@ -216,6 +219,7 @@ class AuditBuilder:
         blocked_reason: str | None = None,
         environment: EnvironmentVersions | None = None,
         created_at: str | None = None,
+        ingestion: LoadMetadata | None = None,
     ) -> AuditArtifact:
         """Assemble the artifact.
 
@@ -290,7 +294,31 @@ class AuditBuilder:
             plan_fingerprint=getattr(plan, "fingerprint", None),
             warnings=tuple(warnings),
             known_limitations=KNOWN_LIMITATIONS,
+            ingestion=self._ingestion_evidence(ingestion, frame),
         )
+
+    @staticmethod
+    def _ingestion_evidence(
+        metadata: LoadMetadata | None, frame: pd.DataFrame
+    ) -> IngestionEvidence | None:
+        """Record how the table was read, refusing metadata that describes another table.
+
+        ``None`` stays ``None``: an artifact built from a frame loaded some other
+        way says it has no ingestion record rather than inventing one.
+        """
+        if metadata is None:
+            return None
+        if metadata.row_count != len(frame) or metadata.column_count != frame.shape[1]:
+            raise EvidenceError(
+                f"The ingestion metadata describes {metadata.row_count} rows and "
+                f"{metadata.column_count} columns, but the audited frame has "
+                f"{len(frame)} and {frame.shape[1]}. An artifact cannot record how one "
+                "table was read beside the evidence about another."
+            )
+        return IngestionEvidence(**{
+            key: tuple(value) if key == "warnings" else value
+            for key, value in metadata.to_dict().items()
+        })
 
     # ------------------------------------------------------------------ #
     # Per-section recording
