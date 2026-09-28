@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 __all__ = ["value_counts"]
@@ -65,7 +66,60 @@ def _ties_in_order_of_appearance(series: pd.Series, counted: pd.Series) -> pd.Se
 
     A label that never appears -- an unobserved category, counted as zero -- sorts
     after every label that does, in the order pandas listed it.
+
+    Vectorised. ``pd.factorize`` numbers the distinct values in order of first
+    appearance in one pass; the first row of each code, the first missing row,
+    one ``get_indexer`` from pandas' labels to those codes, and one stable
+    ``lexsort`` finish the job, with no Python work per row. The per-element loop
+    this replaced cost about fifty Python calls per row on an all-distinct
+    column, where every value ties (G0.1). If any observed label cannot be
+    matched this way, the loop below is used instead, so an exotic type is
+    counted slowly rather than wrongly.
     """
+    first = _first_positions(series, counted)
+    if first is None:
+        return _ties_by_python_loop(series, counted)
+    counts = counted.to_numpy(dtype="int64")
+    order = np.lexsort((np.arange(len(counted)), first, -counts))
+    return counted.iloc[order]
+
+
+def _first_positions(series: pd.Series, counted: pd.Series) -> np.ndarray | None:
+    """First row at which each of ``counted``'s labels appears, or ``None``.
+
+    Every missing value shares one position, the first missing row -- the same
+    single key the loop gives them. A label that never appears gets ``len(series)``.
+    ``None`` means some observed label could not be located, and the caller falls
+    back to the exact loop.
+    """
+    rows = len(series)
+    try:
+        codes, uniques = pd.factorize(series, use_na_sentinel=True)
+        present = codes >= 0
+        first_by_code = np.full(len(uniques), rows, dtype="int64")
+        if present.any():
+            found, first_index = np.unique(codes[present], return_index=True)
+            first_by_code[found] = np.flatnonzero(present)[first_index]
+        first_missing = int(np.argmax(~present)) if not present.all() else rows
+
+        labels = counted.index
+        where = pd.Index(uniques).get_indexer(labels)
+        label_missing = np.asarray(pd.isna(labels), dtype=bool)
+    except (TypeError, ValueError):
+        return None
+
+    matched = where >= 0
+    unmatched = ~matched & ~label_missing & (counted.to_numpy() > 0)
+    if unmatched.any():
+        return None
+    first = np.full(len(labels), rows, dtype="int64")
+    first[matched] = first_by_code[where[matched]]
+    first[label_missing] = first_missing
+    return first
+
+
+def _ties_by_python_loop(series: pd.Series, counted: pd.Series) -> pd.Series:
+    """The exact per-element ordering, kept for labels the vectorised path cannot match."""
     first_seen: dict[Any, int] = {}
     for position, value in enumerate(series.tolist()):
         key = _MISSING if _is_missing(value) else value

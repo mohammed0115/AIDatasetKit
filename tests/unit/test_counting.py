@@ -213,3 +213,91 @@ class TestTheLayersThatTally:
         first = TaskDetector().detect(target, target_name="t")
         second = TaskDetector().detect(target.iloc[::-1].reset_index(drop=True), target_name="t")
         assert first.classes == second.classes
+
+
+class TestTheVectorisedOrderEqualsTheExactOne:
+    """G0.1: the vectorised tie ordering is the per-element loop's, value for value.
+
+    ``_ties_by_python_loop`` is the ordering 79e7cc8 introduced and every fixture
+    was checked against. The vectorised path replaced it for speed only, so for
+    every input it must produce the identical tally -- same labels, same counts,
+    same order -- including when pandas hands its ties back reversed.
+    """
+
+    BATTERY = {
+        "strings_tied": pd.Series(["b", "a", "c", "a", "b", "d", "c"]),
+        "numeric_tied": pd.Series([3, 1, 2, 1, 3, 2, 5]),
+        "mixed_compatible": pd.Series([1, 1.0, True, 2, 2.0, "1", "1"], dtype=object),
+        "nan": pd.Series([np.nan, 2.0, 1.0, np.nan, 1.0, 2.0]),
+        "none_and_nan": pd.Series([None, "a", np.nan, "b", "a", None, "b"], dtype=object),
+        "nullable_int": pd.Series([2, None, 1, 2, None, 1], dtype="Int64"),
+        "nullable_bool": pd.Series([True, None, False, None, True, False], dtype="boolean"),
+        "near_float_max": pd.Series([1e308, -1e308, 1e308, 1.7e308, -1e308, 1.7e308]),
+        "infinities": pd.Series([np.inf, -np.inf, 1.0, np.inf, -np.inf, 1.0]),
+        "single_value": pd.Series([7]),
+        "empty": pd.Series([], dtype="float64"),
+        "all_distinct": pd.Series(np.random.default_rng(3).permutation(500).astype("int64")),
+        "low_cardinality": pd.Series(list("abcabcabcab")),
+        "categorical_unobserved": pd.Series(pd.Categorical(["y", "x", "y", "x"], categories=["z", "x", "y"])),
+        "datetimes": pd.Series(pd.to_datetime(["2024-01-02", None, "2024-01-01", "2024-01-02", None, "2024-01-01"])),
+    }
+
+    @staticmethod
+    def _reference(series, dropna):
+        from aidatasetkit.core.counting import _ties_by_python_loop
+
+        counted = series.value_counts(dropna=dropna)
+        if len(counted) > 1 and counted.duplicated().any():
+            counted = _ties_by_python_loop(series, counted)
+        return counted
+
+    @pytest.mark.parametrize("name", sorted(BATTERY))
+    @pytest.mark.parametrize("dropna", [True, False])
+    def test_same_tally_as_the_loop(self, name, dropna):
+        series = self.BATTERY[name]
+        pd.testing.assert_series_equal(value_counts(series, dropna=dropna), self._reference(series, dropna))
+
+    @pytest.mark.parametrize("name", sorted(BATTERY))
+    @pytest.mark.parametrize("dropna", [True, False])
+    def test_same_tally_when_pandas_reverses_its_ties(self, name, dropna, monkeypatch):
+        original = pd.Series.value_counts
+
+        def reversed_ties(self, *args, **kwargs):
+            counted = original(self, *args, **kwargs)
+            order = sorted(range(len(counted)), key=lambda i: (-int(counted.iloc[i]), -i))
+            return counted.iloc[order]
+
+        expected = self._reference(self.BATTERY[name], dropna)
+        monkeypatch.setattr(pd.Series, "value_counts", reversed_ties)
+        pd.testing.assert_series_equal(value_counts(self.BATTERY[name], dropna=dropna), expected)
+
+    @pytest.mark.parametrize("name", sorted(BATTERY))
+    def test_repeated_calls_agree(self, name):
+        series = self.BATTERY[name]
+        first = value_counts(series, dropna=False)
+        for _ in range(3):
+            pd.testing.assert_series_equal(value_counts(series, dropna=False), first)
+
+    @pytest.mark.parametrize("name", sorted(BATTERY))
+    def test_the_input_is_not_modified(self, name):
+        series = self.BATTERY[name]
+        before = series.copy()
+        value_counts(series, dropna=False)
+        pd.testing.assert_series_equal(series, before)
+
+    def test_huge_integers_still_take_the_exact_path(self):
+        series = pd.Series([HUGE, 1, HUGE, 2, 1], dtype=object)
+        assert _as_pairs(value_counts(series)) == [(HUGE, 2), (1, 2), (2, 1)]
+
+    def test_one_is_not_the_string_one(self):
+        labels = list(value_counts(pd.Series([1, "1", 1, "1", 2], dtype=object)).index)
+        assert labels == [1, "1", 2]
+        assert type(labels[0]) is int and type(labels[1]) is str
+
+    def test_an_unmatchable_label_falls_back_to_the_exact_loop(self, monkeypatch):
+        """If the vectorised path cannot place a label, the loop decides; nothing is guessed."""
+        from aidatasetkit.core import counting
+
+        monkeypatch.setattr(counting, "_first_positions", lambda series, counted: None)
+        series = self.BATTERY["strings_tied"]
+        pd.testing.assert_series_equal(value_counts(series), self._reference(series, True))
