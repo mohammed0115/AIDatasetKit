@@ -178,10 +178,22 @@ def _choose(
     path: Path, sample: str, complete: bool, fmt: TableFormat, options: LoadOptions
 ) -> tuple[str, DelimiterSource, bool]:
     """The delimiter to use, how it was chosen, and whether the table is one column."""
-    if options.delimiter is not None:
-        return options.delimiter, DelimiterSource.EXPLICIT, False
-
     shapes = {delimiter: _shape(sample, complete, delimiter) for delimiter in SUPPORTED_DELIMITERS}
+
+    if options.delimiter is not None:
+        # An explicit delimiter skips detection, not validation. Named ',' for a
+        # file separated by ';' it would read one column of 'a;b;c' -- the very
+        # misread this module exists to prevent -- so that is refused.
+        chosen = shapes[options.delimiter]
+        others = [d for d in SUPPORTED_DELIMITERS if d != options.delimiter and shapes[d].consistent]
+        if chosen.single and others:
+            raise MalformedInputError(
+                f"{path.name} does not contain the requested delimiter "
+                f"{_NAMES[options.delimiter]}, but it is consistently separated by "
+                f"{_NAMES[others[0]]}. Reading it under {_NAMES[options.delimiter]} would "
+                "produce one column; pass the right delimiter, or omit it to detect."
+            )
+        return options.delimiter, DelimiterSource.EXPLICIT, False
 
     if fmt is TableFormat.TSV:
         tab = shapes["\t"]
