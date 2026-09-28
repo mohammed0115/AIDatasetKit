@@ -85,23 +85,27 @@ def _ties_in_order_of_appearance(series: pd.Series, counted: pd.Series) -> pd.Se
 
 
 def _first_positions(series: pd.Series, counted: pd.Series) -> np.ndarray | None:
-    """First row at which each of ``counted``'s labels appears, or ``None``.
+    """A key per label of ``counted`` that orders labels by first appearance, or ``None``.
 
-    Every missing value shares one position, the first missing row -- the same
-    single key the loop gives them. A label that never appears gets ``len(series)``.
-    ``None`` means some observed label could not be located, and the caller falls
-    back to the exact loop.
+    ``pd.factorize`` numbers distinct non-missing values in order of first
+    appearance, so the code itself is that order and no row position is needed.
+    Every missing value shares one key, placed after exactly the values that
+    appear before the first missing row: those are codes ``0 .. m - 1`` with
+    ``m = max(codes[:first_missing]) + 1``, because codes are handed out in
+    order. So a code below ``m`` keeps its value, missing gets ``m``, and any
+    later code moves up by one. A label that never appears sorts after all of
+    them. ``None`` means some observed label could not be located, and the
+    caller falls back to the exact loop.
     """
-    rows = len(series)
     try:
         codes, uniques = pd.factorize(series, use_na_sentinel=True)
-        present = codes >= 0
-        first_by_code = np.full(len(uniques), rows, dtype="int64")
-        if present.any():
-            found, first_index = np.unique(codes[present], return_index=True)
-            first_by_code[found] = np.flatnonzero(present)[first_index]
-        first_missing = int(np.argmax(~present)) if not present.all() else rows
-
+        missing_rows = codes < 0
+        if missing_rows.any():
+            first_missing = int(np.argmax(missing_rows))
+            before = codes[:first_missing]
+            m = int(before.max()) + 1 if first_missing else 0
+        else:
+            m = len(uniques)
         labels = counted.index
         where = pd.Index(uniques).get_indexer(labels)
         label_missing = np.asarray(pd.isna(labels), dtype=bool)
@@ -109,13 +113,12 @@ def _first_positions(series: pd.Series, counted: pd.Series) -> np.ndarray | None
         return None
 
     matched = where >= 0
-    unmatched = ~matched & ~label_missing & (counted.to_numpy() > 0)
-    if unmatched.any():
+    if (~matched & ~label_missing & (counted.to_numpy() > 0)).any():
         return None
-    first = np.full(len(labels), rows, dtype="int64")
-    first[matched] = first_by_code[where[matched]]
-    first[label_missing] = first_missing
-    return first
+    key = np.full(len(labels), len(uniques) + 1, dtype="int64")
+    key[matched] = where[matched] + (where[matched] >= m)
+    key[label_missing] = m
+    return key
 
 
 def _ties_by_python_loop(series: pd.Series, counted: pd.Series) -> pd.Series:
