@@ -7,10 +7,10 @@ G0_STATUS                    = PASS (16/16)
 G0_MAIN_INTEGRATION          = PASS
 GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
-OVERALL_CERTIFIED_PROGRESS   = 40.95%   (95 proven / 232 applicable, G0–G12)
+OVERALL_CERTIFIED_PROGRESS   = 43.97%   (102 proven / 232 applicable, G0–G12; updated after G1-W1, §0)
 AUDIT_GATE                   = PASS     (the audit is complete with evidence; G1–G12 are not)
 READY_FOR_G1_IMPLEMENTATION  = YES      (updated after G0.1: P0-1 closed; was NO at audit time, §9)
-NEXT_AUTHORIZED_ACTION       = owner authorisation of G1-W1 (G0.1 closed, §0)
+NEXT_AUTHORIZED_ACTION       = CTO review of G1-W1; G1-W2 not authorised (§0)
 ```
 
 **حدود هذا المستند:**
@@ -44,6 +44,14 @@ AUDIT_DOCUMENTS       = CORRECT
 - **بنود G11:** انتقلت أربعة بنود من `MISSING` إلى `PARTIAL`: G11-02، G11-04، G11-11، G11-21. **لم ينتقل أي بند إلى `SUPPORTED_AND_TESTED`**، لأن benchmark واحدًا وحراسة مسار واحد لا يغلقان فجوات الأداء.
 - **النسب:** G11 بقي 5/21 = 23.81%، والنسبة الكلية بقيت 95/232 = **40.95%**.
 - **G12-14:** خُفِّضت شدته من P0 إلى P1.
+
+**تحديث 3 — G1-W1 (ingestion foundation):**
+
+- **P0-2: CLOSED.** الإثبات في `docs/evidence/G1_W1_INGESTION_FOUNDATION_REPORT.md`.
+- **إلى `SUPPORTED_AND_TESTED`:** G1-02، G1-03، G1-18، G1-20، G1-21، G10-11، G10-24.
+- **إلى `PARTIAL`:** G1-13 (list/tuple of mappings فقط)، G1-17 (ترميزات صريحة فقط، بلا اكتشاف تلقائي).
+- **تغيّر الدليل دون الحالة:** G1-01، G1-19.
+- **النسب (من الجدول):** G1 = 10/26 = **38.46%**، G10 = 18/28 = **64.29%**، الكلي = 102/232 = **43.97%**.
 
 ## 1. Main integration
 
@@ -124,9 +132,9 @@ G0_MAIN_INTEGRATION = PASS
 
 | ID | Gate | Capability | Classification | Code Evidence | Test Evidence | Gap | Severity |
 |---|---|---|---|---|---|---|---|
-| G1-01 | G1 | CSV, comma-delimited, UTF-8 (CLI) | `SUPPORTED_AND_TESTED` | cli/main.py::_audit `pd.read_csv(path)` | tests/integration/test_audit_end_to_end.py (TestTheConsoleCommand, golden) | — | — |
-| G1-02 | G1 | CSV delimiter detection (`;`, tab) | `MISSING` | cli/main.py: `read_csv` with pandas' default `,` | probe_ingestion.py (exploratory): `a;b;label` -> 1 column, exit 0 | Silent misread: audit succeeds on a wrong table | P0 |
-| G1-03 | G1 | TSV | `MISSING` | cli/main.py: suffix check refuses `.tsv` | probe_ingestion.py (exploratory): exit 1 'not supported yet' | No reader | P1 |
+| G1-01 | G1 | CSV, comma-delimited, UTF-8 (CLI) | `SUPPORTED_AND_TESTED` | ingestion.load_table (G1-W1; was cli `pd.read_csv(path)`) | tests/integration/test_audit_end_to_end.py (golden), tests/integration/test_cli_ingestion.py | — | — |
+| G1-02 | G1 | CSV delimiter detection (`,` `;` tab `\|`) | `SUPPORTED_AND_TESTED` | ingestion/delimited.py::_choose (G1-W1): csv strict on a 64 KiB sample, ambiguity refused, explicit delimiter validated | tests/unit/test_ingestion.py::TestDelimiterDetection, tests/integration/test_cli_ingestion.py; scripts/ingestion_mutations.py (1–3) | Closed P0-2 | — |
+| G1-03 | G1 | TSV | `SUPPORTED_AND_TESTED` | ingestion/formats.py + delimited.py (G1-W1) | tests/unit/test_ingestion.py::TestTsv, tests/integration/test_cli_ingestion.py::test_every_supported_layout | — | — |
 | G1-04 | G1 | XLSX | `MISSING` | no reader | probe_ingestion.py (exploratory): refused | No reader | P1 |
 | G1-05 | G1 | XLS | `MISSING` | no reader | probe_ingestion.py (exploratory): refused | No reader | P2 |
 | G1-06 | G1 | Parquet | `MISSING` | no reader | probe_ingestion.py (exploratory): refused | No reader | P1 |
@@ -136,15 +144,15 @@ G0_MAIN_INTEGRATION = PASS
 | G1-10 | G1 | XML | `MISSING` | no reader | probe_ingestion.py (exploratory): refused | No reader | P3 |
 | G1-11 | G1 | YAML | `MISSING` | no reader; PyYAML not a dependency | probe_ingestion.py (exploratory): refused | No reader | P3 |
 | G1-12 | G1 | pandas DataFrame in memory (Python API) | `SUPPORTED_AND_TESTED` | DataProfiler.profile, DataQualityInspector.inspect, AIDataFacade.load | tests/unit/test_profiler.py, test_quality.py, integration/test_facade.py | — | — |
-| G1-13 | G1 | list of dicts / records / iterables | `MISSING` | profiler.py:95 raises ValidationError for non-DataFrame | probe_profile_perf.py: `ValidationError: A pandas DataFrame is required, got list.` | No adapter | P1 |
+| G1-13 | G1 | list of dicts / records / iterables | `PARTIAL` | ingestion/loader.py::_from_records (G1-W1): list or tuple of mappings | tests/unit/test_ingestion.py::TestRecords | Generators and other iterables refused (`UnsupportedFormatError`); not reachable from AIDataFacade.load | P2 |
 | G1-14 | G1 | SQLite | `MISSING` | no reader | — | No reader | P2 |
 | G1-15 | G1 | PostgreSQL / SQLAlchemy / query results | `MISSING` | no reader; no DB dependency | — | No reader; connection handling undecided | P2 |
 | G1-16 | G1 | Document extraction (TXT, Markdown, HTML, PDF, DOCX) | `OUT_OF_SCOPE` | no reader, by design of a tabular library | probe_ingestion.py (exploratory): all refused | Belongs upstream (MWIE/connectors): extract to a table first | — |
-| G1-17 | G1 | Non-UTF-8 encodings / encoding detection | `MISSING` | read_csv without `encoding=` | probe_ingestion.py (exploratory): latin-1 -> `UnicodeDecodeError`, exit 1 | No detection, no encoding option, raw error text | P1 |
-| G1-18 | G1 | UTF-8 with BOM | `SUPPORTED_NOT_SUFFICIENTLY_TESTED` | pandas strips the BOM | probe_ingestion.py (exploratory): header `a` read correctly; no test | Behaviour untested | P3 |
-| G1-19 | G1 | Duplicate header detection | `SUPPORTED_AND_TESTED` | cli/main.py raw-header check | tests/integration/test_audit_end_to_end.py::test_duplicate_headers_are_refused_rather_than_renamed | — | — |
-| G1-20 | G1 | Empty input | `PARTIAL` | pandas EmptyDataError surfaces as exit 1; header-only accepted | probe_ingestion.py (exploratory): empty -> `EmptyDataError: No columns to parse` | No library error type; header-only file produces an audit of zero rows | P2 |
-| G1-21 | G1 | Malformed rows | `PARTIAL` | pandas ParserError surfaces via CLI catch-all | probe_ingestion.py (exploratory): `ParserError: ... Expected 2 fields in line 3` | Raw pandas message; no row-level report, no tolerant mode | P1 |
+| G1-17 | G1 | Non-UTF-8 encodings / encoding detection | `PARTIAL` | LoadOptions.encoding (G1-W1): utf-8, utf-8-sig, latin-1, cp1256 when named; `EncodingError` otherwise | tests/unit/test_ingestion.py::TestEncodings, tests/integration/test_cli_ingestion.py::test_cp1256_is_read_when_named | Explicit encodings SUPPORTED_AND_TESTED; automatic detection not implemented (by decision) | P2 |
+| G1-18 | G1 | UTF-8 with BOM | `SUPPORTED_AND_TESTED` | delimited.plan_delimited: BOM → utf-8-sig with a warning (G1-W1) | tests/unit/test_ingestion.py::TestEncodings::test_a_utf8_byte_order_mark_is_honoured | — | — |
+| G1-19 | G1 | Duplicate header detection | `SUPPORTED_AND_TESTED` | delimited._validate (moved from cli in G1-W1); loader._from_dataframe | tests/unit/test_ingestion.py::test_duplicate_headers_before_pandas_renames_them, test_audit_end_to_end.py::test_duplicate_headers_are_refused_rather_than_renamed | — | — |
+| G1-20 | G1 | Empty input | `SUPPORTED_AND_TESTED` | `EmptyInputError` for 0 bytes, whitespace, header-only, empty frame/records (G1-W1) | tests/unit/test_ingestion.py::TestRefusals, TestDataFrames, TestRecords; tests/integration/test_cli_ingestion.py::test_structured_refusals | — | — |
+| G1-21 | G1 | Malformed rows | `SUPPORTED_AND_TESTED` | delimited._validate: every record's width, strict quoting; `MalformedInputError` names the record and line (G1-W1) | tests/unit/test_ingestion.py::TestRefusals (too few/many fields, after the sample, unclosed quote); tests/integration/test_cli_ingestion.py | No tolerant/skip mode, by design: refuse | — |
 | G1-22 | G1 | Type inference incl. dates from text | `PARTIAL` | core/schema.py detects DATETIME only for datetime64 dtype | probe_ingestion.py (exploratory): ISO dates in CSV -> `categorical`, dtype object | Dates never inferred from files | P1 |
 | G1-23 | G1 | Row/column counts and memory estimate | `SUPPORTED_AND_TESTED` | DatasetProfile.row_count/column_count/memory_usage_bytes | tests/unit/test_profiler.py | — | — |
 | G1-24 | G1 | Excel sheets | `MISSING` | no spreadsheet reader | — | No reader | P2 |
@@ -289,7 +297,7 @@ G0_MAIN_INTEGRATION = PASS
 | G10-08 | G10 | Hashes and run ids | `SUPPORTED_AND_TESTED` | fingerprints; publication run_id and manifest | test_publication.py | — | — |
 | G10-09 | G10 | Single error hierarchy | `SUPPORTED_AND_TESTED` | core/exceptions.AIDatasetKitError | test_exceptions.py | — | — |
 | G10-10 | G10 | Unsupported-format error | `PARTIAL` | CLI message + exit 1 | tests/integration/test_audit_end_to_end.py | No exception type for library callers | P2 |
-| G10-11 | G10 | Malformed-input error | `PARTIAL` | raw pandas ParserError via CLI catch-all | probe_ingestion.py (exploratory) | Not a library error | P1 |
+| G10-11 | G10 | Malformed-input error | `SUPPORTED_AND_TESTED` | `MalformedInputError`/`AmbiguousDelimiterError` under `IngestionError` (G1-W1) | tests/unit/test_ingestion.py::TestTheErrorContract, tests/integration/test_cli_ingestion.py::test_structured_refusals | — | — |
 | G10-12 | G10 | Schema errors | `SUPPORTED_AND_TESTED` | SchemaError | test_facade.py, test_training_and_comparison.py | — | — |
 | G10-13 | G10 | Data-quality blocking (BLOCKED verdict) | `SUPPORTED_AND_TESTED` | evidence/policy.decide_verdict; facade refuses | test_facade.py, test_audit_end_to_end.py | — | — |
 | G10-14 | G10 | Resource-limit error | `MISSING` | — | — | None | P1 |
@@ -302,7 +310,7 @@ G0_MAIN_INTEGRATION = PASS
 | G10-21 | G10 | Spreadsheet formulas | `NOT_APPLICABLE` | no spreadsheet output | probe: formula text inert in HTML | Becomes applicable with CSV/Excel export | — |
 | G10-22 | G10 | No external links in the report | `SUPPORTED_AND_TESTED` | standalone HTML | test_it_is_a_standalone_page_with_no_external_requests | — | — |
 | G10-23 | G10 | Oversized inputs | `MISSING` | — | — | None | P1 |
-| G10-24 | G10 | Malformed files | `PARTIAL` | refused with pandas' message | probe_ingestion.py (exploratory) | No hardened reader | P1 |
+| G10-24 | G10 | Malformed files | `SUPPORTED_AND_TESTED` | CSV/TSV (the only formats read): binary/NUL, UTF-16, broken quoting, ragged rows, undecodable bytes refused (G1-W1) | tests/unit/test_ingestion.py::TestRefusals | Other formats are not read at all | — |
 | G10-25 | G10 | Sensitive data in logs | `SUPPORTED_NOT_SUFFICIENTLY_TESTED` | NullHandler; logs carry exc_info only | no test | Unverified | P3 |
 | G10-26 | G10 | Secret handling | `NOT_APPLICABLE` | the library handles no secrets | — | — | — |
 | G10-27 | G10 | HTML escaping | `SUPPORTED_AND_TESTED` | report._escape (html.escape) | test_evidence_artifact.py:505 | — | — |
@@ -351,12 +359,13 @@ G0_MAIN_INTEGRATION = PASS
 
 | الصيغة | القراءة | الدليل |
 |---|---|---|
-| CSV (`,`، UTF-8، مع BOM أو بدونه) | `SUPPORTED_AND_TESTED` عبر CLI (BOM: `SUPPORTED_NOT_SUFFICIENTLY_TESTED`) | e2e، probe |
-| CSV بفاصل `;` أو tab | **يُقرأ خطأً دون تحذير**، كعمود واحد، وexit 0 | probe: `['a;b;label']` |
-| CSV بترميز غير UTF-8 | يرفض بـ`UnicodeDecodeError` خام | probe |
-| TSV، XLSX، XLS، Parquet، Feather، JSON، JSONL، XML، YAML | `MISSING`: يرفضها CLI برسالة «not supported yet» | probe |
+| CSV (`,`، UTF-8، مع BOM أو بدونه) | `SUPPORTED_AND_TESTED` عبر `load_table` وCLI (G1-W1) | test_ingestion، e2e |
+| CSV بفاصل `;` أو tab أو `\|` | `SUPPORTED_AND_TESTED` (G1-W1)؛ كان يُقرأ خطأً (P0-2، مغلق) | test_ingestion، test_cli_ingestion |
+| CSV بترميز غير UTF-8 | utf-8-sig/latin-1/cp1256 عند التسمية: `SUPPORTED_AND_TESTED`؛ غير ذلك `EncodingError`؛ لا اكتشاف تلقائي | test_ingestion |
+| TSV | `SUPPORTED_AND_TESTED` (G1-W1) | test_ingestion |
+| XLSX، XLS، Parquet، Feather، JSON، JSONL، XML، YAML | `MISSING`: يرفضها CLI برسالة «not supported yet» | probe |
 | DataFrame في الذاكرة | `SUPPORTED_AND_TESTED` | tests |
-| list of dicts / records | `MISSING`: `ValidationError` | probe |
+| list of dicts / records | `PARTIAL` (G1-W1): list/tuple of mappings عبر `load_table` | test_ingestion |
 | SQLite، PostgreSQL، SQLAlchemy | `MISSING` | — |
 | TXT، MD، HTML، PDF، DOCX | `OUT_OF_SCOPE`: استخراج قبل المكتبة | — |
 
@@ -443,7 +452,7 @@ G0_MAIN_INTEGRATION = PASS
    - في عمود رقمي متصل كل القيم متعادلة، فيصبح كل عمود من هذا النوع مسار O(n) بطيئًا.
    - لم يلتقطه أي اختبار، لعدم وجود حماية أداء (G11).
    - معايير G0 الـ16 لم تشمل الأداء، لذلك يبقى G0 = PASS بمعاييره. لكن هذا عيب حقيقي في الكود المعتمد، ويُسجَّل هنا ولا يُخفى.
-2. **P0-2: قراءة CSV خاطئة بصمت.**
+2. **P0-2: قراءة CSV خاطئة بصمت.** **الحالة: CLOSED في G1-W1** (انظر §0 و`G1_W1_INGESTION_FOUNDATION_REPORT.md`).
    - ملف مفصول بـ`;` أو tab ويحمل امتداد `.csv` يُقرأ عمودًا واحدًا، ويُنتج audit كاملًا بـexit 0.
    - لمكتبة غرضها إنتاج الأدلة، هذا دليل خاطئ دون أي إشارة.
    - يقع داخل نطاق G1.
@@ -547,7 +556,7 @@ G0_MAIN_INTEGRATION = PASS
 |---|---|---:|---:|---:|---|---|
 | G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
 | G0.1 | Profiling performance hotfix | — | — | — | PASS | P0-1 مغلق (انظر §0) |
-| G1 | Ingestion | 5 | 26 | 19.23% | AUDIT | الموجة 1 بعد G0.1 (الـroadmap) |
+| G1 | Ingestion | 10 | 26 | 38.46% | IN PROGRESS | W1 مغلقة؛ W2 تنتظر مراجعة CTO |
 | G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | تواريخ ونص وقيم |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | عمليات جدولية |
 | G4 | EDA & Statistics | 9 | 13 | 69.23% | AUDIT | ارتباط فئوي واختبارات |
@@ -556,17 +565,17 @@ G0_MAIN_INTEGRATION = PASS
 | G7 | Multi-dataset & Schema | 0 | 13 | 0.00% | AUDIT | بعد G1 وG3 |
 | G8 | Visualization & Reporting | 15 | 23 | 65.22% | AUDIT | line/time series وتصدير |
 | G9 | AI-ready Context | 8 | 12 | 66.67% | AUDIT | أقسام context |
-| G10 | Provenance/Security/Privacy/Errors | 16 | 28 | 57.14% | AUDIT | أخطاء الموارد والمدخلات |
+| G10 | Provenance/Security/Privacy/Errors | 18 | 28 | 64.29% | AUDIT | أخطاء الموارد والمدخلات |
 | G11 | Performance & Certification | 5 | 21 | 23.81% | AUDIT | 4 بنود MISSING→PARTIAL في G0.1؛ benchmarks في CI |
 | G12 | Masari Consumer Integration | 2 | 14 | 14.29% | AUDIT | بعد G1–G9 |
-| **All** | G0–G12 | **95** | **232** | **40.95%** | — | — |
+| **All** | G0–G12 | **102** | **232** | **43.97%** | — | — |
 
 **تفصيل الحالات لكل بوابة** (حتى لا يختفي العمل الموجود غير المكتمل):
 
 | Gate | SUPPORTED_AND_TESTED | SUPPORTED_NOT_SUFFICIENTLY_TESTED | PARTIAL | MISSING | BLOCKED | NOT_APPLICABLE | OUT_OF_SCOPE |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | G0 | 16 | 0 | 0 | 0 | 0 | 0 | 0 |
-| G1 | 5 | 1 | 3 | 17 | 0 | 0 | 1 |
+| G1 | 10 | 0 | 3 | 13 | 0 | 0 | 1 |
 | G2 | 15 | 0 | 2 | 5 | 0 | 0 | 0 |
 | G3 | 2 | 0 | 5 | 10 | 0 | 1 | 0 |
 | G4 | 9 | 0 | 2 | 2 | 0 | 0 | 0 |
@@ -575,7 +584,7 @@ G0_MAIN_INTEGRATION = PASS
 | G7 | 0 | 0 | 4 | 9 | 0 | 0 | 0 |
 | G8 | 15 | 0 | 1 | 7 | 0 | 0 | 0 |
 | G9 | 8 | 1 | 2 | 1 | 0 | 0 | 0 |
-| G10 | 16 | 4 | 6 | 2 | 0 | 3 | 0 |
+| G10 | 18 | 4 | 4 | 2 | 0 | 3 | 0 |
 | G11 | 5 | 0 | 6 | 10 | 0 | 0 | 0 |
 | G12 | 2 | 0 | 7 | 5 | 0 | 1 | 0 |
 

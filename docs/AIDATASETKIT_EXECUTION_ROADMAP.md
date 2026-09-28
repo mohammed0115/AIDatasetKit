@@ -18,7 +18,7 @@
 
 ---
 
-## G0.1 — Hotfix قبل G1 (مقترح، غير مُفوَّض)
+## G0.1 — Hotfix قبل G1 (**منجز: PASS**، انظر `docs/evidence/G0_1_PROFILING_PERFORMANCE_HOTFIX_REPORT.md`)
 
 | البند | المحتوى |
 |---|---|
@@ -33,7 +33,7 @@
 
 ---
 
-## G1 — Ingestion (اليوم 19.23%: 5 من 26)
+## G1 — Ingestion (بعد G1-W1: 38.46%، 10 من 26؛ كان 19.23%)
 
 **Objective:** إدخال عام وآمن للجداول، مع كشف صريح لبنية الملف، ودون أي قراءة صامتة خاطئة.
 
@@ -41,8 +41,8 @@
 
 **Gaps:**
 
-- **P0-2:** فاصل غير `,` يُقرأ خطأً دون تحذير.
-- **P1:** ترميزات غير UTF-8؛ الأسطر المشوهة؛ TSV وXLSX وParquet وJSON/JSONL؛ records؛ استنتاج التواريخ؛ حدود الموارد؛ chunking.
+- ~~**P0-2:** فاصل غير `,` يُقرأ خطأً دون تحذير.~~ **مغلق في G1-W1.**
+- **P1:** XLSX وParquet وJSON/JSONL؛ استنتاج التواريخ؛ حدود الموارد؛ chunking. (الترميزات الصريحة والأسطر المشوهة وTSV وrecords أُنجزت في G1-W1؛ اكتشاف الترميز التلقائي غير مخطط.)
 - **P2:** XLS وsheets وFeather وSQLite وPostgreSQL.
 - **P3:** XML وYAML.
 - المستندات: `OUT_OF_SCOPE`.
@@ -51,8 +51,8 @@
 
 | Wave | المحتوى | Depends | Complexity |
 |---|---|---|---|
-| G1-W1 | حزمة `aidatasetkit.ingestion` (طبقة فوق `core`): `load_table(path \| frame \| records, *, options) -> LoadedTable(frame, metadata)`. metadata فيها الصيغة، والترميز، والفاصل، والرأس، والصفوف والأعمدة، والذاكرة، والتحذيرات. CSV مع كشف الفاصل (رفض صريح عند الغموض)، وترميز صريح، وTSV، وrecords (list of dicts). خطأ منظم لكل من الصيغة غير المدعومة والمدخل المشوه والمدخل الفارغ. CLI يستخدم الطبقة الجديدة | G0.1 | M |
-| G1-W2 | حدود موارد مُعلَنة (bytes، rows، columns) وخطأ `ResourceLimitError`؛ استنتاج التواريخ من النص بسياسة معلنة، دون تخمين صامت | W1 | M |
+| G1-W1 ✅ **منجزة** (`docs/evidence/G1_W1_INGESTION_FOUNDATION_REPORT.md`) | حزمة `aidatasetkit.ingestion` (طبقة فوق `core`): `load_table(path \| frame \| records, *, options) -> LoadedTable(frame, metadata)`. metadata فيها الصيغة، والترميز، والفاصل، والرأس، والصفوف والأعمدة، والذاكرة، والتحذيرات. CSV مع كشف الفاصل (رفض صريح عند الغموض)، وترميز صريح، وTSV، وrecords (list of dicts). خطأ منظم لكل من الصيغة غير المدعومة والمدخل المشوه والمدخل الفارغ. CLI يستخدم الطبقة الجديدة | G0.1 | M |
+| G1-W2 (غير مُفوَّضة؛ تنتظر مراجعة CTO) | حدود موارد مُعلَنة (bytes، rows، columns) وخطأ `ResourceLimitError`؛ استنتاج التواريخ من النص بسياسة معلنة، دون تخمين صامت | W1 | M |
 | G1-W3 | Parquet وFeather (pyarrow كـextra اختياري)؛ JSON وJSONL | W1 | M |
 | G1-W4 | XLSX (openpyxl كـextra) مع sheets واختيار صريح للـsheet؛ رفض ملفات الماكرو | W1 | M |
 | G1-W5 | chunked profiling للملفات الكبيرة أو sampling مُعلَن، مسجّل في الـartifact | W2 | L |
