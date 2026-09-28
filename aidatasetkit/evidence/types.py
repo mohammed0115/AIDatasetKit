@@ -42,10 +42,16 @@ __all__ = [
     "Verdict",
 ]
 
-#: Version of the artifact *format*, not of the library. Bumped only when the
-#: shape or meaning of a recorded field changes, so a stored artifact can always
-#: be read against the contract it was written against.
-ARTIFACT_SCHEMA_VERSION = "1.0"
+#: Version of the artifact *format*, not of the library. Bumped whenever the
+#: shape or meaning of the record changes -- a field added, removed or redefined
+#: -- so a stored artifact can always be read against the contract it was written
+#: against. An additive change is a minor bump, anything else a major one.
+#: ``lineage.json`` carries the same version. The publication layout
+#: (``runs/<run_id>`` and ``CURRENT``) is versioned separately.
+#:
+#: 1.0 -- the first published contract.
+#: 1.1 -- G1-W1: the top-level ``ingestion`` record.
+ARTIFACT_SCHEMA_VERSION = "1.1"
 
 
 class EvidenceSource(StrEnum):

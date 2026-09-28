@@ -887,9 +887,9 @@
       "scikit_learn": "1.9.0",
       "scipy": "1.18.0"
     },
-    "semantic_fingerprint": "007838931330c91af0d430a3e90c8b5c98305f76d1f482a511302939d85e2c71"
+    "semantic_fingerprint": "3e93dd5e11b75f51d99c16bee263723627b4f93bebeb10c31e2bf31c92ed6be0"
   },
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "stage": "prepared",
   "target": {
     "class_counts": {

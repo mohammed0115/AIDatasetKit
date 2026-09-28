@@ -46,6 +46,16 @@ built from a frame, so its record is ``null``: the key is the whole change. The
 schema version stays 1.0 by the same rule as before -- a field was added, none
 changed shape or meaning -- and an artifact written before this step is
 recognisable by the absent key.
+
+**G1-W1 closure -- artifact schema 1.0 to 1.1.** The paragraph above is the
+reasoning that shipped, and it was wrong: a new top-level key changes the shape
+of the record, and the contract is that a change of shape is identifiable from
+``schema_version`` alone, without comparing fingerprints. The version is now
+1.1, a minor bump because the change is additive. It is its own step rather than
+a rewrite of the previous one, because an artifact with ``ingestion`` and schema
+1.0 was published on ``main`` (90ecfae) and has to stay explicable. Nothing else
+moved: undoing the step is setting the version back, and that alone reproduces
+the previous identity.
 """
 
 from __future__ import annotations
@@ -96,6 +106,10 @@ def _restore_threshold(name: str, value: object) -> Callable[[dict], None]:
 
 def _rollback_ingestion(semantic: dict) -> None:
     del semantic["ingestion"]
+
+
+def _rollback_schema_1_1(semantic: dict) -> None:
+    semantic["schema_version"] = "1.0"
 
 
 def _rollback_threshold(name: str) -> Callable[[dict], None]:
@@ -152,6 +166,12 @@ CHAIN: tuple[Step, ...] = (
         before="0f0fd1d5e9785d46351d7d28dc15d2d4eda4cc7fbc54bf0509a2a76eb3b471a5",
         after="007838931330c91af0d430a3e90c8b5c98305f76d1f482a511302939d85e2c71",
         rollback=_rollback_ingestion,
+    ),
+    Step(
+        "G1-W1 closure: artifact schema 1.0 -> 1.1",
+        before="007838931330c91af0d430a3e90c8b5c98305f76d1f482a511302939d85e2c71",
+        after="3e93dd5e11b75f51d99c16bee263723627b4f93bebeb10c31e2bf31c92ed6be0",
+        rollback=_rollback_schema_1_1,
     ),
 )
 
@@ -280,8 +300,51 @@ class TestTheIngestionStep:
 
     def test_nothing_but_the_key_moved(self):
         stored = _stored()
+        _rollback_schema_1_1(stored)
         del stored["ingestion"]
-        assert config_fingerprint(stored) == CHAIN[-2].after
+        assert config_fingerprint(stored) == _step("G1-W1 ingestion").before
+
+
+def _step(prefix: str) -> Step:
+    (step,) = [step for step in CHAIN if step.name.startswith(prefix)]
+    return step
+
+
+class TestTheSchemaStep:
+    """The version says what the record is, without comparing fingerprints."""
+
+    def test_the_current_code_writes_1_1(self, semantic):
+        from aidatasetkit.evidence import ARTIFACT_SCHEMA_VERSION
+
+        assert semantic["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.1"
+
+    def test_the_fixture_declares_1_1(self):
+        assert _stored()["schema_version"] == "1.1"
+
+    def test_setting_the_version_back_reproduces_the_intermediate_artifact(self):
+        """The 1.0-with-ingestion artifact that 90ecfae published."""
+        stored = _stored()
+        _rollback_schema_1_1(stored)
+        assert "ingestion" in stored
+        assert config_fingerprint(stored) == _step("G1-W1 ingestion").after
+
+    def test_then_removing_the_key_reproduces_the_pre_g1_artifact(self):
+        stored = _stored()
+        _rollback_schema_1_1(stored)
+        del stored["ingestion"]
+        assert config_fingerprint(stored) == _step("G1-W1 ingestion").before
+
+    def test_only_the_version_moved(self):
+        """Data, findings, decisions and lineage are what they were in 1.0."""
+        current, previous = _stored(), _stored()
+        _rollback_schema_1_1(previous)
+        changed = {key for key in current if current[key] != previous[key]}
+        assert changed == {"schema_version"}
+
+    def test_a_1_0_artifact_is_recognisable_as_the_older_contract(self):
+        older = _stored()
+        _rollback_schema_1_1(older)
+        assert older["schema_version"] == "1.0" != _stored()["schema_version"]
 
 
 class TestTheCvFoldsStep:
@@ -308,8 +371,15 @@ class TestTheMulticollinearityStep:
         assert "possible_multicollinearity" not in codes
         assert "multicollinearity_not_assessed" not in codes
 
-    def test_the_schema_version_did_not_move(self, semantic):
-        assert semantic["schema_version"] == "1.0"
+    def test_the_schema_version_did_not_move(self):
+        """At this step, not today: the G1-W1 closure moved it to 1.1 later."""
+        older = _stored()
+        for step in reversed(CHAIN):
+            before = older["schema_version"]
+            step.rollback(older)
+            if step.name.startswith("G0 multicollinearity"):
+                assert before == older["schema_version"] == "1.0"
+                break
 
     def test_an_older_artifact_is_recognisable(self):
         """A reader holding a pre-G0 artifact can tell, from the file alone."""

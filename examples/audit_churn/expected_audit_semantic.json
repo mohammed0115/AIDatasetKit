@@ -876,7 +876,7 @@
     "task_type": "classification"
   },
   "plan_fingerprint": "90b978c9c9dc745a9a9d0d0f8f0143ca",
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "stage": "prepared",
   "target": {
     "class_counts": {
