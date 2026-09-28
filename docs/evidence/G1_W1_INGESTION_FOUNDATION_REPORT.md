@@ -1,0 +1,245 @@
+# G1-W1 — Ingestion Foundation: تقرير الدليل
+
+```text
+AUTHORIZED_WAVE        = G1-W1
+G1_W1_STATUS           = PASS (branch CI 10/10؛ main CI يُسجَّل في الرد النهائي بعد الـfast-forward)
+PRE_WAVE_MAIN_SHA      = 69303b35e30c8dda1b51490360e65bc22ff920ed
+BRANCH                 = g1-w1-ingestion
+TESTED_BRANCH_SHA      = 4d0eb6c2a23014ee7600a184224b51f8ca539052 (آخر commit كود/اختبار/وثائق قبل هذا التقرير)
+POST_WAVE_SHA          = commit هذا التقرير (رأس الفرع عند الدمج؛ مسجل في الرد النهائي)
+FINAL_MAIN_SHA         = يساوي POST_WAVE_SHA بعد fast-forward فقط
+P0-2                   = CLOSED
+G1                     = 10/26 = 38.46%   (كان 5/26 = 19.23%)
+OVERALL                = 102/232 = 43.97% (كان 95/232 = 40.95%)
+G1_W2_AUTHORIZATION    = NO_GO_PENDING_CTO_REVIEW
+```
+
+## 1. النطاق
+
+- **منفّذ:** `aidatasetkit.ingestion` كسلطة القراءة الوحيدة: CSV وTSV وpandas.DataFrame وlist/tuple of mappings.
+- **لم يُنفَّذ (بقرار):** اكتشاف الترميز التلقائي، حدود الموارد، استنتاج التواريخ، chunking، JSON/JSONL، Parquet/Feather، XLS/XLSX، SQLite/PostgreSQL، XML/YAML، URLs، HTTP، scraping، MWIE، Masari.
+- `AIDataFacade.load()` لم يُوسَّع.
+- لا اعتماد جديد: المكتبة تستخدم `csv` و`codecs` من stdlib، وpandas الموجود أصلاً.
+
+## 2. Commits
+
+| SHA | الرسالة |
+|---|---|
+| `5759522` | feat(ingestion): add typed table loading contracts |
+| `b8065c3` | feat(ingestion): detect and validate delimited text; load frames and records |
+| `6353985` | feat(evidence): record how the audited table was read |
+| `ed91a89` | feat(cli): route table loading through ingestion |
+| `2c46646` | fix(ingestion): validate an explicit delimiter against the content |
+| `bd87aab` | test(ingestion): cover delimiters encodings and malformed inputs |
+| `312668a` | perf(ingestion): benchmark load_table against a bare read_csv |
+| `2c27926` | docs(ingestion): document what is read, how, and the code path |
+| `4d0eb6c` | docs(audit): record G1-W1 in the capability audit and roadmap |
+
+`2c46646` إصلاح لعيب وجدته أثناء التطوير: فاصل صريح `,` على ملف مفصول بـ`;` كان
+يُقرأ عموداً واحداً، أي P0-2 نفسه عبر باب آخر. لم يُدمج قبل إصلاحه.
+
+## 3. تصميم الـAPI
+
+```python
+from pathlib import Path
+from aidatasetkit.ingestion import load_table, LoadOptions
+
+loaded = load_table(Path("data.csv"), options=LoadOptions(encoding="cp1256", delimiter=None, header=True))
+loaded.frame      # pandas.DataFrame
+loaded.metadata   # LoadMetadata (frozen) -> .to_dict()
+```
+
+- **المصادر المقبولة:** `os.PathLike` (امتداد `.csv`/`.tsv`)، `pandas.DataFrame`، `list`/`tuple` of `Mapping`.
+- **مرفوض:** `str` و`bytes` (غموض مسار/محتوى/رابط)؛ أي نوع آخر → `UnsupportedFormatError`.
+- **`LoadOptions`:** frozen، يُتحقق منه عند الإنشاء (`InvalidIngestionOptionsError`). الأسماء البديلة (`utf8`, `latin1`, `iso-8859-1`) تُحوَّل إلى اسمها القانوني عبر `codecs.lookup`.
+- **`LoadMetadata`:** `source_kind`, `format`, `encoding`, `delimiter`, `delimiter_source`, `header`, `row_count`, `column_count`, `memory_bytes`, `warnings`. ما لا ينطبق = `None`. لا مسار ولا قيم خلايا.
+- **DataFrame:** يُعاد الكائن نفسه (`loaded.frame is frame`) دون تعديل، ويُرفض الفارغ والمكرر الأعمدة، ولا profiling.
+- **records:** الأعمدة = اتحاد المفاتيح بترتيب أول ظهور؛ المفتاح الغائب = خلية ناقصة + تحذير بعدد السجلات؛ المفاتيح غير النصية والعناصر غير Mapping مرفوضة؛ المدخل لا يتغير.
+
+## 4. خوارزمية اكتشاف الفاصل (`ingestion/delimited.py`)
+
+1. **Probe** أول 64 KiB بايت: 0 بايت → `EmptyInputError`؛ NUL → `MalformedInputError` (ثنائي/UTF-16)؛ BOM مع `utf-8` → `utf-8-sig` + تحذير.
+2. **Sample** أول `SAMPLE_CHARS = 64 KiB` حرف بعد الفك. إن لم تكن العيّنة الملف كله يُحذف آخر سجل (قد يكون مقطوعاً)، وخطأ اقتباس في نهايتها لا يُعد عيباً.
+3. لكل فاصل من `, ; \t |`: `csv.reader(strict=True)` على العيّنة → عرض كل سجل غير فارغ. **مؤهَّل** = كل السجلات بعرض واحد ≥ 2.
+4. القرار:
+   - فاصل صريح: يُستخدم، إلا إذا كان الملف تحته عموداً واحداً وفاصل آخر مؤهَّل → `MalformedInputError`.
+   - `.tsv`: tab مؤهَّل → `format`؛ tab عمود واحد وفاصل آخر مؤهَّل → `MalformedInputError`؛ tab عمود واحد فقط → عمود واحد + تحذير.
+   - `.csv`: مؤهَّل واحد → `detected`؛ أكثر → `AmbiguousDelimiterError` بعدد الأعمدة لكل مرشح؛ الكل عمود واحد → عمود واحد + تحذير و`delimiter=None`؛ الكل مكسور الاقتباس → `MalformedInputError`؛ غير ذلك → `MalformedInputError` (حقول غير متسقة).
+5. **Validate** تمريرة كاملة متدفقة بـ`csv` تحت الفاصل المختار: كل سجل بعرض السجل الأول (السطر الفارغ تماماً يُتجاهل كما في pandas؛ سطر مسافات في جدول متعدد الأعمدة يُرفض)، العناوين المكررة → `DuplicateHeadersError`، عنوان بلا صفوف → `EmptyInputError`، بايت لا يُفك → `EncodingError`.
+6. **Parse** `pd.read_csv(sep, encoding, header)` مرة واحدة، ثم مطابقة عدد الصفوف والأعمدة مع خطوة التحقق؛ الاختلاف → `MalformedInputError`.
+
+**الحتمية:** لا عشوائية ولا اعتماد على المنصة؛ ترتيب المرشحين ثابت (`SUPPORTED_DELIMITERS`). `test_detection_is_deterministic` واختبارات CI على Windows وLinux.
+
+**الكلفة:** عيّنة محدودة + تمريرتان كاملتان (csv ثم pandas). انظر §10.
+
+## 5. عقد الترميز
+
+| الترميز | السلوك |
+|---|---|
+| `utf-8` | الافتراضي؛ مع BOM يُقرأ كـ`utf-8-sig` + تحذير |
+| `utf-8-sig` | عند الطلب |
+| `latin-1` | عند الطلب |
+| `cp1256` | عند الطلب (عربي Windows) |
+| أي ترميز آخر (UTF-16، cp1252، …) | `InvalidIngestionOptionsError` عند إنشاء `LoadOptions` |
+| بايت لا يُفك | `EncodingError` مع offset، وليس `UnicodeDecodeError` |
+
+`AUTO_ENCODING_DETECTION = NO`.
+
+## 6. أنواع الأخطاء (`core/exceptions.py`)
+
+كلها تحت `IngestionError(AIDatasetKitError)`، ومتوافقة مع الفئات القائمة:
+
+| الخطأ | يرث أيضاً |
+|---|---|
+| `InputNotFoundError` | — |
+| `UnsupportedFormatError` | — |
+| `InvalidIngestionOptionsError` | `ConfigurationError` |
+| `EncodingError` | — |
+| `MalformedInputError` | — |
+| `AmbiguousDelimiterError` | `MalformedInputError` |
+| `EmptyInputError` | `EmptyDataError` |
+| `DuplicateHeadersError` | `SchemaError` |
+
+الـCLI: كل `IngestionError` → سطر واحد `error: TypeName: message` على stderr، exit 1، بلا traceback (إلا مع `--debug`)، ولا نشر.
+
+## 7. الفرق الدلالي في الـartifact وترحيل الـfingerprint
+
+- `AuditArtifact.ingestion: IngestionEvidence | None`، ومفتاح `"ingestion"` في `semantic_dict()` بعد `"dataset"`.
+- `AuditBuilder.build(..., ingestion=LoadMetadata | None)`: يرفض (`EvidenceError`) metadata لا تطابق أعداد الإطار.
+- `report.html`: قسم *Input* (يُحذف إن لم يوجد سجل).
+- `schema_version` بقي `1.0` (المفتاح إضافي).
+- **الـgolden:** الفرق الوحيد في `examples/audit_churn/`: سطر `"ingestion": null` في `expected_audit_semantic.json` و`expected_audit_semantic.pandas2.json` و`audit.json`، وسطر الـfingerprint في `audit.json` و`report.html`. القيمة `null` لأن الـgolden يُبنى من DataFrame عبر `AuditBuilder` مباشرة، لا عبر `load_table`. لا تغيّر في `lineage.json` ولا في config fingerprint ولا في أي قياس.
+- **Fingerprint:** `0f0fd1d5e9785d46351d7d28dc15d2d4eda4cc7fbc54bf0509a2a76eb3b471a5` → `007838931330c91af0d430a3e90c8b5c98305f76d1f482a511302939d85e2c71`. خطوة `"G1-W1 ingestion record added to the artifact"` في `tests/unit/test_capability_fingerprint_migration.py` مع rollback (حذف المفتاح) يعيد البصمة السابقة حرفياً (`TestTheIngestionStep`).
+
+## 8. الاختبارات المحلية
+
+كل الأرقام من سجلات pytest في scratchpad الجلسة (الأمر: `python -m pytest -p no:cacheprovider -q <files>` مع `PYTHONPATH=.`).
+
+**Focused** (`test_ingestion.py`, `test_cli_ingestion.py`, `test_capability_fingerprint_migration.py`, `test_counting_performance.py`, `test_architecture_boundaries.py`, `test_audit_end_to_end.py`):
+
+| البيئة | Python | pandas | numpy | النتيجة |
+|---|---|---|---|---|
+| L (global) | 3.12.3 | 2.3.3 | 2.4.1 | 371 passed |
+| MIN (`venv_min`) | 3.11.16 | 2.1.4 | 1.26.4 | 371 passed |
+| V (`venv_verified`) | 3.12.3 | 3.0.5 | 2.5.2 | 371 passed |
+
+- حراسات G0.1 (`tests/unit/test_counting_performance.py`) ضمن الـ371 ولم تُعدَّل.
+- **عدد الاختبارات:** collect-only على `69303b3` = 4219، وعلى `4d0eb6c` = 4366؛ لا اختبار محذوف؛ الزيادة +147 = 112 (`test_ingestion.py`) + 19 (`test_cli_ingestion.py`) + 5 (layer لكل module جديد) + 2 (`TestTheIngestionStep`) + 9 (`test_exceptions.py` للأخطاء التسعة الجديدة).
+- **الـsuite الكامل محلياً** (MIN، git archive لـ`4d0eb6c`): انظر الملحق §15.
+
+## 9. CI
+
+**الفرع:** run `36404737361` على `4d0eb6c` — **10/10 success**.
+
+| Job | النتيجة | JUnit tests | failures | errors | skipped |
+|---|---|---:|---:|---:|---:|
+| ubuntu-latest / minimum | success | 4367 | 0 | 0 | 47 |
+| ubuntu-latest / minimum + extras | success | 4388 | 0 | 0 | 44 |
+| ubuntu-latest / reference | success | 4367 | 0 | 0 | 47 |
+| ubuntu-latest / reference + extras | success | 4388 | 0 | 0 | 44 |
+| windows-latest / minimum | success | 4367 | 0 | 0 | 46 |
+| windows-latest / minimum + extras | success | 4388 | 0 | 0 | 43 |
+| windows-latest / reference | success | 4367 | 0 | 0 | 46 |
+| windows-latest / reference + extras | success | 4388 | 0 | 0 | 43 |
+| ubuntu-latest / build, install and smoke | success | — | — | — | — |
+| windows-latest / build, install and smoke | success | — | — | — | — |
+
+JUnit يعدّ 4367 مقابل collect 4366، وهو الفرق نفسه (+1) المسجل في G0.1 (4220 مقابل 4219). الزيادة عن G0.1 في JUnit: 4220 → 4367 = +147.
+
+**main:** بعد fast-forward؛ الـrun ID والنتيجة في الرد النهائي.
+
+## 10. الأداء (§21)
+
+`scripts/benchmark_ingestion.py 100000 5`: 100k صف × 10 أعمدة (7.9 MB)، warm-up ثم 5 تشغيلات متتالية، الوسيط؛ الذاكرة بـtracemalloc في تشغيل منفصل. الأساس: `pd.read_csv(path, sep=<الفاصل الصحيح>)`.
+
+| pandas | الفاصل | read_csv | load_table | النسبة | peak read_csv | peak load_table |
+|---|---|---:|---:|---:|---:|---:|
+| 2.3.3 | `,` | 0.124 s | 0.480 s | 3.88× | 19.2 MB | 19.2 MB |
+| 2.3.3 | `;` | 0.180 s | 0.526 s | 2.92× | 19.2 MB | 19.2 MB |
+| 3.0.5 | `,` | 0.196 s | 0.594 s | 3.03× | 12.2 MB | 12.2 MB |
+| 3.0.5 | `;` | 0.221 s | 0.601 s | 2.71× | 12.2 MB | 12.2 MB |
+
+- **الذاكرة:** دون زيادة (1.00×): التحقق متدفق ولا يحتفظ بنسخة ثانية.
+- **الزمن:** ~+0.35–0.40 s لكل 100k صف. السبب معروف: تمريرة `csv` الكاملة في Python، وهي الطريقة الوحيدة لرؤية الصف القصير الذي يملؤه pandas بـNaN بصمت. للمقارنة، profiling لـ100k × 20 في G0.1 يستغرق ثوانٍ، فالقراءة جزء صغير من الـaudit. **مُفسَّر ومقبول**؛ لا حراسة أداء جديدة للقراءة في هذه الموجة (G11-03 بقي `MISSING`).
+- حراسات G0.1 دون تغيير وتمر.
+- عيّنة الاكتشاف: 64 KiB حرف؛ probe: 64 KiB بايت.
+
+## 11. الاختبارات العدائية (§19)
+
+`scripts/ingestion_mutations.py`: كل تعديل يُطبَّق على نسخة من الشجرة (لا على الـworktree) ويُشغَّل الاختبار المسمّى.
+
+| # | الإضعاف | النتيجة |
+|---|---|---|
+| 1 | `pd.read_csv` بالفاصل الافتراضي `,` | 2 failed |
+| 2 | الفاصل من الامتداد فقط | 1 failed |
+| 3 | اختيار صامت عند الغموض | 1 failed |
+| 4 | ترك pandas يعيد تسمية المكرر | 2 failed |
+| 5 | تمرير `UnicodeDecodeError` الخام | 1 failed |
+| 6 | حذف metadata من الدليل | 2 failed |
+| 7 | مسار مطلق في الـartifact | 1 failed |
+| 8 | مخرجات جزئية قبل ingestion | 6 failed |
+
+**8/8 قُتلت.** إضافة لذلك تُظهر الاختبارات السلوك الخاطئ مباشرة: `pd.read_csv` على ملف `;` يعطي `['a;b;label']`، وعلى عناوين مكررة يعطي `a.1`، وعلى صف قصير يقبله بـNaN.
+
+## 12. الأمن والخصوصية (§20)
+
+- `TestTheBoundary`: فحص AST لكل ملف في `aidatasetkit/ingestion/`: لا `socket`/`urllib`/`http`/`requests`/`httpx`/`pickle`/`shelve`/`marshal`/`subprocess`، ولا `eval`/`exec`/`compile`/`__import__`.
+- لا شبكة ولا telemetry ولا LLM. `str` لا يُفسَّر كمسار أو رابط.
+- `load_table` لا يكتب أي ملف (`test_it_writes_nothing`) ولا يُجري profiling (`test_it_does_not_profile`).
+- رسائل الخطأ تستخدم `path.name` فقط، ولا تقتبس قيم خلايا (`TestTheErrorContract`).
+- لا مسار مطلق في `audit.json` ولا `report.html` ولا `manifest.json` ولا `CURRENT` (`test_no_artifact_carries_the_absolute_path`، بأربعة أشكال للمسار).
+- سجل ingestion بلا قيم خلايا (`test_the_ingestion_record_holds_no_cell_value`).
+- الرفض لا ينشر شيئاً، والتشغيل السابق يبقى سليماً (`TestRefusalsPublishNothing`).
+- لا force push ولا tag ولا release ولا PyPI. ملفات المالك غير المتتبعة لم تُلمس.
+
+## 13. غير المنفّذ
+
+```text
+SUPPORTED_NOW              = CSV, TSV, DataFrame, records
+EXPLICIT_ENCODINGS         = utf-8, utf-8-sig, latin-1, cp1256
+AUTO_ENCODING_DETECTION    = NO
+RESOURCE_LIMITS            = NOT_YET_IMPLEMENTED
+DATE_INFERENCE             = NOT_YET_IMPLEMENTED
+CHUNKING                   = NOT_YET_IMPLEMENTED
+JSON_XLSX_PARQUET          = NOT_YET_IMPLEMENTED
+```
+
+## 14. P0-2 قبل وبعد
+
+| | قبل (`69303b3`) | بعد |
+|---|---|---|
+| `a;b;label` في `.csv` | عمود واحد `a;b;label`، audit كامل، exit 0 | 3 أعمدة، `delimiter=";"`, `delimiter_source="detected"` في `audit.json` وقسم Input |
+| tab في `.csv` | عمود واحد | عمودان |
+| غامض (`,` و`;` متسقان) | يُقرأ بـ`,` بصمت | `AmbiguousDelimiterError`، exit 1، لا نشر |
+| `--delimiter ,` على ملف `;` | (لا خيار) | `MalformedInputError` |
+
+## 15. ملحق: الـsuite الكامل محلياً
+
+- **الأمر:** `run_suite.sh g1w1_min 4d0eb6c venv_min/Scripts/python.exe`: `git archive` للـcommit في شجرة معزولة، ثم `pytest -p no:cacheprovider -q -rfE --junitxml`.
+- **البيئة:** Windows 11 (10.0.26200)، locale cp1252، Python 3.11.16، numpy 1.26.4، pandas 2.1.4، scipy 1.11.4، scikit-learn 1.6.1، pytest 8.0.0؛ `import_path` داخل الشجرة المعزولة.
+- **collect:** 4366 tests.
+- **النتيجة:** `4321 passed, 46 skipped in 8159.74s (2:15:59)`، exit 0، لا FAILED ولا ERROR.
+- 4321 + 46 = 4367، أي +1 عن الـcollect، وهو الفرق نفسه في JUnit على CI (§9).
+- المدة الطويلة سببها ذاكرة الجهاز المحدودة (≈1.5 GB حرة)، لا الكود: الخلايا نفسها على CI استغرقت 2–6 دقائق.
+
+## 16. PROJECT PLAN PROGRESS
+
+| Gate | Proven | Applicable | Certified % | Status | التغيير في هذه الموجة |
+|---|---:|---:|---:|---|---|
+| G0 | 16 | 16 | 100.00% | PASS | — |
+| G0.1 | — | — | — | PASS | — |
+| G1 Ingestion | 10 | 26 | 38.46% | IN PROGRESS (W1 PASS) | +5 SAT (G1-02, 03, 18, 20, 21)؛ G1-13 وG1-17 → PARTIAL |
+| G2 | 15 | 22 | 68.18% | AUDIT | — |
+| G3 | 2 | 17 | 11.76% | AUDIT | — |
+| G4 | 9 | 13 | 69.23% | AUDIT | — |
+| G5 | 0 | 15 | 0.00% | AUDIT | — |
+| G6 | 2 | 12 | 16.67% | AUDIT | — |
+| G7 | 0 | 13 | 0.00% | AUDIT | — |
+| G8 | 15 | 23 | 65.22% | AUDIT | — |
+| G9 | 8 | 12 | 66.67% | AUDIT | — |
+| G10 | 18 | 28 | 64.29% | AUDIT | +2 SAT (G10-11, G10-24) |
+| G11 | 5 | 21 | 23.81% | AUDIT | — (G11-03 بقي MISSING) |
+| G12 | 2 | 14 | 14.29% | AUDIT | — |
+| **All** | **102** | **232** | **43.97%** | — | +7 |
+
+محسوبة من جدول §5 في `POST_G0_CAPABILITY_REALITY_AUDIT.md` بعدّ الصفوف آلياً، لا يدوياً.
