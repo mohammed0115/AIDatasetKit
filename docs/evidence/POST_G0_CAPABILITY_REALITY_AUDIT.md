@@ -65,8 +65,8 @@ AUDIT_DOCUMENTS       = CORRECT
 - **G1-13, G1-17 and G1-22 remain PARTIAL.** Generators, automatic encoding
   detection and date inference were not started.
 - Artifact schema remains `1.1`, publication schema remains `1.0`, and the
-  fingerprint contract is unchanged. G1 remains 10/26 = **38.46%** until the
-  final G1-W2 evidence run is signed off.
+  fingerprint contract is unchanged. With the final G1-W2 evidence run, G1 is
+  11/26 = **42.31%** and overall progress is 103/232 = **44.40%**.
 
 ## 1. Main integration
 

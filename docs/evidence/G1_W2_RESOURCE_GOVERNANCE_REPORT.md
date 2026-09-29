@@ -6,7 +6,7 @@ SCOPE = resource governance and large-input safety only
 BRANCH = g1-w2-resource-governance
 BASELINE_SHA = 79b66dad2863bd97cbc641d0353f6d65ad9ec839
 FIRST_CODE_SHA = d2712fb7ccb197c4e88805c38e4471fb8ca9b903
-CURRENT_TESTED_SHA = 80add1085daed01ccb856ebcf4b9107468a25600
+CURRENT_TESTED_SHA = f128ccd6b63507e0ba4baa2dcc0526360fc31e0d
 G1_W3_AUTHORIZATION = NO_GO_PENDING_CTO_REVIEW
 ```
 
@@ -72,6 +72,8 @@ After the additional boundary and publication tests, the narrower runs passed:
 `120 passed` in the ingestion unit slice and `119 passed` in the CLI/facade
 integration slice. The architecture/package slice passed `180 passed, 1
 skipped` (the Windows-minimum isolated-environment test is skipped locally).
+The final local suite at `f128ccd6b63507e0ba4baa2dcc0526360fc31e0d` passed
+`4350 passed, 46 skipped`.
 
 The refusal path is ordered before profiling and publication. The integration
 test first publishes a valid run, then refuses an over-limit input and verifies
@@ -111,8 +113,8 @@ an existing `CURRENT` pointer.
 - G1-13 records: remains `PARTIAL`; generators remain refused.
 - G1-17 encodings: remains `PARTIAL`; automatic detection remains out of scope.
 - G1-22 date inference: remains `PARTIAL`; no text-date inference was started.
-- Interim accounting remains G1 `10/26 = 38.46%`, overall `102/232 = 43.97%`
-  until the authorized final audit update is applied.
+- Final accounting for this wave is G1 `11/26 = 42.31%`, overall
+  `103/232 = 44.40%`.
 
 G1-W3 was not started. No new formats, networking, databases, model-training,
 visualization, Masari or MWIE work was performed.
