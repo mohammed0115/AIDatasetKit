@@ -17,6 +17,7 @@ from aidatasetkit.core.exceptions import (
     RowLimitError,
 )
 from aidatasetkit.ingestion import IngestionLimits, load_table
+from aidatasetkit.facade import AIDataFacade
 
 
 def write(path: Path, text: str) -> Path:
@@ -71,6 +72,13 @@ class TestIngestionLimits:
         with pytest.raises(KeyLimitError):
             load_table([{"a": 1, "b": 2}], limits=IngestionLimits(max_keys_per_record=1))
         assert records == [{"a": 1}, {"a": 2}]
+
+    def test_facade_checks_limits_before_storing_the_frame(self):
+        facade = AIDataFacade(target="label", task="classification")
+        frame = pd.DataFrame({"a": [1, 2], "label": [0, 1]})
+        with pytest.raises(CellLimitError):
+            facade.load(frame, limits=IngestionLimits(max_cells=3))
+        assert facade.stage.value == "empty"
 
     def test_cli_help_and_invalid_limit(self, capsys):
         with pytest.raises(SystemExit) as help_exit:

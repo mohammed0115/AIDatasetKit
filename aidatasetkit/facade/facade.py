@@ -51,6 +51,7 @@ from aidatasetkit.core.types import (
 )
 from aidatasetkit.evidence import Verdict, decide_verdict
 from aidatasetkit.facade.state import FinalEvaluation, Stage
+from aidatasetkit.ingestion import IngestionLimits, load_table
 from aidatasetkit.models import ModelFactory
 from aidatasetkit.preprocessing import (
     BlueprintCache,
@@ -345,7 +346,11 @@ class AIDataFacade:
     # ------------------------------------------------------------------ #
 
     def load(
-        self, train: pd.DataFrame, test: pd.DataFrame | None = None
+        self,
+        train: pd.DataFrame,
+        test: pd.DataFrame | None = None,
+        *,
+        limits: IngestionLimits | None = None,
     ) -> AIDataFacade:
         """Take ownership of a training frame, and optionally a test frame.
 
@@ -372,6 +377,10 @@ class AIDataFacade:
                 the training frame, or a declared identifier column is missing.
             TrainingError: If the training frame has no rows.
         """
+        if limits is not None:
+            load_table(train, limits=limits)
+            if test is not None:
+                load_table(test, limits=limits)
         self._require_frame(train, "train")
         if not self._is_clustering and self._target not in train.columns:
             raise SchemaError(
