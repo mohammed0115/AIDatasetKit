@@ -317,7 +317,7 @@ PRE_CLOSURE_MAIN_SHA       = 90ecfae778a5983d03f4b4fa664327c62b92cff0
 FIRST_SCHEMA_FIX_SHA       = 21e62b4f3952bbc12a773c2ba64a10e1481c5242
 PACKAGING_SMOKE_FIX_SHA    = e491eb6a422eff3a925436f7513a4155e2b434cf
 FINAL_LOCAL_TESTED_SHA     = e491eb6a422eff3a925436f7513a4155e2b434cf
-FINAL_MAIN_SHA             = NOT_INTEGRATED; main and origin/main remain at PRE_CLOSURE_MAIN_SHA
+FINAL_MAIN_CODE_SHA        = e7db88c4b26f90c0495f440ac30f4a601f394601 (fast-forward only; later report-only commit is identified below)
 PYTHON                     = 3.12.3
 NUMPY                      = 2.5.2
 PANDAS                     = 3.0.5
@@ -334,7 +334,8 @@ BRANCH_CI                  = run 36534163130, SUCCESS, 10/10, SHA bd775acd65bcb9
 FINAL_EVIDENCE_SHA         = e56df2c9fad9d3bedb4e54db5701771225be4104 (evidence-only follow-up)
 FINAL_EVIDENCE_CI          = run 36534982952, SUCCESS, 10/10, 0 failures, 0 errors
 FINAL_EVIDENCE_CI_URL      = https://github.com/mohammed0115/AIDatasetKit/actions/runs/36534982952
-MAIN_CI                    = NOT RUN; no fast-forward performed
+MAIN_CI                    = run 36536466851, SUCCESS, 10/10, SHA e7db88c4b26f90c0495f440ac30f4a601f394601
+FINAL_REPORT_UPDATE        = documentation-only; exact resulting main SHA and its CI are returned in the final response
 G1_W2                      = NOT STARTED; NO_GO_PENDING_CTO_REVIEW
 ```
 
@@ -342,13 +343,13 @@ G1_W2                      = NOT STARTED; NO_GO_PENDING_CTO_REVIEW
 - The focused command covered artifact/evidence schemas, fingerprints and migration rollback, golden fixtures, serialization, publication, ingestion, packaging, G0.1 performance guards, architecture boundaries, audit end-to-end, and CLI ingestion: 736 passed. The full suite above was rerun after the packaging-smoke correction.
 - `scripts/release_smoke_test.sh` initially failed because its installed-artifact assertion hard-coded schema `1.0`. The follow-up changes only that assertion to compare against exported `ARTIFACT_SCHEMA_VERSION == "1.1"`. The CI release smoke then passed for both wheel and sdist: build, twine metadata check, clean installs, CLI, audit, and published artifact checks. No distribution was published.
 - Programmatic Golden diff against `90ecfae`: both semantic fixtures changed only `/schema_version`; `audit.json` changed only `/schema_version` and `/provenance/semantic_fingerprint`; `lineage.json` changed only `/schema_version`; HTML changed only the semantic fingerprint display and artifact-schema footer. Dataset, schema, config and plan fingerprints remained identical. The migration tests prove `3e93dd5e…` rolls back to `00783893…` by setting schema to `1.0`, then to `0f0fd1d5…` by removing `ingestion`.
-- Branch CI run `36534163130` passed all 10 jobs on the exact pushed SHA `bd775acd65bcb9c67d441a5c76ace6cda4b4668a`; final evidence-commit CI run `36534982952` passed all 10 jobs on the exact evidence SHA `e56df2c9fad9d3bedb4e54db5701771225be4104` (each run: 2 package + 8 test jobs, zero failures/errors). `gh auth status` reports no authenticated CLI host; results were verified from the public GitHub Actions pages. Main fast-forward and main CI are still pending and are not claimed. At the time of this report, local `main` and `origin/main` both remain exactly `90ecfae778a5983d03f4b4fa664327c62b92cff0`.
+- Branch CI run `36534163130` passed all 10 jobs on exact pushed SHA `bd775acd65bcb9c67d441a5c76ace6cda4b4668a`; final evidence-commit CI run `36534982952` passed all 10 jobs on exact SHA `e56df2c9fad9d3bedb4e54db5701771225be4104`; the subsequent report-only commit `e7db88c4b26f90c0495f440ac30f4a601f394601` also passed 10/10 in run `36535690233`. The branch was fast-forwarded to local `main` and pushed normally; main CI run `36536466851` passed 10/10 on exact SHA `e7db88c4b26f90c0495f440ac30f4a601f394601`. Each matrix was 2 package + 8 test jobs, with zero failures/errors. `gh auth status` reports no authenticated CLI host; these results were verified from public GitHub Actions pages. A final documentation-only update is being added after that verified main SHA; its resulting SHA/CI are reported separately.
 - Remaining G1 gaps from the capability audit: G1-04 XLSX, G1-05 XLS, G1-06 Parquet, G1-07 Feather/Arrow, G1-08 JSON, G1-09 JSONL, G1-10 XML, G1-11 YAML, G1-14 SQLite, G1-15 PostgreSQL/query results, G1-24 Excel sheets, G1-25 chunked/streamed reads, and G1-26 resource limits remain missing; G1-13 still refuses generators/other iterables and is not wired through `AIDataFacade.load`; G1-17 supports only named encodings, without automatic detection; G1-22 does not infer dates from file text. G1-16 document extraction remains explicitly out of scope.
 
 ### 17.7 الحالة
 
 ```text
-G1_W1_FINAL_GATE           = BLOCKED (main integration and main CI not yet verified)
+G1_W1_FINAL_GATE           = PASS (all code, branch, evidence, fast-forward, and main CI criteria verified; following report update is documentation-only)
 P0_1_STATUS                = CLOSED (unchanged; G0.1 evidence)
 P0_2_STATUS                = CLOSED (G1-W1 ingestion evidence)
 READY_FOR_G1_W2            = NO; separate CTO authorization required
