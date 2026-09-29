@@ -18,10 +18,15 @@ M = [
  ("6 metadata dropped from evidence", "aidatasetkit/cli/main.py", "ingestion=loaded.metadata", "ingestion=None", "tests/integration/test_cli_ingestion.py -k \"semicolon_file or input_section\""),
  ("7 absolute path in artifact", "aidatasetkit/cli/main.py", "ingestion=loaded.metadata", "ingestion=__import__('dataclasses').replace(loaded.metadata, warnings=(str(path.resolve()),))", "tests/integration/test_cli_ingestion.py -k absolute_path"),
  ("8 partial output before ingestion", "aidatasetkit/cli/main.py", "    loaded = load_table(\n", "    (args.output / 'runs' / 'partial').mkdir(parents=True, exist_ok=True)\n    loaded = load_table(\n", "tests/integration/test_cli_ingestion.py -k \"ambiguous_file_is_refused or structured_refusals\""),
+ ("9 bypass source byte limit", "aidatasetkit/ingestion/loader.py", "    if limits.max_source_bytes is not None:\n", "    if False:\n", "tests/unit/test_ingestion_limits.py -k file_bytes"),
+ ("10 reject exact byte boundary", "aidatasetkit/ingestion/loader.py", "if size > limits.max_source_bytes:", "if size >= limits.max_source_bytes:", "tests/unit/test_ingestion_limits.py -k file_bytes"),
+ ("11 skip dataframe cell limit", "aidatasetkit/ingestion/loader.py", "if limits.max_cells is not None and rows > limits.max_cells // columns:", "if False:", "tests/unit/test_ingestion_limits.py -k dataframe"),
+ ("12 skip record count limit", "aidatasetkit/ingestion/loader.py", "if limits.max_records is not None and len(records) > limits.max_records:", "if False:", "tests/unit/test_ingestion_limits.py -k records"),
+ ("13 make cli unlimited", "aidatasetkit/cli/main.py", "_DEFAULT_INGESTION_LIMITS = IngestionLimits()", "_DEFAULT_INGESTION_LIMITS = IngestionLimits(max_source_bytes=None, max_rows=None, max_columns=None, max_cells=None, max_field_length=None)", "tests/unit/test_ingestion_limits.py -k cli_defaults"),
 ]
 for name, rel, old, new, tests in M:
     if WORK.exists(): shutil.rmtree(WORK)
-    shutil.copytree(SRC, WORK)
+    shutil.copytree(SRC, WORK, ignore=shutil.ignore_patterns(".git", ".pytest_cache", "__pycache__", "*.pyc"))
     f = WORK / rel; t = f.read_bytes().replace(b"\r\n", b"\n").decode()
     assert t.count(old) >= 1, (name, "anchor missing")
     f.write_bytes(t.replace(old, new, 1).encode())

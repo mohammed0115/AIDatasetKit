@@ -188,3 +188,20 @@ class TestRefusalsPublishNothing:
         assert result.returncode == EXIT_CODES["usage"]
         assert published(output) == before
         assert sorted(p.name for p in (output / "runs").iterdir()) == runs_before
+
+    def test_a_resource_refusal_leaves_the_previous_run_as_it_was(self, tmp_path):
+        output = tmp_path / "out"
+        good = tmp_path / "good.csv"
+        good.write_bytes(table(";").encode())
+        assert audit(good, output).returncode != EXIT_CODES["usage"]
+        before = published(output)
+        runs_before = sorted(p.name for p in (output / "runs").iterdir())
+
+        limited = tmp_path / "limited.csv"
+        limited.write_text("a,b\n1,2\n3,4\n", encoding="utf-8")
+        result = audit(limited, output, "--max-rows", "1")
+        assert result.returncode == EXIT_CODES["usage"]
+        assert result.stderr.startswith("error: RowLimitError:")
+        assert str(tmp_path) not in result.stderr and "1,2" not in result.stderr
+        assert published(output) == before
+        assert sorted(p.name for p in (output / "runs").iterdir()) == runs_before

@@ -55,9 +55,15 @@ URLs or cloud storage. A `.txt` file is refused even when it holds CSV.
   whole file is then validated. A file that is consistent under two delimiters
   is refused as ambiguous; a row with too few or too many fields is refused, not
   padded.
-- **Not implemented yet:** input size limits (a file is loaded whole into
-  memory), date inference, chunked reading. Reading costs two full passes over
-  the file (a validation pass and the pandas parse) plus the sample.
+- **Resource limits are guards, not chunking.** By default files are refused
+  above 64 MiB, 1,000,000 data rows, 1,000 columns, 10,000,000 data cells or
+  1,000,000 characters in one CSV/TSV field. DataFrames and records are checked
+  before analysis/materialization as applicable; callers may provide an
+  immutable `IngestionLimits` policy. The CLI uses the same finite defaults and
+  exposes overrides. Accepted files still cost two full passes (validation and
+  pandas parse) plus the sample and are loaded as one pandas table.
+- **Not implemented yet:** date inference, true chunked profiling, generators
+  and arbitrary iterables. A refused input is never published as a new audit.
 
 ## Detection
 

@@ -53,6 +53,21 @@ AUDIT_DOCUMENTS       = CORRECT
 - **تغيّر الدليل دون الحالة:** G1-01، G1-19.
 - **النسب (من الجدول):** G1 = 10/26 = **38.46%**، G10 = 18/28 = **64.29%**، الكلي = 102/232 = **43.97%**.
 
+**تحديث 4 — G1-W2 (resource governance):**
+
+- **G1-26: CLOSED.** `IngestionLimits` is immutable and finite by default;
+  file bytes, CSV/TSV rows, columns, cells and field length are checked before
+  pandas parsing, while DataFrames and supported records are checked before
+  analysis or materialization. CLI defaults equal library defaults.
+- **G1-25 remains MISSING.** Validation is streaming, but accepted inputs are
+  still loaded into one pandas table; true chunked profiling was explicitly out
+  of scope for G1-W2.
+- **G1-13, G1-17 and G1-22 remain PARTIAL.** Generators, automatic encoding
+  detection and date inference were not started.
+- Artifact schema remains `1.1`, publication schema remains `1.0`, and the
+  fingerprint contract is unchanged. G1 remains 10/26 = **38.46%** until the
+  final G1-W2 evidence run is signed off.
+
 ## 1. Main integration
 
 | البند | القيمة |
@@ -156,8 +171,8 @@ G0_MAIN_INTEGRATION = PASS
 | G1-22 | G1 | Type inference incl. dates from text | `PARTIAL` | core/schema.py detects DATETIME only for datetime64 dtype | probe_ingestion.py (exploratory): ISO dates in CSV -> `categorical`, dtype object | Dates never inferred from files | P1 |
 | G1-23 | G1 | Row/column counts and memory estimate | `SUPPORTED_AND_TESTED` | DatasetProfile.row_count/column_count/memory_usage_bytes | tests/unit/test_profiler.py | — | — |
 | G1-24 | G1 | Excel sheets | `MISSING` | no spreadsheet reader | — | No reader | P2 |
-| G1-25 | G1 | Large files: chunking / streaming | `MISSING` | whole file read into memory | — | No chunked path | P1 |
-| G1-26 | G1 | Resource limits (size, rows, columns) | `MISSING` | none on input (G0-05 of the original plan not done) | — | Oversized input can exhaust memory | P1 |
+| G1-25 | G1 | Large files: chunking / streaming | `MISSING` | validation pass streams records, but accepted input is still one pandas table | tests/unit/test_ingestion_limits.py; G1-W2 report | No true chunked profiling path; explicitly out of scope | P1 |
+| G1-26 | G1 | Resource limits (size, rows, columns) | `SUPPORTED_AND_TESTED` | ingestion/types.py::IngestionLimits; loader.py and delimited.py enforce finite bytes/rows/columns/cells/field limits before pandas or analysis | tests/unit/test_ingestion_limits.py; tests/integration/test_cli_ingestion.py; G1-W2 report | — | — |
 | G1-27 | G1 | Unsupported format refused with a clear message | `SUPPORTED_AND_TESTED` | cli/main.py suffix check | tests/integration/test_audit_end_to_end.py (not really parquet) | — | — |
 | G2-01 | G2 | Missing values per column and dataset | `SUPPORTED_AND_TESTED` | profiler.py _profile_column; checks.check_missing_values | test_profiler.py, test_quality.py | — | — |
 | G2-02 | G2 | Duplicate rows | `SUPPORTED_AND_TESTED` | profiler._count_duplicate_rows; check_duplicate_rows | test_profiler.py, test_quality.py | — | — |

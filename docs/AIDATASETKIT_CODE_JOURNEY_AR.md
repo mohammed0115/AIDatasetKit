@@ -11,8 +11,10 @@ flowchart TD
     U["المستخدم: aidatasetkit audit data.csv --target churn"] --> M["aidatasetkit/cli/main.py<br/>main() ثم _audit()"]
     M --> F{"resolve_format(path)<br/>ingestion/formats.py"}
     F -- "امتداد غير مدعوم" --> X1["error: ... exit 1<br/>لا يُنشر شيء"]
-    F -- ".csv / .tsv" --> L["load_table(path, options)<br/>ingestion/loader.py"]
-    L --> P["plan_delimited()<br/>ingestion/delimited.py"]
+    F -- ".csv / .tsv" --> L["load_table(path, options, limits)<br/>ingestion/loader.py"]
+    L --> G["فحص IngestionLimits<br/>قبل pandas والتحليل"]
+    G -- "خارج الحدود" --> E["ResourceLimitError<br/>لا نشر ولا استبدال CURRENT"]
+    G -- "داخل الحدود" --> P["plan_delimited(limits)<br/>ingestion/delimited.py"]
     P --> D["_choose(): اكتشاف الفاصل<br/>على عيّنة 64 KiB"]
     D --> V["_validate(): تمريرة كاملة بـ csv<br/>عرض كل سجل، العناوين، عدد الصفوف"]
     V --> R["pandas.read_csv(sep, encoding)<br/>ثم مطابقة عدد الصفوف والأعمدة"]
@@ -56,13 +58,14 @@ flowchart TD
 الأخطاء كلها في `aidatasetkit/core/exceptions.py` تحت `IngestionError`، وهو فرع من
 `AIDatasetKitError`.
 
-### 3.1 `load_table(source, *, options=None)`
+### 3.1 `load_table(source, *, options=None, limits=None)`
 
 يوزّع حسب نوع المصدر:
 
 - `pandas.DataFrame` ← `_from_dataframe`: يرفض الإطار الفارغ (`EmptyInputError`)
   والأعمدة المكررة (`DuplicateHeadersError`)، ويعيد **الكائن نفسه** دون نسخ أو
-  تعديل، ولا يُجري أي profiling. خيارات الملفات (encoding/delimiter) مرفوضة هنا.
+  تعديل، ويفحص rows/columns/cells قبل profiling. خيارات الملفات
+  (encoding/delimiter) مرفوضة هنا.
 - `str` أو `bytes` ← `UnsupportedFormatError`: النص قد يكون مساراً أو محتوى أو
   رابطاً، ولا نخمّن؛ المطلوب `pathlib.Path`.
 - `os.PathLike` ← `_from_file`.
@@ -88,13 +91,17 @@ flowchart TD
 3. **التحقق** في `_validate`: تمريرة كاملة متدفقة بـ `csv` بذاكرة ثابتة: كل سجل
    يجب أن يطابق عرض السجل الأول (pandas يملأ الصف القصير بـ NaN بصمت، ونحن نرفضه)،
    والعناوين المكررة تُكتشف هنا قبل أن يعيد pandas تسميتها `a.1`، والملف الذي فيه
-   عنوان فقط ← `EmptyInputError`. أي بايت لا يُفك ← `EncodingError` وليس
-   `UnicodeDecodeError`.
+  عنوان فقط ← `EmptyInputError`. حدود rows/columns/cells/field length ترفع
+  `ResourceLimitError` داخل هذه التمريرة، قبل `pandas.read_csv`. أي بايت لا يُفك
+  ← `EncodingError` وليس `UnicodeDecodeError`.
 4. **التحليل**: `pd.read_csv(path, sep=..., encoding=...)` مرة واحدة، ثم مقارنة
    عدد الصفوف والأعمدة بما عدّته خطوة التحقق؛ أي اختلاف ← `MalformedInputError`.
 
-الكلفة: تمريرتان كاملتان (التحقق وpandas) زائد عيّنة محدودة. لا توجد حدود لحجم
-الملف بعد، والجدول يُحمَّل كاملاً في الذاكرة.
+الكلفة: تمريرتان كاملتان (التحقق وpandas) زائد عيّنة محدودة للمدخل المقبول.
+الحدود تمنع الاستمرار مبكراً عند الرفض، لكنها لا تقدّم chunked profiling؛
+الجدول المقبول يُحمَّل كاملاً في الذاكرة. الافتراضات finite في
+`IngestionLimits()`، وCLI يستخدمها نفسها عبر `--max-input-bytes` و`--max-rows`
+و`--max-columns` و`--max-cells` و`--max-field-length`.
 
 ## 4. الاستهلاك: profiling ثم quality ثم preprocessing
 

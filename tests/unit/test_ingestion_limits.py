@@ -16,7 +16,7 @@ from aidatasetkit.core.exceptions import (
     RecordLimitError,
     RowLimitError,
 )
-from aidatasetkit.ingestion import IngestionLimits, load_table
+from aidatasetkit.ingestion import IngestionLimits, LoadOptions, load_table
 from aidatasetkit.facade import AIDataFacade
 
 
@@ -40,6 +40,7 @@ class TestIngestionLimits:
 
     def test_file_bytes_are_rejected_before_parsing(self, tmp_path):
         path = write(tmp_path / "data.csv", "a,b\n1,2\n")
+        assert load_table(path, limits=IngestionLimits(max_source_bytes=path.stat().st_size)).frame.shape == (1, 2)
         with pytest.raises(FileSizeLimitError) as caught:
             load_table(path, limits=IngestionLimits(max_source_bytes=path.stat().st_size - 1))
         assert caught.value.limit_name == "max_source_bytes"
@@ -48,6 +49,9 @@ class TestIngestionLimits:
 
     def test_rows_columns_cells_and_field_length_are_guarded(self, tmp_path):
         path = write(tmp_path / "data.csv", "a,b\n1,2\n3,4\n")
+        assert load_table(path, limits=IngestionLimits(max_rows=2)).frame.shape == (2, 2)
+        assert load_table(path, limits=IngestionLimits(max_columns=2)).frame.shape == (2, 2)
+        assert load_table(path, limits=IngestionLimits(max_cells=4)).frame.shape == (2, 2)
         with pytest.raises(RowLimitError):
             load_table(path, limits=IngestionLimits(max_rows=1))
         with pytest.raises(ColumnLimitError):
@@ -56,6 +60,22 @@ class TestIngestionLimits:
             load_table(path, limits=IngestionLimits(max_cells=3))
         with pytest.raises(FieldLengthLimitError):
             load_table(write(tmp_path / "long.csv", "a\n\u0623\u062d\u0645\u062f\n"), limits=IngestionLimits(max_field_length=2))
+
+    def test_row_refusal_stops_before_a_later_malformed_record(self, tmp_path):
+        path = write(tmp_path / "early.csv", 'a,b\n1,2\n3,4\n"unterminated\n')
+        with pytest.raises(RowLimitError):
+            load_table(path, options=LoadOptions(delimiter=","), limits=IngestionLimits(max_rows=1))
+
+    def test_records_character_limit_and_large_integer_cell_guard(self):
+        records = [{"a": "abcd"}]
+        assert load_table(records, limits=IngestionLimits(max_record_chars=4)).frame.shape == (1, 1)
+        with pytest.raises(CellLimitError):
+            load_table(records, limits=IngestionLimits(max_record_chars=3))
+        with pytest.raises(CellLimitError):
+            load_table(
+                [{"a": 1, "b": 2}] * 3,
+                limits=IngestionLimits(max_cells=5, max_records=1_000_000_000_000_000_000),
+            )
 
     def test_dataframe_is_not_copied_or_mutated(self):
         frame = pd.DataFrame({"a": [1, 2], "b": ["x", "y"]})
@@ -79,6 +99,18 @@ class TestIngestionLimits:
         with pytest.raises(CellLimitError):
             facade.load(frame, limits=IngestionLimits(max_cells=3))
         assert facade.stage.value == "empty"
+
+    def test_facade_does_not_start_analysis_after_refusal(self, monkeypatch):
+        facade = AIDataFacade(target="label", task="classification")
+
+        def should_not_run(*args, **kwargs):
+            raise AssertionError("analysis started after ingestion refusal")
+
+        monkeypatch.setattr("aidatasetkit.facade.facade.DataProfiler.profile", should_not_run)
+        monkeypatch.setattr("aidatasetkit.facade.facade.DataQualityInspector.inspect", should_not_run)
+        frame = pd.DataFrame({"a": [1, 2], "label": [0, 1]})
+        with pytest.raises(CellLimitError):
+            facade.load(frame, limits=IngestionLimits(max_cells=3))
 
     def test_cli_help_and_invalid_limit(self, capsys):
         with pytest.raises(SystemExit) as help_exit:

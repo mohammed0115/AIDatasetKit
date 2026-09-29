@@ -291,7 +291,16 @@ Also merged, unreleased: model training, evaluation, model comparison, the
 Not supported yet: anomaly detection, dimensionality reduction, time series,
 text, images, hyperparameter tuning, cross-validation, model persistence,
 databases, cloud storage, Parquet, Excel, JSON, automatic encoding detection,
-input size limits, date inference, chunked reading.
+date inference, true chunked profiling or generators/other arbitrary iterables.
+
+Every supported input now has finite resource limits before pandas parsing or
+analysis: 64 MiB file bytes, 1,000,000 data rows, 1,000 columns, 10,000,000
+data cells and 1,000,000 characters per CSV/TSV field by default. The Python
+API accepts an immutable `IngestionLimits` policy; the CLI exposes the same
+defaults through `--max-input-bytes`, `--max-rows`, `--max-columns`,
+`--max-cells` and `--max-field-length`. Refusal is structured and leaves
+publication untouched. These are guards, not chunked processing: accepted
+inputs are still loaded as one pandas table.
 
 Regression models and their preprocessing are held to the same executed
 capability contracts as the classifiers. The *readiness verdict* is not: its

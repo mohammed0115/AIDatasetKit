@@ -9,6 +9,22 @@ Versions before `1.0` may change public interfaces and the artifact schema; see
 First alpha, not yet released: nothing has been published to PyPI, TestPyPI or
 as a GitHub release, and no version is tagged. Everything below is new.
 
+### G1-W2 resource governance and large-input safety
+
+Evidence: `docs/evidence/G1_W2_RESOURCE_GOVERNANCE_REPORT.md`.
+
+- Added immutable `IngestionLimits` policy with finite defaults for source bytes,
+  rows, columns, cells, CSV/TSV field length, records, record keys and record
+  character volume.
+- Enforced limits before pandas parsing or analysis for files, DataFrames and
+  supported records. CSV/TSV row, shape and field checks fail during the
+  existing streaming validation pass.
+- Added structured resource-limit errors and matching CLI flags. Omitted CLI
+  flags inherit the finite library defaults; resource refusal does not create a
+  publication or replace `CURRENT`.
+- Artifact schema remains `1.1`; publication schema and fingerprints remain
+  unchanged. This work does not add true chunked profiling or generator support.
+
 ### G1-W1 ingestion foundation
 
 Evidence: `docs/evidence/G1_W1_INGESTION_FOUNDATION_REPORT.md`.
