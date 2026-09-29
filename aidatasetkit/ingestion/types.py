@@ -15,6 +15,7 @@ from aidatasetkit.core.exceptions import InvalidIngestionOptionsError
 __all__ = [
     "DEFAULT_ENCODING",
     "DelimiterSource",
+    "IngestionLimits",
     "LoadMetadata",
     "LoadOptions",
     "LoadedTable",
@@ -49,6 +50,42 @@ class DelimiterSource(StrEnum):
     EXPLICIT = "explicit"
     #: Fixed by the format: a ``.tsv`` file is tab-separated.
     FORMAT = "format"
+
+
+def _validate_limit(name: str, value: int | None) -> None:
+    if value is not None and (
+        isinstance(value, bool) or not isinstance(value, int) or value <= 0
+    ):
+        raise InvalidIngestionOptionsError(
+            f"{name} must be a positive integer or None to disable it."
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class IngestionLimits:
+    """Finite resource policy applied before and during table materialization."""
+
+    max_source_bytes: int | None = 64 * 1024 * 1024
+    max_rows: int | None = 1_000_000
+    max_columns: int | None = 1_000
+    max_cells: int | None = 10_000_000
+    max_field_length: int | None = 1_000_000
+    max_records: int | None = 1_000_000
+    max_keys_per_record: int | None = 1_000
+    max_record_chars: int | None = 10_000_000
+
+    def __post_init__(self) -> None:
+        for name in (
+            "max_source_bytes",
+            "max_rows",
+            "max_columns",
+            "max_cells",
+            "max_field_length",
+            "max_records",
+            "max_keys_per_record",
+            "max_record_chars",
+        ):
+            _validate_limit(name, getattr(self, name))
 
 
 #: Delimiters detection chooses among, and the only ones an option may name.

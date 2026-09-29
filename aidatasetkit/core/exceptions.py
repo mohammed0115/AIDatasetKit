@@ -51,6 +51,14 @@ __all__ = [
     "AmbiguousDelimiterError",
     "EmptyInputError",
     "DuplicateHeadersError",
+    "ResourceLimitError",
+    "FileSizeLimitError",
+    "RowLimitError",
+    "ColumnLimitError",
+    "CellLimitError",
+    "FieldLengthLimitError",
+    "RecordLimitError",
+    "KeyLimitError",
     "TrainingError",
     "WorkflowStateError",
     "PredictionValidationError",
@@ -320,6 +328,54 @@ class DuplicateHeadersError(IngestionError, SchemaError):
     Detected before pandas can rename them to ``a.1``, ``a.2``: an audit of
     renamed columns would describe a dataset that does not exist.
     """
+
+
+class ResourceLimitError(IngestionError):
+    """A configured ingestion resource limit was exceeded."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        limit_name: str,
+        configured_limit: int,
+        observed_value: int,
+        input_kind: str,
+    ) -> None:
+        self.code = "INGESTION_RESOURCE_LIMIT"
+        self.limit_name = limit_name
+        self.configured_limit = configured_limit
+        self.observed_value = observed_value
+        self.input_kind = input_kind
+        super().__init__(message)
+
+
+class FileSizeLimitError(ResourceLimitError):
+    """The source file is larger than allowed."""
+
+
+class RowLimitError(ResourceLimitError):
+    """The input contains more rows than allowed."""
+
+
+class ColumnLimitError(ResourceLimitError):
+    """The input contains more columns than allowed."""
+
+
+class CellLimitError(ResourceLimitError):
+    """The input contains more cells than allowed."""
+
+
+class FieldLengthLimitError(ResourceLimitError):
+    """A delimited field is longer than allowed."""
+
+
+class RecordLimitError(ResourceLimitError):
+    """The records input contains more records than allowed."""
+
+
+class KeyLimitError(ResourceLimitError):
+    """A record contains more keys than allowed."""
 
 
 class TrainingError(AIDatasetKitError):

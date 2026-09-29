@@ -40,13 +40,18 @@ from pathlib import Path
 
 from aidatasetkit.core.exceptions import (
     AmbiguousDelimiterError,
+    CellLimitError,
+    ColumnLimitError,
     DuplicateHeadersError,
     EmptyInputError,
     EncodingError,
+    FieldLengthLimitError,
     MalformedInputError,
+    RowLimitError,
 )
 from aidatasetkit.ingestion.types import (
     DelimiterSource,
+    IngestionLimits,
     LoadOptions,
     SUPPORTED_DELIMITERS,
     TableFormat,
@@ -79,13 +84,19 @@ class DelimitedPlan:
     warnings: tuple[str, ...]
 
 
-def plan_delimited(path: Path, fmt: TableFormat, options: LoadOptions) -> DelimitedPlan:
+def plan_delimited(
+    path: Path,
+    fmt: TableFormat,
+    options: LoadOptions,
+    limits: IngestionLimits | None = None,
+) -> DelimitedPlan:
     """Detect and validate; return the plan the parse will follow.
 
     Raises:
         EmptyInputError, EncodingError, MalformedInputError,
         AmbiguousDelimiterError, DuplicateHeadersError.
     """
+    limits = limits if limits is not None else IngestionLimits()
     with open(path, "rb") as handle:
         probe = handle.read(_PROBE_BYTES)
     if not probe:
@@ -113,7 +124,7 @@ def plan_delimited(path: Path, fmt: TableFormat, options: LoadOptions) -> Delimi
             "No supported delimiter (',', ';', tab, '|') separates the records, so "
             "the file was read as a single column."
         )
-    rows, columns = _validate(path, encoding, delimiter, options.header)
+    rows, columns = _validate(path, encoding, delimiter, options.header, limits)
     return DelimitedPlan(
         encoding=encoding,
         delimiter=delimiter,
@@ -243,7 +254,13 @@ def _choose(
 # --------------------------------------------------------------------------- #
 
 
-def _validate(path: Path, encoding: str, delimiter: str, header: bool) -> tuple[int, int]:
+def _validate(
+    path: Path,
+    encoding: str,
+    delimiter: str,
+    header: bool,
+    limits: IngestionLimits,
+) -> tuple[int, int]:
     """One streaming pass: every record's width, the header, the row count.
 
     Returns:
@@ -264,6 +281,12 @@ def _validate(path: Path, encoding: str, delimiter: str, header: bool) -> tuple[
                     if width is None:
                         width = len(record)
                         names = record
+                        if limits.max_columns is not None and width > limits.max_columns:
+                            raise ColumnLimitError(
+                                f"{path.name} exceeds the column limit ({width} > {limits.max_columns}).",
+                                limit_name="max_columns", configured_limit=limits.max_columns,
+                                observed_value=width, input_kind="file",
+                            )
                     elif len(record) != width:
                         raise MalformedInputError(
                             f"{path.name}: record {records} (ending on line {reader.line_num}) "
@@ -271,6 +294,28 @@ def _validate(path: Path, encoding: str, delimiter: str, header: bool) -> tuple[
                             f"first record has {width}. Every row must have the same "
                             "number of fields."
                         )
+                    data_rows = records - (1 if header else 0)
+                    if limits.max_rows is not None and data_rows > limits.max_rows:
+                        raise RowLimitError(
+                            f"{path.name} exceeds the row limit ({data_rows} > {limits.max_rows}).",
+                            limit_name="max_rows", configured_limit=limits.max_rows,
+                            observed_value=data_rows, input_kind="file",
+                        )
+                    if limits.max_cells is not None and data_rows > limits.max_cells // width:
+                        cells = data_rows * width
+                        raise CellLimitError(
+                            f"{path.name} exceeds the cell limit ({cells} > {limits.max_cells}).",
+                            limit_name="max_cells", configured_limit=limits.max_cells,
+                            observed_value=cells, input_kind="file",
+                        )
+                    if limits.max_field_length is not None:
+                        longest = max((len(value) for value in record), default=0)
+                        if longest > limits.max_field_length:
+                            raise FieldLengthLimitError(
+                                f"{path.name} exceeds the field-length limit.",
+                                limit_name="max_field_length", configured_limit=limits.max_field_length,
+                                observed_value=longest, input_kind="file",
+                            )
                     if not anything and any(value.strip() for value in record):
                         anything = True
             except csv.Error as error:

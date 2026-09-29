@@ -35,6 +35,7 @@ from aidatasetkit.core.exceptions import (
     IncompatibleModelError,
 )
 from aidatasetkit.ingestion import (
+    IngestionLimits,
     SUPPORTED_ENCODINGS,
     LoadOptions,
     UnsupportedFormatError,
@@ -224,10 +225,28 @@ def build_parser() -> argparse.ArgumentParser:
             "needs this flag."
         ),
     )
+    for option, destination, help_text in (
+        ("--max-input-bytes", "max_source_bytes", "Maximum source file bytes."),
+        ("--max-rows", "max_rows", "Maximum data rows."),
+        ("--max-columns", "max_columns", "Maximum columns."),
+        ("--max-cells", "max_cells", "Maximum total data cells."),
+        ("--max-field-length", "max_field_length", "Maximum CSV/TSV field characters."),
+    ):
+        audit.add_argument(option, dest=destination, type=_positive_integer, help=help_text)
     audit.add_argument(
         "--debug", action="store_true", help="Show the full traceback on failure."
     )
     return parser
+
+
+def _positive_integer(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("must be a positive integer") from error
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -298,6 +317,13 @@ def _audit(args: argparse.Namespace) -> int:
         options=LoadOptions(
             encoding=args.encoding,
             delimiter=None if args.delimiter is None else _DELIMITER_CHOICES[args.delimiter],
+        ),
+        limits=IngestionLimits(
+            max_source_bytes=args.max_source_bytes,
+            max_rows=args.max_rows,
+            max_columns=args.max_columns,
+            max_cells=args.max_cells,
+            max_field_length=args.max_field_length,
         ),
     )
     frame = loaded.frame

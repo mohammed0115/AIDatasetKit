@@ -10,18 +10,25 @@ from typing import Any
 import pandas as pd
 
 from aidatasetkit.core.exceptions import (
+    CellLimitError,
+    ColumnLimitError,
     DuplicateHeadersError,
     EmptyInputError,
     EncodingError,
     InputNotFoundError,
     InvalidIngestionOptionsError,
+    FileSizeLimitError,
+    KeyLimitError,
     MalformedInputError,
+    RecordLimitError,
+    RowLimitError,
     UnsupportedFormatError,
 )
 from aidatasetkit.ingestion.delimited import plan_delimited
 from aidatasetkit.ingestion.formats import resolve_format
 from aidatasetkit.ingestion.types import (
     LoadedTable,
+    IngestionLimits,
     LoadMetadata,
     LoadOptions,
     SourceKind,
@@ -30,7 +37,12 @@ from aidatasetkit.ingestion.types import (
 __all__ = ["load_table"]
 
 
-def load_table(source: Any, *, options: LoadOptions | None = None) -> LoadedTable:
+def load_table(
+    source: Any,
+    *,
+    options: LoadOptions | None = None,
+    limits: IngestionLimits | None = None,
+) -> LoadedTable:
     """Load a table, or refuse it with a structured error. Never a wrong table.
 
     Args:
@@ -47,19 +59,20 @@ def load_table(source: Any, *, options: LoadOptions | None = None) -> LoadedTabl
         IngestionError: One of its subclasses, for every refusal.
     """
     options = options if options is not None else LoadOptions()
+    limits = limits if limits is not None else IngestionLimits()
     if isinstance(source, pd.DataFrame):
         _require_default(options, "a DataFrame")
-        return _from_dataframe(source)
+        return _from_dataframe(source, limits)
     if isinstance(source, (str, bytes)):
         raise UnsupportedFormatError(
             f"A {type(source).__name__} is not accepted as a source, so it can never "
             "be mistaken for data or for a path. Pass pathlib.Path(...) for a file."
         )
     if isinstance(source, os.PathLike):
-        return _from_file(Path(os.fspath(source)), options)
+        return _from_file(Path(os.fspath(source)), options, limits)
     if isinstance(source, (list, tuple)):
         _require_default(options, "records")
-        return _from_records(source)
+        return _from_records(source, limits)
     raise UnsupportedFormatError(
         f"Cannot load a {type(source).__name__}. Supported: a path to a .csv or .tsv "
         "file, a pandas DataFrame, or a list of mappings."
@@ -83,14 +96,22 @@ def _memory(frame: pd.DataFrame) -> int:
 # --------------------------------------------------------------------------- #
 
 
-def _from_file(path: Path, options: LoadOptions) -> LoadedTable:
+def _from_file(path: Path, options: LoadOptions, limits: IngestionLimits) -> LoadedTable:
     fmt = resolve_format(path)
     if not path.exists():
         raise InputNotFoundError(f"No such file: {path.name}.")
     if not path.is_file():
         raise InputNotFoundError(f"{path.name} is not a regular file.")
+    if limits.max_source_bytes is not None:
+        size = path.stat().st_size
+        if size > limits.max_source_bytes:
+            raise FileSizeLimitError(
+                f"{path.name} exceeds the source byte limit ({size} > {limits.max_source_bytes}).",
+                limit_name="max_source_bytes", configured_limit=limits.max_source_bytes,
+                observed_value=size, input_kind=SourceKind.FILE.value,
+            )
 
-    plan = plan_delimited(path, fmt, options)
+    plan = plan_delimited(path, fmt, options, limits)
     try:
         frame = pd.read_csv(
             path,
@@ -135,12 +156,32 @@ def _from_file(path: Path, options: LoadOptions) -> LoadedTable:
 # --------------------------------------------------------------------------- #
 
 
-def _from_dataframe(frame: pd.DataFrame) -> LoadedTable:
+def _from_dataframe(frame: pd.DataFrame, limits: IngestionLimits) -> LoadedTable:
     """Checked and described, never copied or modified."""
     if frame.shape[0] == 0 or frame.shape[1] == 0:
         raise EmptyInputError(
             f"The DataFrame has {frame.shape[0]} row(s) and {frame.shape[1]} column(s); "
             "there is no table to load."
+        )
+    rows, columns = map(int, frame.shape)
+    if limits.max_rows is not None and rows > limits.max_rows:
+        raise RowLimitError(
+            f"DataFrame exceeds the row limit ({rows} > {limits.max_rows}).",
+            limit_name="max_rows", configured_limit=limits.max_rows,
+            observed_value=rows, input_kind=SourceKind.DATAFRAME.value,
+        )
+    if limits.max_columns is not None and columns > limits.max_columns:
+        raise ColumnLimitError(
+            f"DataFrame exceeds the column limit ({columns} > {limits.max_columns}).",
+            limit_name="max_columns", configured_limit=limits.max_columns,
+            observed_value=columns, input_kind=SourceKind.DATAFRAME.value,
+        )
+    if limits.max_cells is not None and rows > limits.max_cells // columns:
+        cells = rows * columns
+        raise CellLimitError(
+            f"DataFrame exceeds the cell limit ({cells} > {limits.max_cells}).",
+            limit_name="max_cells", configured_limit=limits.max_cells,
+            observed_value=cells, input_kind=SourceKind.DATAFRAME.value,
         )
     duplicated = frame.columns[frame.columns.duplicated()]
     if len(duplicated):
@@ -152,7 +193,7 @@ def _from_dataframe(frame: pd.DataFrame) -> LoadedTable:
     return LoadedTable(frame=frame, metadata=_in_memory(SourceKind.DATAFRAME, frame, ()))
 
 
-def _from_records(records: Sequence[Any]) -> LoadedTable:
+def _from_records(records: Sequence[Any], limits: IngestionLimits) -> LoadedTable:
     """Rows as mappings. Columns in order of first appearance; missing keys are missing cells.
 
     A record that lacks a key another record has gets a missing value there, and
@@ -161,12 +202,25 @@ def _from_records(records: Sequence[Any]) -> LoadedTable:
     """
     if len(records) == 0:
         raise EmptyInputError("The list of records is empty; there is no table to load.")
+    if limits.max_records is not None and len(records) > limits.max_records:
+        raise RecordLimitError(
+            f"Records exceed the record limit ({len(records)} > {limits.max_records}).",
+            limit_name="max_records", configured_limit=limits.max_records,
+            observed_value=len(records), input_kind=SourceKind.RECORDS.value,
+        )
     columns: dict[str, None] = {}
+    total_chars = 0
     for position, record in enumerate(records):
         if not isinstance(record, Mapping):
             raise MalformedInputError(
                 f"Record {position} is a {type(record).__name__}, not a mapping. Every "
                 "record must map column names to values."
+            )
+        if limits.max_keys_per_record is not None and len(record) > limits.max_keys_per_record:
+            raise KeyLimitError(
+                f"Record exceeds the key limit ({len(record)} > {limits.max_keys_per_record}).",
+                limit_name="max_keys_per_record", configured_limit=limits.max_keys_per_record,
+                observed_value=len(record), input_kind=SourceKind.RECORDS.value,
             )
         for key in record:
             if not isinstance(key, str):
@@ -175,10 +229,31 @@ def _from_records(records: Sequence[Any]) -> LoadedTable:
                     "given as records must be strings."
                 )
             columns.setdefault(key, None)
+        if limits.max_record_chars is not None:
+            total_chars += sum(len(str(value)) for value in record.values())
+            if total_chars > limits.max_record_chars:
+                raise CellLimitError(
+                    "Records exceed the accumulated value-character limit.",
+                    limit_name="max_record_chars", configured_limit=limits.max_record_chars,
+                    observed_value=total_chars, input_kind=SourceKind.RECORDS.value,
+                )
     if not columns:
         raise EmptyInputError("Every record is empty; there are no columns to load.")
 
     names = list(columns)
+    if limits.max_columns is not None and len(names) > limits.max_columns:
+        raise ColumnLimitError(
+            f"Records exceed the column limit ({len(names)} > {limits.max_columns}).",
+            limit_name="max_columns", configured_limit=limits.max_columns,
+            observed_value=len(names), input_kind=SourceKind.RECORDS.value,
+        )
+    if limits.max_cells is not None and len(records) > limits.max_cells // len(names):
+        cells = len(records) * len(names)
+        raise CellLimitError(
+            f"Records exceed the cell limit ({cells} > {limits.max_cells}).",
+            limit_name="max_cells", configured_limit=limits.max_cells,
+            observed_value=cells, input_kind=SourceKind.RECORDS.value,
+        )
     frame = pd.DataFrame([dict(record) for record in records], columns=names)
     incomplete = sum(1 for record in records if len(record) < len(names))
     notes = ()
