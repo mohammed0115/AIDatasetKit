@@ -3,6 +3,7 @@
 ```text
 AUTHORIZED_WAVE        = G1-W1
 G1_W1_STATUS           = PASS (branch CI 10/10؛ main CI يُسجَّل في الرد النهائي بعد الـfast-forward)
+                         → أعادته مراجعة CTO إلى CONDITIONAL_PASS بسبب إصدار الـschema؛ الإغلاق في §17
 PRE_WAVE_MAIN_SHA      = 69303b35e30c8dda1b51490360e65bc22ff920ed
 BRANCH                 = g1-w1-ingestion
 TESTED_BRANCH_SHA      = 4d0eb6c2a23014ee7600a184224b51f8ca539052 (آخر commit كود/اختبار/وثائق قبل هذا التقرير)
@@ -107,7 +108,7 @@ loaded.metadata   # LoadMetadata (frozen) -> .to_dict()
 - `AuditArtifact.ingestion: IngestionEvidence | None`، ومفتاح `"ingestion"` في `semantic_dict()` بعد `"dataset"`.
 - `AuditBuilder.build(..., ingestion=LoadMetadata | None)`: يرفض (`EvidenceError`) metadata لا تطابق أعداد الإطار.
 - `report.html`: قسم *Input* (يُحذف إن لم يوجد سجل).
-- `schema_version` بقي `1.0` (المفتاح إضافي).
+- `schema_version` بقي `1.0` (المفتاح إضافي). **[مُصحَّح في §17: هذا الحكم خاطئ، والإصدار الآن `1.1`.]**
 - **الـgolden:** الفرق الوحيد في `examples/audit_churn/`: سطر `"ingestion": null` في `expected_audit_semantic.json` و`expected_audit_semantic.pandas2.json` و`audit.json`، وسطر الـfingerprint في `audit.json` و`report.html`. القيمة `null` لأن الـgolden يُبنى من DataFrame عبر `AuditBuilder` مباشرة، لا عبر `load_table`. لا تغيّر في `lineage.json` ولا في config fingerprint ولا في أي قياس.
 - **Fingerprint:** `0f0fd1d5e9785d46351d7d28dc15d2d4eda4cc7fbc54bf0509a2a76eb3b471a5` → `007838931330c91af0d430a3e90c8b5c98305f76d1f482a511302939d85e2c71`. خطوة `"G1-W1 ingestion record added to the artifact"` في `tests/unit/test_capability_fingerprint_migration.py` مع rollback (حذف المفتاح) يعيد البصمة السابقة حرفياً (`TestTheIngestionStep`).
 
@@ -243,3 +244,113 @@ JSON_XLSX_PARQUET          = NOT_YET_IMPLEMENTED
 | **All** | **102** | **232** | **43.97%** | — | +7 |
 
 محسوبة من جدول §5 في `POST_G0_CAPABILITY_REALITY_AUDIT.md` بعدّ الصفوف آلياً، لا يدوياً.
+
+---
+
+## 17. Addendum — G1-W1 artifact schema closure (append-only)
+
+```text
+PREVIOUS_FINAL_MAIN_SHA    = 90ecfae778a5983d03f4b4fa664327c62b92cff0
+PREVIOUS_MAIN_CI           = 36421870660, 10/10
+SCHEMA_DEFECT              = ingestion changed the artifact shape while schema_version stayed 1.0
+CORRECTION                 = artifact schema 1.1 (minor: additive)
+PUBLICATION_SCHEMA         = unchanged at 1.0
+PACKAGE_VERSION_CHANGED    = NO
+INGESTION_BEHAVIOR_CHANGED = NO
+BRANCH                     = g1-w1-schema-closure
+IMPLEMENTATION_SHA         = 21e62b4 (fix(evidence): bump the artifact schema to 1.1 …)
+DOCS_SHA                   = cdca988
+```
+
+### 17.1 العيب
+
+كتبتُ في §7 أن `schema_version` «بقي `1.0` (المفتاح إضافي)»، وكذلك في الـCHANGELOG وفي
+docstring خطوة الترحيل. هذا خلاف العقد في `evidence/types.py` و`docs/audit-artifact.md`:
+تغيّر شكل السجل يجب أن يُعرف من `schema_version` وحده. قبل التصحيح لم يكن يميّز
+artifact الـG1-W1 عن السابق له إلا مقارنة البصمات. §7 وبقية النص أعلاه تُركت كما كُتبت،
+وأُشير إلى التصحيح في موضعه.
+
+### 17.2 التصحيح
+
+- `ARTIFACT_SCHEMA_VERSION = "1.1"` مع سجل للإصدارات في تعليق الثابت. القاعدة: إضافة
+  حقل أو حذفه أو تغيير معناه ترفع الإصدار؛ الإضافي minor، وغيره major.
+- `lineage.json` يحمل الإصدار نفسه (`lineage_dict()` يستخدم `schema_version` ذاته،
+  واختبار e2e يشترط التساوي)، فأصبح `1.1` أيضاً.
+- `PUBLICATION_SCHEMA_VERSION` بقي `1.0` (اختبار جديد `test_the_publication_layout_is_versioned_separately`).
+- لا تغيير في ingestion ولا الاكتشاف ولا الـAPI العام ولا profiling/quality/preprocessing ولا النشر الذري.
+
+### 17.3 سلسلة الترحيل
+
+| الخطوة | before | after | rollback |
+|---|---|---|---|
+| G1-W1 ingestion record added | `0f0fd1d5…b471a5` | `00783893…c2e71` | حذف `ingestion` |
+| G1-W1 closure: schema 1.0 → 1.1 | `00783893…c2e71` | `3e93dd5e11b75f51d99c16bee263723627b4f93bebeb10c31e2bf31c92ed6be0` | `schema_version = "1.0"` |
+
+- الخطوة السابقة لم تُعدَّل؛ الجديدة بعدها (`TestTheChain` يثبت الاتصال والعكس لكل خطوة).
+- `TestTheSchemaStep`: إعادة الإصدار إلى `1.0` تعيد `00783893…` (الـartifact الوسيط الذي نشره `90ecfae`)؛ ثم حذف المفتاح يعيد `0f0fd1d5…`؛ والمفتاح الوحيد الذي يختلف بين الحالتين هو `schema_version`، أي أن القياسات والـfindings والـdecisions والـlineage لم تتحرك.
+- `TestTheMulticollinearityStep::test_the_schema_version_did_not_move` كان يتحقق من الإصدار *الحالي*، فصار يتحقق منه *عند تلك الخطوة* بالرجوع في السلسلة. الادعاء نفسه (تلك الخطوة لم تغيّر الإصدار) ما زال مُثبَتاً.
+
+### 17.4 الفرق الدلالي للـGolden (مقابل `90ecfae`)
+
+مولَّد آلياً بمقارنة JSON عنصراً عنصراً (`git show 90ecfae:<file>` مقابل الملف الجديد):
+
+| الملف | الفرق |
+|---|---|
+| `expected_audit_semantic.json` (pandas 3) | `/schema_version: "1.0" → "1.1"` فقط |
+| `expected_audit_semantic.pandas2.json` | `/schema_version: "1.0" → "1.1"` فقط |
+| `audit.json` | `/schema_version` و`/provenance/semantic_fingerprint` فقط |
+| `lineage.json` | `/schema_version` فقط |
+| `report.html` | سطران: خلية semantic fingerprint، وتذييل «Artifact schema 1.1». dataset/schema/config fingerprints متطابقة |
+
+لا تغيّر في قيم profiling ولا أنواع الأعمدة ولا findings ولا verdict ولا decisions ولا ingestion metadata ولا dataset/config fingerprints.
+
+### 17.5 ملاحظة إجرائية
+
+أول commit للتصحيحين كُتب برسالة تبدأ بـBOM (PowerShell 5.1 `Set-Content -Encoding utf8`).
+كانا محليين ولم يُدفعا؛ أُعيد إنشاؤهما بـ`git reset --soft 90ecfae` ورسائل بلا BOM، والشجرة
+الناتجة مطابقة بايتاً ببايت (`git diff befd912 cdca988` فارغ). لا شيء مدفوع أُعيدت كتابته.
+
+### 17.6 الاختبارات والـCI
+
+```text
+PRE_CLOSURE_MAIN_SHA       = 90ecfae778a5983d03f4b4fa664327c62b92cff0
+FIRST_SCHEMA_FIX_SHA       = 21e62b4f3952bbc12a773c2ba64a10e1481c5242
+PACKAGING_SMOKE_FIX_SHA    = e491eb6a422eff3a925436f7513a4155e2b434cf
+FINAL_LOCAL_TESTED_SHA     = e491eb6a422eff3a925436f7513a4155e2b434cf
+FINAL_MAIN_SHA             = NOT_INTEGRATED; main and origin/main remain at PRE_CLOSURE_MAIN_SHA
+PYTHON                     = 3.12.3
+NUMPY                      = 2.5.2
+PANDAS                     = 3.0.5
+SCIPY                      = 1.18.0
+SCIKIT_LEARN               = 1.9.0
+PYTEST                     = 8.3.3
+PACKAGE_VERSION            = 0.1.0a1 (unchanged)
+ARTIFACT_SCHEMA            = 1.0 -> 1.1
+PUBLICATION_SCHEMA         = 1.0 (unchanged)
+FOCUSED_TESTS              = 736 passed (on cdca988; before the smoke-script-only follow-up)
+FULL_PYTEST                = 4329 passed, 46 skipped, 0 failed, 0 errors; 424.79 s
+JUNIT                      = 4375 tests, 0 failures, 0 errors, 46 skipped
+BRANCH_CI                  = NOT RUN; branch not pushed; GitHub CLI unauthenticated
+FINAL_EVIDENCE_CI          = NOT RUN
+MAIN_CI                    = NOT RUN; no fast-forward performed
+G1_W2                      = NOT STARTED; NO_GO_PENDING_CTO_REVIEW
+```
+
+- The candidate was tested from a separate detached worktree at the exact committed SHA above. CI-equivalent commands: `python -m pytest --collect-only -q` and `python -m pytest -rfE --junitxml=junit.xml`. Collection reported `4374 items / 1 skipped`; the full run and JUnit report agree on 4329 passed, 46 skipped, zero failures, and zero errors (4375 JUnit cases including the collection skip).
+- The focused command covered artifact/evidence schemas, fingerprints and migration rollback, golden fixtures, serialization, publication, ingestion, packaging, G0.1 performance guards, architecture boundaries, audit end-to-end, and CLI ingestion: 736 passed. The full suite above was rerun after the packaging-smoke correction.
+- `scripts/release_smoke_test.sh` initially failed because its installed-artifact assertion hard-coded schema `1.0`. The follow-up changes only that assertion to compare against exported `ARTIFACT_SCHEMA_VERSION == "1.1"`. The CI release smoke then passed for both wheel and sdist: build, twine metadata check, clean installs, CLI, audit, and published artifact checks. No distribution was published.
+- Programmatic Golden diff against `90ecfae`: both semantic fixtures changed only `/schema_version`; `audit.json` changed only `/schema_version` and `/provenance/semantic_fingerprint`; `lineage.json` changed only `/schema_version`; HTML changed only the semantic fingerprint display and artifact-schema footer. Dataset, schema, config and plan fingerprints remained identical. The migration tests prove `3e93dd5e…` rolls back to `00783893…` by setting schema to `1.0`, then to `0f0fd1d5…` by removing `ingestion`.
+- Remote CI was not run: `gh auth status` reports no authenticated GitHub host, and `g1-w1-schema-closure` does not yet exist on `origin`. No branch push, evidence-commit CI, main fast-forward, or main CI is claimed here. At the time of this report, local `main` and `origin/main` both remain exactly `90ecfae778a5983d03f4b4fa664327c62b92cff0`.
+- Remaining G1 gaps from the capability audit: G1-04 XLSX, G1-05 XLS, G1-06 Parquet, G1-07 Feather/Arrow, G1-08 JSON, G1-09 JSONL, G1-10 XML, G1-11 YAML, G1-14 SQLite, G1-15 PostgreSQL/query results, G1-24 Excel sheets, G1-25 chunked/streamed reads, and G1-26 resource limits remain missing; G1-13 still refuses generators/other iterables and is not wired through `AIDataFacade.load`; G1-17 supports only named encodings, without automatic detection; G1-22 does not infer dates from file text. G1-16 document extraction remains explicitly out of scope.
+
+### 17.7 الحالة
+
+```text
+G1_W1_FINAL_GATE           = BLOCKED (remote branch/final-evidence/main CI and main integration not verified)
+P0_1_STATUS                = CLOSED (unchanged; G0.1 evidence)
+P0_2_STATUS                = CLOSED (G1-W1 ingestion evidence)
+READY_FOR_G1_W2            = NO; separate CTO authorization required
+G1_CERTIFIED_PROGRESS      = 38.46% (10/26)   — بلا تغيير
+OVERALL_CERTIFIED_PROGRESS = 43.97% (102/232) — بلا تغيير
+G1_W2_AUTHORIZATION        = NO_GO_PENDING_CTO_REVIEW
+```
