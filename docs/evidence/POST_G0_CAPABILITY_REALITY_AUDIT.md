@@ -53,9 +53,9 @@ AUDIT_DOCUMENTS       = CORRECT
 - **تغيّر الدليل دون الحالة:** G1-01، G1-19.
 - **النسب (من الجدول):** G1 = 10/26 = **38.46%**، G10 = 18/28 = **64.29%**، الكلي = 102/232 = **43.97%**.
 
-**تحديث 4 — G1-W2 (resource governance):**
+**تحديث 4 — G1-W2 (resource governance; local evidence complete, remote certification pending):**
 
-- **G1-26: CLOSED.** `IngestionLimits` is immutable and finite by default;
+- **G1-26: implemented, interim `PARTIAL`.** `IngestionLimits` is immutable and finite by default;
   file bytes, CSV/TSV rows, columns, cells and field length are checked before
   pandas parsing, while DataFrames and supported records are checked before
   analysis or materialization. CLI defaults equal library defaults.
@@ -65,8 +65,9 @@ AUDIT_DOCUMENTS       = CORRECT
 - **G1-13, G1-17 and G1-22 remain PARTIAL.** Generators, automatic encoding
   detection and date inference were not started.
 - Artifact schema remains `1.1`, publication schema remains `1.0`, and the
-  fingerprint contract is unchanged. With the final G1-W2 evidence run, G1 is
-  11/26 = **42.31%** and overall progress is 103/232 = **44.40%**.
+  fingerprint contract is unchanged. Certified totals remain G1 = 10/26 =
+  **38.46%** and overall = 102/232 = **43.97%** until branch, final evidence,
+  and main CI pass.
 
 ## 1. Main integration
 
@@ -172,7 +173,7 @@ G0_MAIN_INTEGRATION = PASS
 | G1-23 | G1 | Row/column counts and memory estimate | `SUPPORTED_AND_TESTED` | DatasetProfile.row_count/column_count/memory_usage_bytes | tests/unit/test_profiler.py | — | — |
 | G1-24 | G1 | Excel sheets | `MISSING` | no spreadsheet reader | — | No reader | P2 |
 | G1-25 | G1 | Large files: chunking / streaming | `MISSING` | validation pass streams records, but accepted input is still one pandas table | tests/unit/test_ingestion_limits.py; G1-W2 report | No true chunked profiling path; explicitly out of scope | P1 |
-| G1-26 | G1 | Resource limits (size, rows, columns) | `SUPPORTED_AND_TESTED` | ingestion/types.py::IngestionLimits; loader.py and delimited.py enforce finite bytes/rows/columns/cells/field limits before pandas or analysis | tests/unit/test_ingestion_limits.py; tests/integration/test_cli_ingestion.py; G1-W2 report | — | — |
+| G1-26 | G1 | Resource limits (size, rows, columns) | `PARTIAL` (implementation and local evidence complete; remote certification pending) | ingestion/types.py::IngestionLimits; loader.py and delimited.py enforce finite bytes/rows/columns/cells/field limits before pandas or analysis | tests/unit/test_ingestion_limits.py; tests/integration/test_cli_ingestion.py; packaging smoke; G1-W2 report | Promote only after branch/final/main CI | P1 |
 | G1-27 | G1 | Unsupported format refused with a clear message | `SUPPORTED_AND_TESTED` | cli/main.py suffix check | tests/integration/test_audit_end_to_end.py (not really parquet) | — | — |
 | G2-01 | G2 | Missing values per column and dataset | `SUPPORTED_AND_TESTED` | profiler.py _profile_column; checks.check_missing_values | test_profiler.py, test_quality.py | — | — |
 | G2-02 | G2 | Duplicate rows | `SUPPORTED_AND_TESTED` | profiler._count_duplicate_rows; check_duplicate_rows | test_profiler.py, test_quality.py | — | — |
@@ -571,7 +572,7 @@ G0_MAIN_INTEGRATION = PASS
 |---|---|---:|---:|---:|---|---|
 | G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
 | G0.1 | Profiling performance hotfix | — | — | — | PASS | P0-1 مغلق (انظر §0) |
-| G1 | Ingestion | 10 | 26 | 38.46% | IN PROGRESS | W1 مغلقة؛ W2 تنتظر مراجعة CTO |
+| G1 | Ingestion | 10 | 26 | 38.46% | IN PROGRESS | W1 مغلقة؛ W2 local PASS، remote CI pending |
 | G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | تواريخ ونص وقيم |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | عمليات جدولية |
 | G4 | EDA & Statistics | 9 | 13 | 69.23% | AUDIT | ارتباط فئوي واختبارات |
@@ -590,7 +591,7 @@ G0_MAIN_INTEGRATION = PASS
 | Gate | SUPPORTED_AND_TESTED | SUPPORTED_NOT_SUFFICIENTLY_TESTED | PARTIAL | MISSING | BLOCKED | NOT_APPLICABLE | OUT_OF_SCOPE |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | G0 | 16 | 0 | 0 | 0 | 0 | 0 | 0 |
-| G1 | 10 | 0 | 3 | 13 | 0 | 0 | 1 |
+| G1 | 10 | 0 | 4 | 12 | 0 | 0 | 1 |
 | G2 | 15 | 0 | 2 | 5 | 0 | 0 | 0 |
 | G3 | 2 | 0 | 5 | 10 | 0 | 1 | 0 |
 | G4 | 9 | 0 | 2 | 2 | 0 | 0 | 0 |
