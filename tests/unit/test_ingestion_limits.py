@@ -66,6 +66,11 @@ class TestIngestionLimits:
         with pytest.raises(RowLimitError):
             load_table(path, options=LoadOptions(delimiter=","), limits=IngestionLimits(max_rows=1))
 
+    def test_long_field_within_policy_is_not_rejected_by_csv_default(self, tmp_path):
+        value = "x" * 200_000
+        path = write(tmp_path / "long.csv", f"a\n{value}\n")
+        assert load_table(path, limits=IngestionLimits(max_field_length=200_000)).frame.iloc[0, 0] == value
+
     def test_records_character_limit_and_large_integer_cell_guard(self):
         records = [{"a": "abcd"}]
         assert load_table(records, limits=IngestionLimits(max_record_chars=4)).frame.shape == (1, 1)

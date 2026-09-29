@@ -35,6 +35,8 @@ from __future__ import annotations
 
 import csv
 import io
+import sys
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -114,26 +116,45 @@ def plan_delimited(
         encoding = "utf-8-sig"
         notes.append("A UTF-8 byte-order mark was found, so the file was read as utf-8-sig.")
 
-    sample, complete = _read_sample(path, encoding)
-    if not sample.strip() and complete:
-        raise EmptyInputError(f"{path.name} contains only whitespace; there is no table to read.")
+    with _field_size_limit(limits.max_field_length):
+        sample, complete = _read_sample(path, encoding)
+        if not sample.strip() and complete:
+            raise EmptyInputError(f"{path.name} contains only whitespace; there is no table to read.")
 
-    delimiter, source, single = _choose(path, sample, complete, fmt, options)
-    if single:
-        notes.append(
-            "No supported delimiter (',', ';', tab, '|') separates the records, so "
-            "the file was read as a single column."
+        try:
+            delimiter, source, single = _choose(path, sample, complete, fmt, options)
+        except csv.Error:
+            raise FieldLengthLimitError(
+                f"{path.name} exceeds the field-length limit.",
+                limit_name="max_field_length", configured_limit=limits.max_field_length,
+                observed_value=(limits.max_field_length or sys.maxsize) + 1,
+                input_kind="file",
+            ) from None
+        if single:
+            notes.append(
+                "No supported delimiter (',', ';', tab, '|') separates the records, so "
+                "the file was read as a single column."
+            )
+        rows, columns = _validate(path, encoding, delimiter, options.header, limits)
+        return DelimitedPlan(
+            encoding=encoding,
+            delimiter=delimiter,
+            delimiter_source=source,
+            single_column=single,
+            data_rows=rows,
+            columns=columns,
+            warnings=tuple(notes),
         )
-    rows, columns = _validate(path, encoding, delimiter, options.header, limits)
-    return DelimitedPlan(
-        encoding=encoding,
-        delimiter=delimiter,
-        delimiter_source=source,
-        single_column=single,
-        data_rows=rows,
-        columns=columns,
-        warnings=tuple(notes),
-    )
+
+
+@contextmanager
+def _field_size_limit(limit: int | None):
+    previous = csv.field_size_limit()
+    csv.field_size_limit(sys.maxsize if limit is None else limit)
+    try:
+        yield
+    finally:
+        csv.field_size_limit(previous)
 
 
 # --------------------------------------------------------------------------- #
@@ -178,7 +199,9 @@ def _shape(sample: str, complete: bool, delimiter: str) -> _Shape:
         for record in csv.reader(io.StringIO(sample), delimiter=delimiter, strict=True):
             if record:
                 widths.append(len(record))
-    except csv.Error:
+    except csv.Error as error:
+        if "field larger than field limit" in str(error):
+            raise
         broken = complete
     if not complete and widths:
         widths.pop()
