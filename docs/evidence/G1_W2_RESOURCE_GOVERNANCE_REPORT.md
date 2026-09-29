@@ -8,12 +8,12 @@ BASELINE_SHA = 79b66dad2863bd97cbc641d0353f6d65ad9ec839
 FIRST_CODE_SHA = d2712fb7ccb197c4e88805c38e4471fb8ca9b903
 LOCAL_TESTED_SHA = f128ccd6b63507e0ba4baa2dcc0526360fc31e0d
 PACKAGING_TESTED_SHA = d398926e87bed127b7dfb4971d971d7f6dc29ca5
-FINAL_BRANCH_SHA = PENDING
+FINAL_BRANCH_SHA = PENDING_FINAL_EVIDENCE_COMMIT
 FINAL_MAIN_SHA = PENDING
 CURRENT_HEAD = d398926e87bed127b7dfb4971d971d7f6dc29ca5
 ORIGIN_MAIN = 79b66dad2863bd97cbc641d0353f6d65ad9ec839
 WORKTREE_CLEAN = YES
-G1_W2_FINAL_GATE = BLOCKED_PENDING_REMOTE_CI
+G1_W2_FINAL_GATE = BLOCKED_PENDING_FINAL_BRANCH_CI_AND_MAIN_CI
 G1_W3_AUTHORIZATION = NO_GO_PENDING_CTO_REVIEW
 ```
 
@@ -228,8 +228,9 @@ difference: **NONE**.
 
 ## Capability accounting
 
-- G1-26 Resource limits: implementation and local evidence are complete; the
-  authoritative row remains `PARTIAL` until remote branch/final/main CI.
+- G1-26 Resource limits: implementation, local evidence and first branch CI
+  are complete; the authoritative row remains `PARTIAL` until final-commit and
+  main CI close.
 - G1-25 Chunking/streaming: remains `MISSING`; validation streaming is not
   chunked profiling.
 - G1-13 records: remains `PARTIAL`; generators remain refused.
@@ -245,7 +246,7 @@ remote closure:
 |---|---:|---:|---:|---|
 | G0 | 16 | 16 | 100.00% | PASS |
 | G0.1 | — | — | — | PASS, outside G0-G12 denominator |
-| G1 | 10 | 26 | 38.46% | G1-W2 local evidence complete; CI pending |
+| G1 | 10 | 26 | 38.46% | First branch CI pass; final/main CI pending |
 | G2 | 15 | 22 | 68.18% | AUDIT |
 | G3 | 2 | 17 | 11.76% | AUDIT |
 | G4 | 9 | 13 | 69.23% | AUDIT |
@@ -266,19 +267,23 @@ G1-13, G1-17, G1-22 remain `PARTIAL`. P0-1 and P0-2 remain `CLOSED`.
 
 ## Remote CI and integration
 
-`gh auth status` reports that no GitHub host is logged in. No remote G1-W2
-branch ref or CI run has been verified yet. The fields below are intentionally
-not claimed as passing:
+`gh auth status` reports that no GitHub host is logged in. GitKraken push
+successfully published the branch; public GitHub Actions pages verified branch
+run `36577314053` on exact SHA `f8d01fd2ff33508de995176242c0014d22258eef` as
+successful. Both package jobs and all eight test-matrix jobs succeeded (10/10,
+zero failures/errors; 5m35s). This evidence-only descendant requires its own
+fresh CI run. Main integration remains blocked until that final branch run
+passes.
 
 ```text
-BRANCH_CI_RUN = NOT_RUN
-BRANCH_CI_SHA = NOT_RUN
-BRANCH_CI_JOBS = 0/10
-BRANCH_CI_STATUS = BLOCKED_PENDING_PUSH_AND_CI_ACCESS
+BRANCH_CI_RUN = 36577314053
+BRANCH_CI_SHA = f8d01fd2ff33508de995176242c0014d22258eef
+BRANCH_CI_JOBS = 10/10
+BRANCH_CI_STATUS = PASS
 FINAL_BRANCH_CI_RUN = NOT_RUN
 FINAL_BRANCH_CI_SHA = NOT_RUN
 FINAL_BRANCH_CI_JOBS = 0/10
-FINAL_BRANCH_CI_STATUS = BLOCKED
+FINAL_BRANCH_CI_STATUS = PENDING_EVIDENCE_COMMIT_CI
 MAIN_CI_RUN = NOT_RUN
 MAIN_CI_SHA = NOT_RUN
 MAIN_CI_JOBS = 0/10
