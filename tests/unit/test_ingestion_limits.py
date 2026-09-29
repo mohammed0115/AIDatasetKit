@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from aidatasetkit.cli.main import main
+from aidatasetkit.cli.main import build_parser, main
 from aidatasetkit.core.exceptions import (
     CellLimitError,
     ColumnLimitError,
@@ -89,3 +89,12 @@ class TestIngestionLimits:
             main(["audit", "missing.csv", "--max-rows", "0"])
         assert invalid_exit.value.code == 1
         assert "positive integer" in capsys.readouterr().err
+
+    def test_cli_defaults_match_library_defaults(self):
+        args = build_parser().parse_args(["audit", "input.csv"])
+        defaults = IngestionLimits()
+        assert args.max_source_bytes == defaults.max_source_bytes
+        assert args.max_rows == defaults.max_rows
+        assert args.max_columns == defaults.max_columns
+        assert args.max_cells == defaults.max_cells
+        assert args.max_field_length == defaults.max_field_length

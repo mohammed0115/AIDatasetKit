@@ -270,10 +270,13 @@ def _validate(
     records = 0
     names: list[str] = []
     anything = False
+    previous_field_limit = csv.field_size_limit()
+    if limits.max_field_length is not None:
+        csv.field_size_limit(limits.max_field_length)
     try:
-        with open(path, encoding=encoding, newline="", errors="strict") as handle:
-            reader = csv.reader(handle, delimiter=delimiter, strict=True)
-            try:
+        try:
+            with open(path, encoding=encoding, newline="", errors="strict") as handle:
+                reader = csv.reader(handle, delimiter=delimiter, strict=True)
                 for record in reader:
                     if not record:
                         continue
@@ -308,23 +311,23 @@ def _validate(
                             limit_name="max_cells", configured_limit=limits.max_cells,
                             observed_value=cells, input_kind="file",
                         )
-                    if limits.max_field_length is not None:
-                        longest = max((len(value) for value in record), default=0)
-                        if longest > limits.max_field_length:
-                            raise FieldLengthLimitError(
-                                f"{path.name} exceeds the field-length limit.",
-                                limit_name="max_field_length", configured_limit=limits.max_field_length,
-                                observed_value=longest, input_kind="file",
-                            )
                     if not anything and any(value.strip() for value in record):
                         anything = True
-            except csv.Error as error:
-                raise MalformedInputError(
-                    f"{path.name}: malformed quoting near line {reader.line_num} ({error}). "
-                    "Check for an unclosed or stray quote character."
+        except csv.Error as error:
+            if limits.max_field_length is not None and "field larger than field limit" in str(error):
+                raise FieldLengthLimitError(
+                    f"{path.name} exceeds the field-length limit.",
+                    limit_name="max_field_length", configured_limit=limits.max_field_length,
+                    observed_value=limits.max_field_length + 1, input_kind="file",
                 ) from None
+            raise MalformedInputError(
+                f"{path.name}: malformed quoting near line {reader.line_num}. "
+                "Check for an unclosed or stray quote character."
+            ) from None
     except UnicodeDecodeError as error:
         raise _encoding_error(path, encoding, error) from None
+    finally:
+        csv.field_size_limit(previous_field_limit)
 
     if records == 0 or not anything:
         raise EmptyInputError(f"{path.name} contains no values; there is no table to read.")

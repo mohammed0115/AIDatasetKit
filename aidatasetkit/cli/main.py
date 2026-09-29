@@ -49,6 +49,9 @@ from aidatasetkit.evidence import (
     verdict_at_least,
 )
 
+
+_DEFAULT_INGESTION_LIMITS = IngestionLimits()
+
 __all__ = ["main", "EXIT_CODES"]
 
 _logger = logging.getLogger(__name__)
@@ -225,14 +228,14 @@ def build_parser() -> argparse.ArgumentParser:
             "needs this flag."
         ),
     )
-    for option, destination, help_text in (
-        ("--max-input-bytes", "max_source_bytes", "Maximum source file bytes."),
-        ("--max-rows", "max_rows", "Maximum data rows."),
-        ("--max-columns", "max_columns", "Maximum columns."),
-        ("--max-cells", "max_cells", "Maximum total data cells."),
-        ("--max-field-length", "max_field_length", "Maximum CSV/TSV field characters."),
+    for option, destination, help_text, default in (
+        ("--max-input-bytes", "max_source_bytes", "Maximum source file bytes.", _DEFAULT_INGESTION_LIMITS.max_source_bytes),
+        ("--max-rows", "max_rows", "Maximum data rows.", _DEFAULT_INGESTION_LIMITS.max_rows),
+        ("--max-columns", "max_columns", "Maximum columns.", _DEFAULT_INGESTION_LIMITS.max_columns),
+        ("--max-cells", "max_cells", "Maximum total data cells.", _DEFAULT_INGESTION_LIMITS.max_cells),
+        ("--max-field-length", "max_field_length", "Maximum CSV/TSV field characters.", _DEFAULT_INGESTION_LIMITS.max_field_length),
     ):
-        audit.add_argument(option, dest=destination, type=_positive_integer, help=help_text)
+        audit.add_argument(option, dest=destination, type=_positive_integer, default=default, help=help_text)
     audit.add_argument(
         "--debug", action="store_true", help="Show the full traceback on failure."
     )
