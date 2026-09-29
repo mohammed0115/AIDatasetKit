@@ -89,12 +89,12 @@ PY
   # manifest, and every file's size and digest, or a refusal.
   "$BIN/python" - "$WORK/out-$KIND" <<'PY' || exit 1
 import sys
-from aidatasetkit.evidence import read_current
+from aidatasetkit.evidence import ARTIFACT_SCHEMA_VERSION, read_current
 run = read_current(sys.argv[1])
 assert sorted(run.contents) == ["audit.json", "lineage.json", "report.html"], sorted(run.contents)
 assert all(run.contents.values()), "an artifact is empty"
 a = run.json("audit.json")
-assert a["schema_version"] == "1.0", a["schema_version"]
+assert a["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.1", a["schema_version"]
 assert a["verdict"] == "blocked", a["verdict"]
 assert a["columns"] and a["findings"], "artifact is empty"
 PY
