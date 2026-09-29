@@ -330,8 +330,8 @@ PUBLICATION_SCHEMA         = 1.0 (unchanged)
 FOCUSED_TESTS              = 736 passed (on cdca988; before the smoke-script-only follow-up)
 FULL_PYTEST                = 4329 passed, 46 skipped, 0 failed, 0 errors; 424.79 s
 JUNIT                      = 4375 tests, 0 failures, 0 errors, 46 skipped
-BRANCH_CI                  = NOT RUN; branch not pushed; GitHub CLI unauthenticated
-FINAL_EVIDENCE_CI          = NOT RUN
+BRANCH_CI                  = run 36534163130, SUCCESS, 10/10, SHA bd775acd65bcb9c67d441a5c76ace6cda4b4668a
+FINAL_EVIDENCE_CI          = PENDING; requires the next evidence-only commit and push
 MAIN_CI                    = NOT RUN; no fast-forward performed
 G1_W2                      = NOT STARTED; NO_GO_PENDING_CTO_REVIEW
 ```
@@ -340,13 +340,13 @@ G1_W2                      = NOT STARTED; NO_GO_PENDING_CTO_REVIEW
 - The focused command covered artifact/evidence schemas, fingerprints and migration rollback, golden fixtures, serialization, publication, ingestion, packaging, G0.1 performance guards, architecture boundaries, audit end-to-end, and CLI ingestion: 736 passed. The full suite above was rerun after the packaging-smoke correction.
 - `scripts/release_smoke_test.sh` initially failed because its installed-artifact assertion hard-coded schema `1.0`. The follow-up changes only that assertion to compare against exported `ARTIFACT_SCHEMA_VERSION == "1.1"`. The CI release smoke then passed for both wheel and sdist: build, twine metadata check, clean installs, CLI, audit, and published artifact checks. No distribution was published.
 - Programmatic Golden diff against `90ecfae`: both semantic fixtures changed only `/schema_version`; `audit.json` changed only `/schema_version` and `/provenance/semantic_fingerprint`; `lineage.json` changed only `/schema_version`; HTML changed only the semantic fingerprint display and artifact-schema footer. Dataset, schema, config and plan fingerprints remained identical. The migration tests prove `3e93dd5e…` rolls back to `00783893…` by setting schema to `1.0`, then to `0f0fd1d5…` by removing `ingestion`.
-- Remote CI was not run: `gh auth status` reports no authenticated GitHub host, and `g1-w1-schema-closure` does not yet exist on `origin`. No branch push, evidence-commit CI, main fast-forward, or main CI is claimed here. At the time of this report, local `main` and `origin/main` both remain exactly `90ecfae778a5983d03f4b4fa664327c62b92cff0`.
+- Branch CI run `36534163130` passed all 10 jobs on the exact pushed SHA `bd775acd65bcb9c67d441a5c76ace6cda4b4668a` (2 package + 8 test jobs). `gh auth status` reports no authenticated CLI host; the result was verified from the public GitHub Actions run page. Final evidence-commit CI, main fast-forward, and main CI are still pending and are not claimed. At the time of this report, local `main` and `origin/main` both remain exactly `90ecfae778a5983d03f4b4fa664327c62b92cff0`.
 - Remaining G1 gaps from the capability audit: G1-04 XLSX, G1-05 XLS, G1-06 Parquet, G1-07 Feather/Arrow, G1-08 JSON, G1-09 JSONL, G1-10 XML, G1-11 YAML, G1-14 SQLite, G1-15 PostgreSQL/query results, G1-24 Excel sheets, G1-25 chunked/streamed reads, and G1-26 resource limits remain missing; G1-13 still refuses generators/other iterables and is not wired through `AIDataFacade.load`; G1-17 supports only named encodings, without automatic detection; G1-22 does not infer dates from file text. G1-16 document extraction remains explicitly out of scope.
 
 ### 17.7 الحالة
 
 ```text
-G1_W1_FINAL_GATE           = BLOCKED (remote branch/final-evidence/main CI and main integration not verified)
+G1_W1_FINAL_GATE           = BLOCKED (final evidence-commit CI and main integration/main CI not yet verified)
 P0_1_STATUS                = CLOSED (unchanged; G0.1 evidence)
 P0_2_STATUS                = CLOSED (G1-W1 ingestion evidence)
 READY_FOR_G1_W2            = NO; separate CTO authorization required
