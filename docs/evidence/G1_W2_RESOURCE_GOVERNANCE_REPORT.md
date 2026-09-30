@@ -415,10 +415,25 @@ FULL_TESTED_SHA     = 4252c521865a27cbc672e997dd0a7e519714f43b
 G1_W2_MUTATIONS     = 13 total, 13 KILLED, 0 SURVIVED, 0 HARNESS_ERROR, 0 TEST_ENVIRONMENT_ERROR
 FULL_SUITE          = 4373 passed, 46 skipped, 0 failed, 0 errors (4418 items + 1 module skip)
 FOCUSED             = 536 passed in 86.11 s
-BRANCH_CI           = PENDING (recorded only once observed)
+FINAL_BRANCH_SHA    = c0759c3ae3fbf0571bdce95b9f48df3c985c13c4
+BRANCH_CI           = run 36699501991 on c0759c3ae3fbf0571bdce95b9f48df3c985c13c4:
+                      push, completed, success, attempt 1, 10/10 jobs success
+                      (ubuntu/windows x minimum, minimum + extras, reference,
+                      reference + extras, build/install/smoke),
+                      2026-09-30T09:58:23Z to 10:04:16Z
 MAIN_CI             = PENDING (recorded only once observed)
-PROGRESS            = provisional: G1 11/26 and overall 103/232 stand only after main CI
+PROGRESS            = provisional until main CI: G1 11/26 = 42.31%, overall
+                      103/232 = 44.40% (official before the seal: 10/26 = 38.46%,
+                      102/232 = 43.97%)
 ```
+
+G1-26 (Resource limits) evidence after this closure: finite defaults and
+their exact values, file preflight before any parser, CSV/TSV row, column,
+cell and field limits with exact boundaries, DataFrame limits without a copy,
+records limits, sentinel privacy, early termination, no publication after a
+resource refusal, CLI/library parity, 13/13 dedicated mutations, full suite
+at `4252c52`, and branch CI 10/10 including build/install/smoke. The facade
+observation above is recorded for CTO review.
 
 Raw summaries: [runs/g1_w2_mutations.md](runs/g1_w2_mutations.md) and
 [runs/g1_w2_full_suite.md](runs/g1_w2_full_suite.md).

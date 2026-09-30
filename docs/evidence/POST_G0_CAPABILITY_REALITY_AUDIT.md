@@ -67,6 +67,11 @@ AUDIT_DOCUMENTS       = CORRECT
 - Artifact schema remains `1.1`, publication schema remains `1.0`, and the
   fingerprint contract is unchanged. Certified totals are G1 = 11/26 =
   **42.31%** and overall = 103/232 = **44.40%**.
+- **Mutation closure (CTO-requested, branch `g1-w2-mutation-closure`).** 13
+  dedicated G1-W2 mutations, 13 killed; two field-length defects found and
+  fixed; full suite 4373 passed, 46 skipped at `4252c52`. The G1-26 totals
+  above stay provisional until main CI on the closure commit and the CTO's
+  final seal; see the G1-W2 report's final mutation closure section.
 
 ## 1. Main integration
 
