@@ -13,11 +13,16 @@ LOCAL_PACKAGING_ARTIFACT_SOURCE_SHA = d398926e87bed127b7dfb4971d971d7f6dc29ca5
 PACKAGING_CI_TESTED_SHA = 5c1c966d9382b7b10a8ca722a8a8c5987cc6f2c0
 FINAL_BRANCH_SHA = 5c1c966d9382b7b10a8ca722a8a8c5987cc6f2c0
 FINAL_MAIN_SHA = 5c1c966d9382b7b10a8ca722a8a8c5987cc6f2c0
-REPORT_CLOSURE_COMMIT = pending this docs-only commit
+REPORT_CLOSURE_COMMIT = 402df7bbeede5ee0e96bd15cd8495f58daf9b920
+REPORT_CLOSURE_BRANCH_CI_RUN = 36682053004 (push, conclusion success)
 CURRENT_HEAD_BEFORE_CLOSURE = 5c1c966d9382b7b10a8ca722a8a8c5987cc6f2c0
 ORIGIN_MAIN_PRE_INTEGRATION = 79b66dad2863bd97cbc641d0353f6d65ad9ec839
 WORKTREE_CLEAN_BEFORE_REPORT_CLOSURE = YES
-G1_W2_FINAL_GATE = PENDING_FINAL_REPORT_COMMIT_CI
+HISTORY_CORRECTION = docs-only descendant of 402df7b restores the historical
+                     audit-time OVERALL_CERTIFIED_PROGRESS (40.95%) in
+                     POST_G0_CAPABILITY_REALITY_AUDIT.md, which 402df7b had
+                     overwritten; certified counts are unchanged
+G1_W2_FINAL_GATE = PENDING_CORRECTION_COMMIT_BRANCH_AND_MAIN_CI
 G1_W3_AUTHORIZATION = NO_GO_PENDING_CTO_REVIEW
 ```
 
@@ -334,6 +339,14 @@ FINAL_MAIN_SHA = 5c1c966d9382b7b10a8ca722a8a8c5987cc6f2c0
 Local `main` was fast-forwarded to `5c1c966`, pushed normally without a merge
 commit, and its CI run passed. No force-push, tag, release or PyPI publication
 occurred. G1-W3 was not started.
+
+Re-verification on 2026-09-30 (unauthenticated public Actions API,
+`/actions/runs/{id}` and `/actions/runs/{id}/jobs`): runs `36577314053`,
+`36578258496` and `36679042688` each report `event=push`, `status=completed`,
+`conclusion=success`, `run_attempt=1`, the SHA recorded above, and 10 jobs
+all `success` (ubuntu/windows × minimum, minimum + extras, reference,
+reference + extras, build/install/smoke). `dist/` artifacts still hash to the
+wheel and sdist SHA-256 values recorded above.
 
 The final report-closure commit will be a documentation-only descendant of
 `5c1c966`; it will receive a fresh branch workflow and fresh main workflow

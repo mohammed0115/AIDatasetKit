@@ -610,7 +610,7 @@ G0_STATUS                    = PASS
 G0_MAIN_INTEGRATION          = PASS
 GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
-OVERALL_CERTIFIED_PROGRESS   = 44.40%
+OVERALL_CERTIFIED_PROGRESS   = 40.95%
 READY_FOR_G1_IMPLEMENTATION  = YES after G0.1 (P0-1 closed; P0-2 is a G1 item)
 NEXT_AUTHORIZED_ACTION       = owner authorisation of G0.1, then G1 wave 1
 ```
