@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import csv
 import io
-import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -117,20 +116,16 @@ def plan_delimited(
         encoding = "utf-8-sig"
         notes.append("A UTF-8 byte-order mark was found, so the file was read as utf-8-sig.")
 
-    with _field_size_limit(limits.max_field_length):
+    # Detection parses the sample under every candidate delimiter, and under a
+    # wrong one a whole line is a single field. The sample is already bounded by
+    # SAMPLE_CHARS, so it is parsed without a field cap; max_field_length is
+    # enforced once, by _validate, under the delimiter actually chosen.
+    with _field_size_limit(None):
         sample, complete = _read_sample(path, encoding)
         if not sample.strip() and complete:
             raise EmptyInputError(f"{path.name} contains only whitespace; there is no table to read.")
 
-        try:
-            delimiter, source, single = _choose(path, sample, complete, fmt, options)
-        except csv.Error:
-            raise FieldLengthLimitError(
-                f"{path.name} exceeds the field-length limit.",
-                limit_name="max_field_length", configured_limit=limits.max_field_length,
-                observed_value=(limits.max_field_length or sys.maxsize) + 1,
-                input_kind="file",
-            ) from None
+        delimiter, source, single = _choose(path, sample, complete, fmt, options)
         if single:
             notes.append(
                 "No supported delimiter (',', ';', tab, '|') separates the records, so "
@@ -148,10 +143,15 @@ def plan_delimited(
         )
 
 
+#: The largest field cap :func:`csv.field_size_limit` accepts on every platform.
+#: It takes a C ``long``, which is 32 bits on Windows, so ``sys.maxsize`` overflows there.
+_UNBOUNDED_FIELD_CHARS = 2**31 - 1
+
+
 @contextmanager
 def _field_size_limit(limit: int | None):
     previous = csv.field_size_limit()
-    csv.field_size_limit(sys.maxsize if limit is None else limit)
+    csv.field_size_limit(_UNBOUNDED_FIELD_CHARS if limit is None else limit)
     try:
         yield
     finally:
