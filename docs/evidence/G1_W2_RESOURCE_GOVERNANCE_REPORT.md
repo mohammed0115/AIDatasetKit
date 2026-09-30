@@ -400,3 +400,135 @@ Remaining G1 gaps: G1-25 true chunked profiling remains `MISSING`; G1-13 generat
 
 G1-W3 was not started. No new formats, networking, databases, model-training,
 visualization, Masari or MWIE work was performed.
+
+## G1-W2 FINAL MUTATION CLOSURE
+
+```text
+CTO_DECISION        = G1-W2 CONDITIONAL_PASS; final seal not approved;
+                      GO = mutation closure only; G1-W3 = NO_GO
+BLOCKER_BEING_CLOSED = the 13/13 above mixed 8 G1-W1 mutations with 5 G1-W2
+                      ones, and the mandatory G1-W2 weakenings were not all shown
+PRE_CLOSURE_SHA     = 02057aaedd34ab6be36615d44f7e611e5c3e08c7 (main = origin/main, clean)
+BRANCH              = g1-w2-mutation-closure
+MUTATION_CODE_SHA   = 4252c521865a27cbc672e997dd0a7e519714f43b
+FULL_TESTED_SHA     = 4252c521865a27cbc672e997dd0a7e519714f43b
+G1_W2_MUTATIONS     = 13 total, 13 KILLED, 0 SURVIVED, 0 HARNESS_ERROR, 0 TEST_ENVIRONMENT_ERROR
+FULL_SUITE          = 4373 passed, 46 skipped, 0 failed, 0 errors (4418 items + 1 module skip)
+FOCUSED             = 536 passed in 86.11 s
+BRANCH_CI           = PENDING (recorded only once observed)
+MAIN_CI             = PENDING (recorded only once observed)
+PROGRESS            = provisional: G1 11/26 and overall 103/232 stand only after main CI
+```
+
+Raw summaries: [runs/g1_w2_mutations.md](runs/g1_w2_mutations.md) and
+[runs/g1_w2_full_suite.md](runs/g1_w2_full_suite.md).
+
+### Defects the mutation work exposed, and their fixes
+
+Writing exact-boundary tests for every limit exposed two genuine G1-W2 defects,
+both reproduced on a `git archive` of `02057aa` before any change:
+
+1. **`max_field_length` measured detection lines, not fields.** Detection parses
+   the sample under every candidate delimiter; under a wrong one a whole line is
+   one field, and the field cap was applied there. A file whose fields were all
+   within the limit was refused whenever a line was longer than the limit, even
+   with an explicit delimiter: a 10-character field was refused at
+   `max_field_length=10` and accepted only at 12, the line length. Fixed in
+   `868885a`: detection parses its bounded sample (`SAMPLE_CHARS`) uncapped, and
+   the limit is enforced once, in the validation pass, under the chosen
+   delimiter. The now-unreachable detection-time branch was removed.
+2. **`max_field_length=None` crashed on Windows.** `csv.field_size_limit` takes a
+   C `long`, 32 bits on Windows, and was given `sys.maxsize`: `OverflowError`
+   for the documented way to disable the limit. Fixed in `868885a` with
+   `2**31 - 1`.
+
+Files accepted before these fixes are read identically: a cap hit during
+detection always raised, so no accepted file's detection depended on it. The
+only behaviour change is that the false refusals above are now accepted and
+`None` no longer crashes. Run against `02057aa`'s code, the new tests fail on
+exactly these two defects (`test_a_csv_exactly_at_each_limit_is_accepted[max_field_length-3]`,
+`test_disabling_the_field_limit_reads_the_file`), plus the seven tests of the
+helper that did not yet exist; the other 26 pass there.
+
+`6c05239` is a behaviour-preserving refactor: the three cell-budget checks
+(DataFrame, records, delimited) now call one helper, `_cells_exceed` in
+`ingestion/types.py`, with the same comparison `rows > max_cells // columns`.
+That makes M-W2-11 testable on huge logical shapes without allocating a table.
+
+### The 13 dedicated G1-W2 mutations
+
+`scripts/g1_w2_mutations.py` exports the commit with `git archive`, applies
+each weakening there, runs its selector, and writes the original bytes back.
+A kill requires pytest exit 1, no errored cases, every expected test failing
+with its expected reason text, and a byte-identical tree afterwards. Four
+negative controls (equivalent mutant, wrong reason, missing anchor, syntax
+error) were classified SURVIVED, HARNESS_ERROR, HARNESS_ERROR and
+HARNESS_ERROR, so a non-zero exit alone is never counted as a kill.
+
+| ID | Weakening | Changed authority | Killing test | Result |
+|---|---|---|---|---|
+| M-W2-01 | file-byte preflight bypassed | `loader._from_file` | `test_oversized_file_never_reaches_a_parser` | KILLED |
+| M-W2-02 | row boundary `>` to `>=` | `delimited._validate` | `test_a_csv_exactly_at_each_limit_is_accepted[max_rows-3]` | KILLED |
+| M-W2-03 | DataFrame total-cell check neutralised | `loader._from_dataframe` | `test_dataframe_over_the_cell_limit_is_refused_with_its_shape` | KILLED |
+| M-W2-04 | records allowed one beyond `max_records` | `loader._from_records` | `test_one_record_over_the_limit_is_refused` | KILLED |
+| M-W2-05 | facade check moved after target detection | `AIDataFacade.load` | `test_facade_refuses_before_target_detection` | KILLED |
+| M-W2-06 | rejected record values in the row-limit message | `delimited._validate` | `test_rejected_cell_values_never_appear_in_the_error` | KILLED |
+| M-W2-07 | run directory created after a `ResourceLimitError` | `cli.main.main` | `test_a_resource_refusal_leaves_the_previous_run_as_it_was` | KILLED |
+| M-W2-08 | row refusal deferred to the end of the scan | `delimited._validate` | `test_row_refusal_reads_no_record_past_the_decisive_one` | KILLED |
+| M-W2-09 | CLI `--max-rows` default differs from the library | `cli.main.build_parser` | `test_every_cli_default_equals_the_library_default` | KILLED |
+| M-W2-10 | Python `max_rows` default made `None` | `IngestionLimits` | `test_every_default_is_the_documented_finite_integer` | KILLED |
+| M-W2-11 | cell budget in wrapping 32-bit arithmetic | `types._cells_exceed` | `test_cell_budget_is_exact_for_huge_logical_shapes` (3 cases) | KILLED |
+| M-W2-12 | DataFrame deep-copied and the copy returned | `loader._from_dataframe` | `test_dataframe_is_returned_itself_with_order_and_dtypes`, `test_dataframe_is_not_copied_or_mutated` | KILLED |
+| M-W2-13 | `max_field_length` not applied by validation | `delimited._validate` | `test_oversized_field_is_refused_before_pandas`, `test_rows_columns_cells_and_field_length_are_guarded` | KILLED |
+
+M-W2-11 does not claim Python integers overflow. It replaces the exact
+comparison with the fixed-width product a C or NumPy `int32` implementation
+would compute: 65,537 × 65,536 = 2^32 + 65,536 wraps to 65,536 and evades a
+10-million-cell budget. The test also covers float rounding (2^53 + 1 cells)
+and 2^80-scale shapes. A separate test proves all three paths call the helper.
+
+Separation from history: `scripts/ingestion_mutations.py` is unchanged except
+that entry 11's anchor follows the refactored expression. Its 13 entries
+(8 G1-W1, 5 earlier exit-code-only G1-W2 checks) all still exit 1 on
+`4252c52`, and none is counted among the 13 dedicated mutations.
+
+### Test integrity (`02057aa..4252c52`)
+
+```text
+TESTS_DELETED       = 0 (no removed test line, no removed file)
+ASSERTIONS_WEAKENED = 0 (tests/ diff is additions only)
+NEW_SKIPS           = 0
+NEW_XFAILS          = 0
+```
+
+The 23 new cases are in `TestResourceGovernanceGuarantees`; no existing test
+was edited.
+
+### Test-count correction
+
+The earlier statement "collected 4,394 tests" above is off by one and is
+superseded. This run collected 4418 items plus one collection-time module skip
+(`test_visualization_renderer.py`, viz extra absent): 4419 results = 4373
+passed + 46 skipped = JUnit `tests`. The 23 new cases account exactly for
+4350 → 4373, so the earlier run had 4395 items, not 4,394.
+
+### Compatibility
+
+No path under `aidatasetkit/evidence`, `examples`, golden fixtures,
+`pyproject.toml` or dependency constraints changed. Artifact schema `1.1`,
+publication schema `1.0`, package version `0.1.0a1`, semantic fingerprint
+and dependencies are unchanged; the golden, fingerprint-migration and
+evidence-artifact tests pass in the focused and full runs.
+
+The wheel/sdist hashes recorded above describe artifacts built from `d398926`
+code. `868885a` changes `delimited.py`, so packaging for this closure is
+evidenced by the CI `build, install and smoke` jobs on Ubuntu and Windows at
+the closure SHA, not by the earlier local artifacts.
+
+### Observation for CTO review (unchanged)
+
+`AIDataFacade.load(train, test=None, *, limits=None)` enforces limits only when
+`limits` is passed; with the default `None` it runs no resource check, unlike
+`load_table` and the CLI, which apply the finite defaults. This predates the
+closure and was not changed here, because enabling defaults on the facade
+would change behaviour for existing callers.
