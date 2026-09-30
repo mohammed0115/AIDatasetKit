@@ -20,7 +20,7 @@ M = [
  ("8 partial output before ingestion", "aidatasetkit/cli/main.py", "    loaded = load_table(\n", "    (args.output / 'runs' / 'partial').mkdir(parents=True, exist_ok=True)\n    loaded = load_table(\n", "tests/integration/test_cli_ingestion.py -k \"ambiguous_file_is_refused or structured_refusals\""),
  ("9 bypass source byte limit", "aidatasetkit/ingestion/loader.py", "    if limits.max_source_bytes is not None:\n", "    if False:\n", "tests/unit/test_ingestion_limits.py -k file_bytes"),
  ("10 reject exact byte boundary", "aidatasetkit/ingestion/loader.py", "if size > limits.max_source_bytes:", "if size >= limits.max_source_bytes:", "tests/unit/test_ingestion_limits.py -k file_bytes"),
- ("11 skip dataframe cell limit", "aidatasetkit/ingestion/loader.py", "if limits.max_cells is not None and rows > limits.max_cells // columns:", "if False:", "tests/unit/test_ingestion_limits.py -k dataframe"),
+ ("11 skip dataframe cell limit", "aidatasetkit/ingestion/loader.py", "if limits.max_cells is not None and _cells_exceed(rows, columns, limits.max_cells):", "if False:", "tests/unit/test_ingestion_limits.py -k dataframe"),
  ("12 skip record count limit", "aidatasetkit/ingestion/loader.py", "if limits.max_records is not None and len(records) > limits.max_records:", "if False:", "tests/unit/test_ingestion_limits.py -k records"),
  ("13 make cli unlimited", "aidatasetkit/cli/main.py", "_DEFAULT_INGESTION_LIMITS = IngestionLimits()", "_DEFAULT_INGESTION_LIMITS = IngestionLimits(max_source_bytes=None, max_rows=None, max_columns=None, max_cells=None, max_field_length=None)", "tests/unit/test_ingestion_limits.py -k cli_defaults"),
 ]

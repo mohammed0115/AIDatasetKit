@@ -61,6 +61,16 @@ def _validate_limit(name: str, value: int | None) -> None:
         )
 
 
+def _cells_exceed(rows: int, columns: int, max_cells: int) -> bool:
+    """Whether ``rows * columns > max_cells``, in exact integer arithmetic.
+
+    The one authority for the cell budget. Dividing the limit instead of
+    multiplying the shape keeps the comparison exact for any logical shape,
+    with no fixed-width wrap and no float rounding.
+    """
+    return rows > max_cells // columns
+
+
 @dataclass(frozen=True, slots=True)
 class IngestionLimits:
     """Finite resource policy applied before and during table materialization."""

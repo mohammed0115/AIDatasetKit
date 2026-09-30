@@ -57,6 +57,7 @@ from aidatasetkit.ingestion.types import (
     LoadOptions,
     SUPPORTED_DELIMITERS,
     TableFormat,
+    _cells_exceed,
 )
 
 __all__ = ["SAMPLE_CHARS", "DelimitedPlan", "plan_delimited"]
@@ -327,7 +328,7 @@ def _validate(
                             limit_name="max_rows", configured_limit=limits.max_rows,
                             observed_value=data_rows, input_kind="file",
                         )
-                    if limits.max_cells is not None and data_rows > limits.max_cells // width:
+                    if limits.max_cells is not None and _cells_exceed(data_rows, width, limits.max_cells):
                         cells = data_rows * width
                         raise CellLimitError(
                             f"{path.name} exceeds the cell limit ({cells} > {limits.max_cells}).",

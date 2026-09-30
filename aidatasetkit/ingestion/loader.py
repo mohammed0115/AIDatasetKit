@@ -32,6 +32,7 @@ from aidatasetkit.ingestion.types import (
     LoadMetadata,
     LoadOptions,
     SourceKind,
+    _cells_exceed,
 )
 
 __all__ = ["load_table"]
@@ -176,7 +177,7 @@ def _from_dataframe(frame: pd.DataFrame, limits: IngestionLimits) -> LoadedTable
             limit_name="max_columns", configured_limit=limits.max_columns,
             observed_value=columns, input_kind=SourceKind.DATAFRAME.value,
         )
-    if limits.max_cells is not None and rows > limits.max_cells // columns:
+    if limits.max_cells is not None and _cells_exceed(rows, columns, limits.max_cells):
         cells = rows * columns
         raise CellLimitError(
             f"DataFrame exceeds the cell limit ({cells} > {limits.max_cells}).",
@@ -247,7 +248,7 @@ def _from_records(records: Sequence[Any], limits: IngestionLimits) -> LoadedTabl
             limit_name="max_columns", configured_limit=limits.max_columns,
             observed_value=len(names), input_kind=SourceKind.RECORDS.value,
         )
-    if limits.max_cells is not None and len(records) > limits.max_cells // len(names):
+    if limits.max_cells is not None and _cells_exceed(len(records), len(names), limits.max_cells):
         cells = len(records) * len(names)
         raise CellLimitError(
             f"Records exceed the cell limit ({cells} > {limits.max_cells}).",
