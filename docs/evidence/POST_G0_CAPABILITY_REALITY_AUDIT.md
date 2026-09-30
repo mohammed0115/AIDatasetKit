@@ -1,16 +1,16 @@
 # POST-G0 Capability Reality Audit — AIDatasetKit
 
 ```text
-CURRENT_GATE                 = G0 closed; G1 audit
-CURRENT_ACTIVITY             = main integration + capability reality audit (no implementation)
+CURRENT_GATE                 = G0 closed; G1-W2 closed
+CURRENT_ACTIVITY             = G1-W2 resource governance certified; awaiting CTO review for G1-W3
 G0_STATUS                    = PASS (16/16)
 G0_MAIN_INTEGRATION          = PASS
 GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
-OVERALL_CERTIFIED_PROGRESS   = 43.97%   (102 proven / 232 applicable, G0–G12; updated after G1-W1, §0)
+OVERALL_CERTIFIED_PROGRESS   = 44.40%   (103 proven / 232 applicable, G0–G12; updated after G1-W2, §0)
 AUDIT_GATE                   = PASS     (the audit is complete with evidence; G1–G12 are not)
-READY_FOR_G1_IMPLEMENTATION  = YES      (updated after G0.1: P0-1 closed; was NO at audit time, §9)
-NEXT_AUTHORIZED_ACTION       = CTO review of G1-W1; G1-W2 not authorised (§0)
+READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W2 complete; G1-W3 requires separate CTO authorization)
+NEXT_AUTHORIZED_ACTION       = CTO review before any G1-W3 work; G1-W3 is NO_GO pending authorization
 ```
 
 **حدود هذا المستند:**
@@ -53,9 +53,9 @@ AUDIT_DOCUMENTS       = CORRECT
 - **تغيّر الدليل دون الحالة:** G1-01، G1-19.
 - **النسب (من الجدول):** G1 = 10/26 = **38.46%**، G10 = 18/28 = **64.29%**، الكلي = 102/232 = **43.97%**.
 
-**تحديث 4 — G1-W2 (resource governance; local evidence complete, remote certification pending):**
+**تحديث 4 — G1-W2 (resource governance; CI and main closure complete):**
 
-- **G1-26: implemented, interim `PARTIAL`.** `IngestionLimits` is immutable and finite by default;
+- **G1-26: `SUPPORTED_AND_TESTED`.** `IngestionLimits` is immutable and finite by default;
   file bytes, CSV/TSV rows, columns, cells and field length are checked before
   pandas parsing, while DataFrames and supported records are checked before
   analysis or materialization. CLI defaults equal library defaults.
@@ -65,9 +65,8 @@ AUDIT_DOCUMENTS       = CORRECT
 - **G1-13, G1-17 and G1-22 remain PARTIAL.** Generators, automatic encoding
   detection and date inference were not started.
 - Artifact schema remains `1.1`, publication schema remains `1.0`, and the
-  fingerprint contract is unchanged. Certified totals remain G1 = 10/26 =
-  **38.46%** and overall = 102/232 = **43.97%** until branch, final evidence,
-  and main CI pass.
+  fingerprint contract is unchanged. Certified totals are G1 = 11/26 =
+  **42.31%** and overall = 103/232 = **44.40%**.
 
 ## 1. Main integration
 
@@ -173,7 +172,7 @@ G0_MAIN_INTEGRATION = PASS
 | G1-23 | G1 | Row/column counts and memory estimate | `SUPPORTED_AND_TESTED` | DatasetProfile.row_count/column_count/memory_usage_bytes | tests/unit/test_profiler.py | — | — |
 | G1-24 | G1 | Excel sheets | `MISSING` | no spreadsheet reader | — | No reader | P2 |
 | G1-25 | G1 | Large files: chunking / streaming | `MISSING` | validation pass streams records, but accepted input is still one pandas table | tests/unit/test_ingestion_limits.py; G1-W2 report | No true chunked profiling path; explicitly out of scope | P1 |
-| G1-26 | G1 | Resource limits (size, rows, columns) | `PARTIAL` (implementation and local evidence complete; remote certification pending) | ingestion/types.py::IngestionLimits; loader.py and delimited.py enforce finite bytes/rows/columns/cells/field limits before pandas or analysis | tests/unit/test_ingestion_limits.py; tests/integration/test_cli_ingestion.py; packaging smoke; G1-W2 report | Promote only after branch/final/main CI | P1 |
+| G1-26 | G1 | Resource limits (size, rows, columns) | `SUPPORTED_AND_TESTED` | ingestion/types.py::IngestionLimits; loader.py and delimited.py enforce finite bytes/rows/columns/cells/field limits before pandas or analysis | unit/integration tests; mutations; wheel/sdist smoke; branch/final/main CI; G1-W2 report | — | — |
 | G1-27 | G1 | Unsupported format refused with a clear message | `SUPPORTED_AND_TESTED` | cli/main.py suffix check | tests/integration/test_audit_end_to_end.py (not really parquet) | — | — |
 | G2-01 | G2 | Missing values per column and dataset | `SUPPORTED_AND_TESTED` | profiler.py _profile_column; checks.check_missing_values | test_profiler.py, test_quality.py | — | — |
 | G2-02 | G2 | Duplicate rows | `SUPPORTED_AND_TESTED` | profiler._count_duplicate_rows; check_duplicate_rows | test_profiler.py, test_quality.py | — | — |
@@ -572,7 +571,7 @@ G0_MAIN_INTEGRATION = PASS
 |---|---|---:|---:|---:|---|---|
 | G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
 | G0.1 | Profiling performance hotfix | — | — | — | PASS | P0-1 مغلق (انظر §0) |
-| G1 | Ingestion | 10 | 26 | 38.46% | IN PROGRESS | W1 مغلقة؛ W2 local PASS، remote CI pending |
+| G1 | Ingestion | 11 | 26 | 42.31% | IN PROGRESS | W1 وW2 مغلقتان |
 | G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | تواريخ ونص وقيم |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | عمليات جدولية |
 | G4 | EDA & Statistics | 9 | 13 | 69.23% | AUDIT | ارتباط فئوي واختبارات |
@@ -584,14 +583,14 @@ G0_MAIN_INTEGRATION = PASS
 | G10 | Provenance/Security/Privacy/Errors | 18 | 28 | 64.29% | AUDIT | أخطاء الموارد والمدخلات |
 | G11 | Performance & Certification | 5 | 21 | 23.81% | AUDIT | 4 بنود MISSING→PARTIAL في G0.1؛ benchmarks في CI |
 | G12 | Masari Consumer Integration | 2 | 14 | 14.29% | AUDIT | بعد G1–G9 |
-| **All** | G0–G12 | **102** | **232** | **43.97%** | — | — |
+| **All** | G0–G12 | **103** | **232** | **44.40%** | — | — |
 
 **تفصيل الحالات لكل بوابة** (حتى لا يختفي العمل الموجود غير المكتمل):
 
 | Gate | SUPPORTED_AND_TESTED | SUPPORTED_NOT_SUFFICIENTLY_TESTED | PARTIAL | MISSING | BLOCKED | NOT_APPLICABLE | OUT_OF_SCOPE |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | G0 | 16 | 0 | 0 | 0 | 0 | 0 | 0 |
-| G1 | 10 | 0 | 4 | 12 | 0 | 0 | 1 |
+| G1 | 11 | 0 | 3 | 12 | 0 | 0 | 1 |
 | G2 | 15 | 0 | 2 | 5 | 0 | 0 | 0 |
 | G3 | 2 | 0 | 5 | 10 | 0 | 1 | 0 |
 | G4 | 9 | 0 | 2 | 2 | 0 | 0 | 0 |
@@ -611,7 +610,7 @@ G0_STATUS                    = PASS
 G0_MAIN_INTEGRATION          = PASS
 GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
-OVERALL_CERTIFIED_PROGRESS   = 40.95%
+OVERALL_CERTIFIED_PROGRESS   = 44.40%
 READY_FOR_G1_IMPLEMENTATION  = YES after G0.1 (P0-1 closed; P0-2 is a G1 item)
 NEXT_AUTHORIZED_ACTION       = owner authorisation of G0.1, then G1 wave 1
 ```
