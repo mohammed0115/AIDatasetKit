@@ -264,12 +264,12 @@ class TestExitCodes:
         assert "no such file" in missing.stderr
 
     def test_an_unsupported_file_type_says_so(self, tmp_path):
-        path = tmp_path / "data.parquet"
-        path.write_text("not really parquet", encoding="utf-8")
+        path = tmp_path / "data.xlsx"
+        path.write_text("not really excel", encoding="utf-8")
         result = run_cli("audit", str(path))
         assert result.returncode == EXIT_CODES["usage"]
         assert "not a supported format" in result.stderr
-        assert ".csv and .tsv" in result.stderr
+        assert ".csv" in result.stderr
 
     def test_an_unknown_target_lists_the_real_columns(self, tmp_path):
         result = run_cli("audit", str(EXAMPLE), "--target", "Nope", "--output", str(tmp_path))

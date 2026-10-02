@@ -676,7 +676,15 @@ class TestNumpyStringLabels:
     @pytest.fixture
     def numpy_labelled(self) -> pd.DataFrame:
         frame = pd.DataFrame({"a": np.arange(60.0) % 13, "c": np.arange(60.0) % 7})
-        return frame.rename(columns=dict(zip(frame.columns, np.array(["p", "q"]))))
+        # np.str_ objects must actually survive as the labels. pandas 3 coerces
+        # them to plain str on the way in through rename() and even through
+        # pd.Index(<object array>), so build the Index element by element with
+        # dtype=object -- the path that keeps the numpy scalar type on every
+        # supported pandas version.
+        labels = pd.Index([np.str_("p"), np.str_("q")], dtype=object)
+        assert all(type(label) is np.str_ for label in labels)
+        frame.columns = labels
+        return frame
 
     def test_such_a_frame_fits(self, numpy_labelled):
         _, pre = build(numpy_labelled)
