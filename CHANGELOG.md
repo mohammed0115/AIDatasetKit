@@ -9,6 +9,28 @@ Versions before `1.0` may change public interfaces and the artifact schema; see
 First alpha, not yet released: nothing has been published to PyPI, TestPyPI or
 as a GitHub release, and no version is tagged. Everything below is new.
 
+### G1-W3 format expansion: JSON, JSONL, Parquet, Feather
+
+Evidence: `docs/evidence/G1_W3_FORMAT_READERS_REPORT.md`.
+
+- **JSON and JSONL** readers in `aidatasetkit.ingestion`: a `.json` file is an
+  array of flat objects, a `.jsonl`/`.ndjson` file is one object per line.
+  Duplicate keys, nested values, non-standard `NaN`/`Infinity` constants and
+  non-object records are refused with structured errors, never read silently.
+  JSONL is checked as it streams: a limit refusal stops reading at the
+  offending line. Both share the one records authority in the loader.
+- **Parquet and Feather** readers through the new optional `parquet` extra
+  (pyarrow, floor 14.0.1 — the CVE-2023-47248 fix). Parquet row, column and
+  cell budgets are enforced from the footer before any data is materialized;
+  Feather enforces columns from the IPC schema before data and rows/cells
+  before the pandas conversion. Corrupt files are `MalformedInputError`;
+  a missing pyarrow is `MissingDependencyError` naming the extra.
+- CLI audits accept the new formats; `audit.json` records their ingestion
+  metadata. Artifact schema remains `1.1`, publication schema `1.0`,
+  fingerprints unchanged.
+- 11 dedicated mutations on the new guards, 11 killed
+  (`scripts/g1_w3_mutations.py`); the G1-W1 and G1-W2 harnesses re-run green.
+
 ### G1-W2 resource governance and large-input safety
 
 Evidence: `docs/evidence/G1_W2_RESOURCE_GOVERNANCE_REPORT.md`.

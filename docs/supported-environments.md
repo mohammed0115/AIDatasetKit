@@ -12,6 +12,7 @@ Two environments are supported, and both are pinned exactly in `constraints/`:
 | pytest (`dev`) | 8.0.0 | 8.3.3 |
 | matplotlib (`viz`) | 3.9.0 | 3.11.2 |
 | xgboost / lightgbm / catboost (`boosting`) | 2.0.0 / 4.0.0 / 1.2 | 3.4.1 / 4.7.0 / 1.2.10 |
+| pyarrow (`parquet`) | 14.0.1 | 25.0.1 |
 
 ```bash
 pip install -c constraints/minimum.txt   -e ".[dev]"      # or reference.txt
@@ -46,6 +47,11 @@ were fixed rather than avoided by requiring pandas 3 (a 400-digit integer broke
 
 **Extras.** Run at exactly the declared floors on the minimum set, and at the
 reference versions on the reference set.
+
+**pyarrow 14.0.1.** The first release with the fix for CVE-2023-47248,
+arbitrary code execution while deserializing a malicious Parquet or Arrow IPC
+file. Older pyarrow is never acceptable for a library whose premise is reading
+untrusted tables, so the floor is the fix, not the oldest version that imports.
 
 ## What differs between the two, by design
 

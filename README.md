@@ -279,10 +279,12 @@ says *no known blocker found*, *review required*, *possible leakage*,
 ## Scope of this alpha
 
 Supported: `.csv` and `.tsv` files (comma, semicolon, tab or pipe, detected or
-named; utf-8, utf-8-sig, latin-1 or cp1256, never guessed), pandas DataFrames
-and lists of records · tabular data · binary and multiclass
-classification readiness · regression model contexts · scikit-learn model
-contexts · profiling · quality and leakage diagnostics · capability-driven
+named; utf-8, utf-8-sig, latin-1 or cp1256, never guessed), `.json` files
+holding an array of flat objects, `.jsonl`/`.ndjson` files holding one object
+per line, `.parquet` and `.feather`/`.arrow` files (via the optional `parquet`
+extra), pandas DataFrames and lists of records · tabular data · binary and
+multiclass classification readiness · regression model contexts · scikit-learn
+model contexts · profiling · quality and leakage diagnostics · capability-driven
 preprocessing plans · feature lineage · audit artifacts.
 
 Also merged, unreleased: model training, evaluation, model comparison, the
@@ -290,7 +292,7 @@ Also merged, unreleased: model training, evaluation, model comparison, the
 
 Not supported yet: anomaly detection, dimensionality reduction, time series,
 text, images, hyperparameter tuning, cross-validation, model persistence,
-databases, cloud storage, Parquet, Excel, JSON, automatic encoding detection,
+databases, cloud storage, Excel, automatic encoding detection,
 date inference, true chunked profiling or generators/other arbitrary iterables.
 
 Every supported input now has finite resource limits before pandas parsing or

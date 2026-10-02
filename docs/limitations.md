@@ -44,10 +44,14 @@ The readiness verdict has not been verified for a clustering run either. Its
 thresholds and its leakage checks were built against a target, and a clustering
 frame has none.
 
-**CSV and TSV only, from files.** `aidatasetkit.ingestion.load_table` — which
-the CLI uses — reads `.csv` and `.tsv` files, a pandas DataFrame, or a list of
-records, and nothing else: no JSON, JSONL, Parquet, Feather, Excel, databases,
+**Delimited text, JSON and columnar files only.** `aidatasetkit.ingestion.load_table`
+— which the CLI uses — reads `.csv`, `.tsv`, `.json` (an array of flat
+objects), `.jsonl`/`.ndjson`, `.parquet` and `.feather`/`.arrow` files, a
+pandas DataFrame, or a list of records, and nothing else: no Excel, databases,
 URLs or cloud storage. A `.txt` file is refused even when it holds CSV.
+Parquet and Feather need the optional `parquet` extra (pyarrow); JSON is read
+whole (bounded by the source-byte limit), while JSONL is checked as it
+streams.
 
 - **Encodings are never guessed.** utf-8 (default), utf-8-sig, latin-1 and
   cp1256 are read when named; anything else — UTF-16 included — is refused.

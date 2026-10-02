@@ -7,7 +7,7 @@ G0_STATUS                    = PASS (16/16)
 G0_MAIN_INTEGRATION          = PASS
 GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
-OVERALL_CERTIFIED_PROGRESS   = 44.40%   (103 proven / 232 applicable, G0–G12; updated after G1-W2, §0)
+OVERALL_CERTIFIED_PROGRESS   = 46.12%   (107 proven / 232 applicable, G0–G12; updated after G1-W3, §0)
 AUDIT_GATE                   = PASS     (the audit is complete with evidence; G1–G12 are not)
 READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W2 complete; G1-W3 requires separate CTO authorization)
 NEXT_AUTHORIZED_ACTION       = CTO review before any G1-W3 work; G1-W3 is NO_GO pending authorization
@@ -69,9 +69,23 @@ AUDIT_DOCUMENTS       = CORRECT
   **42.31%** and overall = 103/232 = **44.40%**.
 - **Mutation closure (CTO-requested, branch `g1-w2-mutation-closure`).** 13
   dedicated G1-W2 mutations, 13 killed; two field-length defects found and
-  fixed; full suite 4373 passed, 46 skipped at `4252c52`. The G1-26 totals
-  above stay provisional until main CI on the closure commit and the CTO's
-  final seal; see the G1-W2 report's final mutation closure section.
+  fixed; full suite 4373 passed, 46 skipped at `4252c52`. Main CI on `6ba8817`
+  passed 10/10 (check-runs, verified 2026-10-01); the CTO master directive
+  sealed G1-W2 CERTIFIED. See the G1-W2 report's final mutation closure section.
+
+**تحديث 5 — G1-W3 (JSON/JSONL/Parquet/Feather readers):**
+
+- **G1-06, G1-07, G1-08, G1-09: `SUPPORTED_AND_TESTED`.** JSON is read as an
+  array of flat objects, JSONL as one object per line checked as it streams,
+  Parquet with the shape budgets enforced from the footer before any data is
+  read, Feather with columns from the IPC schema before data and rows/cells
+  before the pandas conversion. pyarrow stays an optional extra (`parquet`),
+  floor 14.0.1 (the CVE-2023-47248 fix). 11 dedicated mutations, 11 killed;
+  the G1-W1 and G1-W2 harnesses re-run green on the same tree.
+- Artifact schema remains `1.1`, publication schema remains `1.0`, package
+  version `0.1.0a1`, fingerprints unchanged. Certified totals are G1 = 15/26 =
+  **57.69%** and overall = 107/232 = **46.12%**.
+- Evidence: `docs/evidence/G1_W3_FORMAT_READERS_REPORT.md`.
 
 ## 1. Main integration
 
@@ -157,10 +171,10 @@ G0_MAIN_INTEGRATION = PASS
 | G1-03 | G1 | TSV | `SUPPORTED_AND_TESTED` | ingestion/formats.py + delimited.py (G1-W1) | tests/unit/test_ingestion.py::TestTsv, tests/integration/test_cli_ingestion.py::test_every_supported_layout | — | — |
 | G1-04 | G1 | XLSX | `MISSING` | no reader | probe_ingestion.py (exploratory): refused | No reader | P1 |
 | G1-05 | G1 | XLS | `MISSING` | no reader | probe_ingestion.py (exploratory): refused | No reader | P2 |
-| G1-06 | G1 | Parquet | `MISSING` | no reader | probe_ingestion.py (exploratory): refused | No reader | P1 |
-| G1-07 | G1 | Feather / Arrow tables | `MISSING` | no reader; pyarrow not a dependency | probe_ingestion.py (exploratory): refused | No reader | P2 |
-| G1-08 | G1 | JSON | `MISSING` | no reader | probe_ingestion.py (exploratory): refused | No reader | P1 |
-| G1-09 | G1 | JSONL | `MISSING` | no reader | probe_ingestion.py (exploratory): refused | No reader | P1 |
+| G1-06 | G1 | Parquet | `SUPPORTED_AND_TESTED` | ingestion/columnar.py::_parquet_frame (G1-W3): footer row/column/cell preflight before materialization; footer/data agreement checked | tests/unit/test_ingestion_columnar.py, tests/integration/test_ingestion_without_pyarrow.py, test_cli_ingestion.py; scripts/g1_w3_mutations.py (M-W3-07/08) | — | — |
+| G1-07 | G1 | Feather / Arrow tables | `SUPPORTED_AND_TESTED` | ingestion/columnar.py::_feather_frame (G1-W3): column budget from the IPC schema before data, rows/cells on the Arrow table before pandas | tests/unit/test_ingestion_columnar.py, tests/integration/test_ingestion_without_pyarrow.py; scripts/g1_w3_mutations.py (M-W3-09) | — | — |
+| G1-08 | G1 | JSON | `SUPPORTED_AND_TESTED` | ingestion/json_text.py (G1-W3): array of flat objects; duplicate keys, nested values, NaN/Infinity refused | tests/unit/test_ingestion_json.py, tests/integration/test_cli_ingestion.py; scripts/g1_w3_mutations.py (M-W3-01..06) | — | — |
+| G1-09 | G1 | JSONL | `SUPPORTED_AND_TESTED` | ingestion/json_text.py (G1-W3): one object per line, checked as it streams; a limit refusal stops reading at the offending line | tests/unit/test_ingestion_json.py, tests/integration/test_cli_ingestion.py; scripts/g1_w3_mutations.py (M-W3-05/06) | — | — |
 | G1-10 | G1 | XML | `MISSING` | no reader | probe_ingestion.py (exploratory): refused | No reader | P3 |
 | G1-11 | G1 | YAML | `MISSING` | no reader; PyYAML not a dependency | probe_ingestion.py (exploratory): refused | No reader | P3 |
 | G1-12 | G1 | pandas DataFrame in memory (Python API) | `SUPPORTED_AND_TESTED` | DataProfiler.profile, DataQualityInspector.inspect, AIDataFacade.load | tests/unit/test_profiler.py, test_quality.py, integration/test_facade.py | — | — |
@@ -576,7 +590,7 @@ G0_MAIN_INTEGRATION = PASS
 |---|---|---:|---:|---:|---|---|
 | G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
 | G0.1 | Profiling performance hotfix | — | — | — | PASS | P0-1 مغلق (انظر §0) |
-| G1 | Ingestion | 11 | 26 | 42.31% | IN PROGRESS | W1 وW2 مغلقتان |
+| G1 | Ingestion | 15 | 26 | 57.69% | IN PROGRESS | W1–W3 مغلقة؛ XLSX بعدها |
 | G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | تواريخ ونص وقيم |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | عمليات جدولية |
 | G4 | EDA & Statistics | 9 | 13 | 69.23% | AUDIT | ارتباط فئوي واختبارات |
@@ -588,14 +602,14 @@ G0_MAIN_INTEGRATION = PASS
 | G10 | Provenance/Security/Privacy/Errors | 18 | 28 | 64.29% | AUDIT | أخطاء الموارد والمدخلات |
 | G11 | Performance & Certification | 5 | 21 | 23.81% | AUDIT | 4 بنود MISSING→PARTIAL في G0.1؛ benchmarks في CI |
 | G12 | Masari Consumer Integration | 2 | 14 | 14.29% | AUDIT | بعد G1–G9 |
-| **All** | G0–G12 | **103** | **232** | **44.40%** | — | — |
+| **All** | G0–G12 | **107** | **232** | **46.12%** | — | — |
 
 **تفصيل الحالات لكل بوابة** (حتى لا يختفي العمل الموجود غير المكتمل):
 
 | Gate | SUPPORTED_AND_TESTED | SUPPORTED_NOT_SUFFICIENTLY_TESTED | PARTIAL | MISSING | BLOCKED | NOT_APPLICABLE | OUT_OF_SCOPE |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | G0 | 16 | 0 | 0 | 0 | 0 | 0 | 0 |
-| G1 | 11 | 0 | 3 | 12 | 0 | 0 | 1 |
+| G1 | 15 | 0 | 3 | 8 | 0 | 0 | 1 |
 | G2 | 15 | 0 | 2 | 5 | 0 | 0 | 0 |
 | G3 | 2 | 0 | 5 | 10 | 0 | 1 | 0 |
 | G4 | 9 | 0 | 2 | 2 | 0 | 0 | 0 |
