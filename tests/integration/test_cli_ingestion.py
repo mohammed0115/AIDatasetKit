@@ -106,6 +106,23 @@ class TestFilesAreReadRight:
         ingestion = published(tmp_path / "out")[0]["ingestion"]
         assert (ingestion["delimiter"], ingestion["delimiter_source"]) == ("\t", "explicit")
 
+    @pytest.mark.parametrize(
+        ("name", "text", "fmt"),
+        [
+            ("rows.json", json.dumps([dict(zip(HEADER, record)) for record in ROWS]), "json"),
+            ("rows.jsonl", "".join(json.dumps(dict(zip(HEADER, record))) + "\n" for record in ROWS), "jsonl"),
+        ],
+    )
+    def test_json_files_are_audited_end_to_end(self, tmp_path, name, text, fmt):
+        path = tmp_path / name
+        path.write_bytes(text.encode("utf-8"))
+        result = audit(path, tmp_path / "out")
+        assert result.returncode != EXIT_CODES["usage"], result.stderr
+        ingestion = published(tmp_path / "out")[0]["ingestion"]
+        assert ingestion["format"] == fmt
+        assert ingestion["row_count"] == len(ROWS)
+        assert ingestion["column_count"] == 4
+
 
 class TestTheEvidenceSaysHowItWasRead:
     def test_the_report_has_an_input_section(self, semicolon):

@@ -39,6 +39,8 @@ class TableFormat(StrEnum):
 
     CSV = "csv"
     TSV = "tsv"
+    JSON = "json"
+    JSONL = "jsonl"
 
 
 class DelimiterSource(StrEnum):

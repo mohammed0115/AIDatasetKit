@@ -26,12 +26,14 @@ from aidatasetkit.core.exceptions import (
 )
 from aidatasetkit.ingestion.delimited import plan_delimited
 from aidatasetkit.ingestion.formats import resolve_format
+from aidatasetkit.ingestion.json_text import read_json_text
 from aidatasetkit.ingestion.types import (
     LoadedTable,
     IngestionLimits,
     LoadMetadata,
     LoadOptions,
     SourceKind,
+    TableFormat,
     _cells_exceed,
 )
 
@@ -48,9 +50,10 @@ def load_table(
 
     Args:
         source: A path (:class:`pathlib.Path` or any :class:`os.PathLike`) to a
-            ``.csv`` or ``.tsv`` file; a :class:`pandas.DataFrame`; or a list or
-            tuple of mappings, one per row. A plain ``str`` is refused rather
-            than guessed at -- pass ``Path("data.csv")``.
+            ``.csv``, ``.tsv``, ``.json``, ``.jsonl`` or ``.ndjson`` file; a
+            :class:`pandas.DataFrame`; or a list or tuple of mappings, one per
+            row. A plain ``str`` is refused rather than guessed at -- pass
+            ``Path("data.csv")``.
         options: How a file is read. In-memory sources accept only the defaults.
 
     Returns:
@@ -75,8 +78,8 @@ def load_table(
         _require_default(options, "records")
         return _from_records(source, limits)
     raise UnsupportedFormatError(
-        f"Cannot load a {type(source).__name__}. Supported: a path to a .csv or .tsv "
-        "file, a pandas DataFrame, or a list of mappings."
+        f"Cannot load a {type(source).__name__}. Supported: a path to a .csv, "
+        ".tsv, .json or .jsonl file, a pandas DataFrame, or a list of mappings."
     )
 
 
@@ -111,6 +114,25 @@ def _from_file(path: Path, options: LoadOptions, limits: IngestionLimits) -> Loa
                 limit_name="max_source_bytes", configured_limit=limits.max_source_bytes,
                 observed_value=size, input_kind=SourceKind.FILE.value,
             )
+
+    if fmt in (TableFormat.JSON, TableFormat.JSONL):
+        records, names, encoding, notes = read_json_text(path, fmt, options, limits)
+        frame, frame_notes = _records_frame(records, names, limits, SourceKind.FILE.value)
+        return LoadedTable(
+            frame=frame,
+            metadata=LoadMetadata(
+                source_kind=SourceKind.FILE,
+                format=fmt,
+                encoding=encoding,
+                delimiter=None,
+                delimiter_source=None,
+                header=None,
+                row_count=int(len(frame)),
+                column_count=int(frame.shape[1]),
+                memory_bytes=_memory(frame),
+                warnings=notes + frame_notes,
+            ),
+        )
 
     plan = plan_delimited(path, fmt, options, limits)
     try:
@@ -238,32 +260,47 @@ def _from_records(records: Sequence[Any], limits: IngestionLimits) -> LoadedTabl
                     limit_name="max_record_chars", configured_limit=limits.max_record_chars,
                     observed_value=total_chars, input_kind=SourceKind.RECORDS.value,
                 )
-    if not columns:
-        raise EmptyInputError("Every record is empty; there are no columns to load.")
+    frame, notes = _records_frame(records, list(columns), limits, SourceKind.RECORDS.value)
+    return LoadedTable(frame=frame, metadata=_in_memory(SourceKind.RECORDS, frame, notes))
 
-    names = list(columns)
+
+def _records_frame(
+    records: Sequence[Mapping[str, Any]],
+    names: list[str],
+    limits: IngestionLimits,
+    input_kind: str,
+) -> tuple[pd.DataFrame, tuple[str, ...]]:
+    """The frame for checked records: the column and cell budgets, then the build.
+
+    Columns are the keys in order of first appearance. A record that lacks a
+    key gets a missing value there, and the warnings say how many records that
+    affected. Shared by the records source and by the JSON readers, so a table
+    of records means the same thing wherever the records came from.
+    """
+    if not names:
+        raise EmptyInputError("Every record is empty; there are no columns to load.")
     if limits.max_columns is not None and len(names) > limits.max_columns:
         raise ColumnLimitError(
             f"Records exceed the column limit ({len(names)} > {limits.max_columns}).",
             limit_name="max_columns", configured_limit=limits.max_columns,
-            observed_value=len(names), input_kind=SourceKind.RECORDS.value,
+            observed_value=len(names), input_kind=input_kind,
         )
     if limits.max_cells is not None and _cells_exceed(len(records), len(names), limits.max_cells):
         cells = len(records) * len(names)
         raise CellLimitError(
             f"Records exceed the cell limit ({cells} > {limits.max_cells}).",
             limit_name="max_cells", configured_limit=limits.max_cells,
-            observed_value=cells, input_kind=SourceKind.RECORDS.value,
+            observed_value=cells, input_kind=input_kind,
         )
     frame = pd.DataFrame([dict(record) for record in records], columns=names)
     incomplete = sum(1 for record in records if len(record) < len(names))
-    notes = ()
+    notes: tuple[str, ...] = ()
     if incomplete:
         notes = (
             f"{incomplete} of {len(records)} records lack at least one of the "
             f"{len(names)} keys; those cells are missing values.",
         )
-    return LoadedTable(frame=frame, metadata=_in_memory(SourceKind.RECORDS, frame, notes))
+    return frame, notes
 
 
 def _in_memory(kind: SourceKind, frame: pd.DataFrame, notes: tuple[str, ...]) -> LoadMetadata:
