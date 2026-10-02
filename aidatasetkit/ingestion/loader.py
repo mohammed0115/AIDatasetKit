@@ -24,6 +24,7 @@ from aidatasetkit.core.exceptions import (
     RowLimitError,
     UnsupportedFormatError,
 )
+from aidatasetkit.ingestion.columnar import read_columnar
 from aidatasetkit.ingestion.delimited import plan_delimited
 from aidatasetkit.ingestion.formats import resolve_format
 from aidatasetkit.ingestion.json_text import read_json_text
@@ -50,10 +51,10 @@ def load_table(
 
     Args:
         source: A path (:class:`pathlib.Path` or any :class:`os.PathLike`) to a
-            ``.csv``, ``.tsv``, ``.json``, ``.jsonl`` or ``.ndjson`` file; a
-            :class:`pandas.DataFrame`; or a list or tuple of mappings, one per
-            row. A plain ``str`` is refused rather than guessed at -- pass
-            ``Path("data.csv")``.
+            ``.csv``, ``.tsv``, ``.json``, ``.jsonl``, ``.ndjson``, ``.parquet``,
+            ``.feather`` or ``.arrow`` file; a :class:`pandas.DataFrame`; or a
+            list or tuple of mappings, one per row. A plain ``str`` is refused
+            rather than guessed at -- pass ``Path("data.csv")``.
         options: How a file is read. In-memory sources accept only the defaults.
 
     Returns:
@@ -79,7 +80,8 @@ def load_table(
         return _from_records(source, limits)
     raise UnsupportedFormatError(
         f"Cannot load a {type(source).__name__}. Supported: a path to a .csv, "
-        ".tsv, .json or .jsonl file, a pandas DataFrame, or a list of mappings."
+        ".tsv, .json, .jsonl, .parquet or .feather file, a pandas DataFrame, "
+        "or a list of mappings."
     )
 
 
@@ -131,6 +133,24 @@ def _from_file(path: Path, options: LoadOptions, limits: IngestionLimits) -> Loa
                 column_count=int(frame.shape[1]),
                 memory_bytes=_memory(frame),
                 warnings=notes + frame_notes,
+            ),
+        )
+
+    if fmt in (TableFormat.PARQUET, TableFormat.FEATHER):
+        frame = read_columnar(path, fmt, options, limits)
+        return LoadedTable(
+            frame=frame,
+            metadata=LoadMetadata(
+                source_kind=SourceKind.FILE,
+                format=fmt,
+                encoding=None,
+                delimiter=None,
+                delimiter_source=None,
+                header=None,
+                row_count=int(len(frame)),
+                column_count=int(frame.shape[1]),
+                memory_bytes=_memory(frame),
+                warnings=(),
             ),
         )
 

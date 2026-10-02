@@ -41,6 +41,8 @@ class TableFormat(StrEnum):
     TSV = "tsv"
     JSON = "json"
     JSONL = "jsonl"
+    PARQUET = "parquet"
+    FEATHER = "feather"
 
 
 class DelimiterSource(StrEnum):

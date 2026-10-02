@@ -52,10 +52,14 @@ dependencies = [
 [project.optional-dependencies]
 boosting = ["xgboost>=2.0.0", "lightgbm>=4.0.0", "catboost>=1.2"]
 viz = ["matplotlib>=3.9.0"]
+# Parquet and Feather readers. 14.0.1 is the first release with the fix for
+# CVE-2023-47248, arbitrary code execution while deserializing a malicious
+# Parquet or Arrow IPC file; older pyarrow is never acceptable.
+parquet = ["pyarrow>=14.0.1"]
 # Everything CONTRIBUTING.md and scripts/release_smoke_test.sh ask a contributor
 # to run. Without build and twine the documented release gate cannot execute.
 dev = ["pytest>=8.0.0", "build>=1.0", "twine>=5.0"]
-all = ["aidatasetkit[boosting,viz,dev]"]
+all = ["aidatasetkit[boosting,viz,parquet,dev]"]
 
 [project.scripts]
 aidatasetkit = "aidatasetkit.cli.main:main"

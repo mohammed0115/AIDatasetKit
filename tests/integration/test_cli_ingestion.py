@@ -122,6 +122,17 @@ class TestFilesAreReadRight:
         assert ingestion["format"] == fmt
         assert ingestion["row_count"] == len(ROWS)
         assert ingestion["column_count"] == 4
+    def test_a_parquet_file_is_audited_end_to_end(self, tmp_path):
+        pytest.importorskip("pyarrow", reason="the parquet extra is not installed")
+        path = tmp_path / "rows.parquet"
+        import pandas as pd
+
+        pd.DataFrame([dict(zip(HEADER, record)) for record in ROWS]).to_parquet(path, index=False)
+        result = audit(path, tmp_path / "out")
+        assert result.returncode != EXIT_CODES["usage"], result.stderr
+        ingestion = published(tmp_path / "out")[0]["ingestion"]
+        assert ingestion["format"] == "parquet"
+        assert ingestion["row_count"] == len(ROWS)
 
 
 class TestTheEvidenceSaysHowItWasRead:

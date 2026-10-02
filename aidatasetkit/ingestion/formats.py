@@ -11,13 +11,16 @@ __all__ = ["SUPPORTED_SUFFIXES", "resolve_format"]
 
 #: Suffix (lower-cased) -> format. ``.txt`` is deliberately absent: a text file
 #: says nothing about being a table, and reading one as CSV would be a guess.
-#: ``.ndjson`` is JSON Lines under its other name.
+#: ``.ndjson`` is JSON Lines and ``.arrow`` is Feather under their other names.
 SUPPORTED_SUFFIXES: dict[str, TableFormat] = {
     ".csv": TableFormat.CSV,
     ".tsv": TableFormat.TSV,
     ".json": TableFormat.JSON,
     ".jsonl": TableFormat.JSONL,
     ".ndjson": TableFormat.JSONL,
+    ".parquet": TableFormat.PARQUET,
+    ".feather": TableFormat.FEATHER,
+    ".arrow": TableFormat.FEATHER,
 }
 
 
@@ -33,7 +36,7 @@ def resolve_format(path: Path) -> TableFormat:
     except KeyError:
         raise UnsupportedFormatError(
             f"{suffix or 'a file without a suffix'} is not a supported format. "
-            "Supported now: .csv, .tsv, .json, .jsonl and .ndjson files, or a "
-            "pandas DataFrame or a list of records from Python. Excel and "
-            "Parquet are not supported yet."
+            "Supported now: .csv, .tsv, .json, .jsonl, .ndjson, .parquet, "
+            ".feather and .arrow files, or a pandas DataFrame or a list of "
+            "records from Python. Excel is not supported yet."
         ) from None

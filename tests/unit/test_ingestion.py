@@ -301,7 +301,7 @@ class TestRefusals:
         with pytest.raises(MalformedInputError, match="NUL bytes"):
             load_table(write(tmp_path, "u16.csv", "a,b\n1,2\n", "utf-16"))
 
-    @pytest.mark.parametrize("name", ["data.xlsx", "data.parquet", "data.xml", "data", "data.txt"])
+    @pytest.mark.parametrize("name", ["data.xlsx", "data.xml", "data", "data.txt"])
     def test_unsupported_suffixes(self, tmp_path, name):
         path = write(tmp_path, name, "a,b\n1,2\n")
         with pytest.raises(UnsupportedFormatError, match="not a supported format"):

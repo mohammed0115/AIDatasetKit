@@ -137,13 +137,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     audit = subparsers.add_parser(
         "audit",
-        help="Inspect a CSV, TSV, JSON or JSONL file and write audit.json, lineage.json, and report.html.",
+        help="Inspect a CSV, TSV, JSON, JSONL, Parquet or Feather file and write audit.json, lineage.json, and report.html.",
         description=(
-            "Audit one CSV, TSV, JSON or JSONL file. Writes three artifacts: "
-            "audit.json (the canonical machine-readable record), lineage.json "
-            "(each input column and what it became), and report.html (the same "
-            "evidence rendered for a person). Nothing is trained, and your data "
-            "is never modified."
+            "Audit one CSV, TSV, JSON, JSONL, Parquet or Feather file. Writes "
+            "three artifacts: audit.json (the canonical machine-readable record), "
+            "lineage.json (each input column and what it became), and report.html "
+            "(the same evidence rendered for a person). Nothing is trained, and "
+            "your data is never modified."
         ),
         epilog=(
             "Exit codes: 0 below the --fail-on threshold; 1 the command could not "
@@ -154,7 +154,7 @@ def build_parser() -> argparse.ArgumentParser:
             "before sharing it outside your team."
         ),
     )
-    audit.add_argument("path", type=Path, help="Path to a .csv, .tsv, .json or .jsonl file.")
+    audit.add_argument("path", type=Path, help="Path to a .csv, .tsv, .json, .jsonl, .parquet or .feather file.")
     audit.add_argument(
         "--target", default=None, help="Column holding the label, if there is one."
     )
