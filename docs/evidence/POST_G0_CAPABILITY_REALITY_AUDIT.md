@@ -7,7 +7,7 @@ G0_STATUS                    = PASS (16/16)
 G0_MAIN_INTEGRATION          = PASS
 GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
-OVERALL_CERTIFIED_PROGRESS   = 46.12%   (107 proven / 232 applicable, G0–G12; updated after G1-W3, §0)
+OVERALL_CERTIFIED_PROGRESS   = 46.55%   (108 proven / 232 applicable, G0–G12; updated after G1-W4, §0)
 AUDIT_GATE                   = PASS     (the audit is complete with evidence; G1–G12 are not)
 READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W2 complete; G1-W3 requires separate CTO authorization)
 NEXT_AUTHORIZED_ACTION       = CTO review before any G1-W3 work; G1-W3 is NO_GO pending authorization
@@ -86,6 +86,20 @@ AUDIT_DOCUMENTS       = CORRECT
   version `0.1.0a1`, fingerprints unchanged. Certified totals are G1 = 15/26 =
   **57.69%** and overall = 107/232 = **46.12%**.
 - Evidence: `docs/evidence/G1_W3_FORMAT_READERS_REPORT.md`.
+
+**تحديث 6 — G1-W4 (Excel .xlsx reader):**
+
+- **G1-04: `SUPPORTED_AND_TESTED`.** An `.xlsx` workbook is read as one
+  worksheet's table through the optional `excel` extra (openpyxl, floor 3.1.0).
+  The row/column/cell budgets are enforced from the worksheet's declared
+  dimensions before any cell is materialized; a multi-sheet workbook is refused
+  unless `sheet=` names one; a macro-enabled archive is refused; a corrupt zip
+  is `MalformedInputError`. `sheet=` is refused for every non-xlsx source.
+  6 dedicated mutations, 6 killed; the W1/W2/W3 harnesses re-run green.
+- Artifact schema `1.1`, publication schema `1.0`, version `0.1.0a1`,
+  fingerprints unchanged. Certified totals are G1 = 16/26 = **61.54%** and
+  overall = 108/232 = **46.55%**.
+- Evidence: `docs/evidence/G1_W4_XLSX_READER_REPORT.md`.
 
 ## 1. Main integration
 
@@ -169,7 +183,7 @@ G0_MAIN_INTEGRATION = PASS
 | G1-01 | G1 | CSV, comma-delimited, UTF-8 (CLI) | `SUPPORTED_AND_TESTED` | ingestion.load_table (G1-W1; was cli `pd.read_csv(path)`) | tests/integration/test_audit_end_to_end.py (golden), tests/integration/test_cli_ingestion.py | — | — |
 | G1-02 | G1 | CSV delimiter detection (`,` `;` tab `\|`) | `SUPPORTED_AND_TESTED` | ingestion/delimited.py::_choose (G1-W1): csv strict on a 64 KiB sample, ambiguity refused, explicit delimiter validated | tests/unit/test_ingestion.py::TestDelimiterDetection, tests/integration/test_cli_ingestion.py; scripts/ingestion_mutations.py (1–3) | Closed P0-2 | — |
 | G1-03 | G1 | TSV | `SUPPORTED_AND_TESTED` | ingestion/formats.py + delimited.py (G1-W1) | tests/unit/test_ingestion.py::TestTsv, tests/integration/test_cli_ingestion.py::test_every_supported_layout | — | — |
-| G1-04 | G1 | XLSX | `MISSING` | no reader | probe_ingestion.py (exploratory): refused | No reader | P1 |
+| G1-04 | G1 | XLSX | `SUPPORTED_AND_TESTED` | ingestion/excel.py (G1-W4): worksheet dims preflight before cells; multi-sheet refused unless sheet=; macro archive refused | tests/unit/test_ingestion_excel.py, tests/integration/test_ingestion_without_openpyxl.py, test_cli_ingestion.py; scripts/g1_w4_mutations.py (6/6) | — | — |
 | G1-05 | G1 | XLS | `MISSING` | no reader | probe_ingestion.py (exploratory): refused | No reader | P2 |
 | G1-06 | G1 | Parquet | `SUPPORTED_AND_TESTED` | ingestion/columnar.py::_parquet_frame (G1-W3): footer row/column/cell preflight before materialization; footer/data agreement checked | tests/unit/test_ingestion_columnar.py, tests/integration/test_ingestion_without_pyarrow.py, test_cli_ingestion.py; scripts/g1_w3_mutations.py (M-W3-07/08) | — | — |
 | G1-07 | G1 | Feather / Arrow tables | `SUPPORTED_AND_TESTED` | ingestion/columnar.py::_feather_frame (G1-W3): column budget from the IPC schema before data, rows/cells on the Arrow table before pandas | tests/unit/test_ingestion_columnar.py, tests/integration/test_ingestion_without_pyarrow.py; scripts/g1_w3_mutations.py (M-W3-09) | — | — |
@@ -590,7 +604,7 @@ G0_MAIN_INTEGRATION = PASS
 |---|---|---:|---:|---:|---|---|
 | G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
 | G0.1 | Profiling performance hotfix | — | — | — | PASS | P0-1 مغلق (انظر §0) |
-| G1 | Ingestion | 15 | 26 | 57.69% | IN PROGRESS | W1–W3 مغلقة؛ XLSX بعدها |
+| G1 | Ingestion | 16 | 26 | 61.54% | IN PROGRESS | W1–W4 مغلقة؛ chunked بعدها |
 | G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | تواريخ ونص وقيم |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | عمليات جدولية |
 | G4 | EDA & Statistics | 9 | 13 | 69.23% | AUDIT | ارتباط فئوي واختبارات |
@@ -602,14 +616,14 @@ G0_MAIN_INTEGRATION = PASS
 | G10 | Provenance/Security/Privacy/Errors | 18 | 28 | 64.29% | AUDIT | أخطاء الموارد والمدخلات |
 | G11 | Performance & Certification | 5 | 21 | 23.81% | AUDIT | 4 بنود MISSING→PARTIAL في G0.1؛ benchmarks في CI |
 | G12 | Masari Consumer Integration | 2 | 14 | 14.29% | AUDIT | بعد G1–G9 |
-| **All** | G0–G12 | **107** | **232** | **46.12%** | — | — |
+| **All** | G0–G12 | **108** | **232** | **46.55%** | — | — |
 
 **تفصيل الحالات لكل بوابة** (حتى لا يختفي العمل الموجود غير المكتمل):
 
 | Gate | SUPPORTED_AND_TESTED | SUPPORTED_NOT_SUFFICIENTLY_TESTED | PARTIAL | MISSING | BLOCKED | NOT_APPLICABLE | OUT_OF_SCOPE |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | G0 | 16 | 0 | 0 | 0 | 0 | 0 | 0 |
-| G1 | 15 | 0 | 3 | 8 | 0 | 0 | 1 |
+| G1 | 16 | 0 | 3 | 7 | 0 | 0 | 1 |
 | G2 | 15 | 0 | 2 | 5 | 0 | 0 | 0 |
 | G3 | 2 | 0 | 5 | 10 | 0 | 1 | 0 |
 | G4 | 9 | 0 | 2 | 2 | 0 | 0 | 0 |
