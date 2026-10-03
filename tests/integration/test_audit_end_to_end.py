@@ -264,7 +264,7 @@ class TestExitCodes:
         assert "no such file" in missing.stderr
 
     def test_an_unsupported_file_type_says_so(self, tmp_path):
-        path = tmp_path / "data.xlsx"
+        path = tmp_path / "data.xls"
         path.write_text("not really excel", encoding="utf-8")
         result = run_cli("audit", str(path))
         assert result.returncode == EXIT_CODES["usage"]
