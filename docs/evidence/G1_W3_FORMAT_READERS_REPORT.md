@@ -9,7 +9,8 @@ claim below names the run that proves it.
 ```text
 PRE_CLOSURE_SHA  = 6ba8817891f59f8c0c4861a06f9338f8ae2202d6 (main = origin/main, clean)
 BRANCH           = g1-w3-format-readers
-FINAL_BRANCH_SHA = 638d9374c3317d10f0de56ba5e7a3d8e53b1760d
+FINAL_BRANCH_SHA = f7327b74fb8784032ef772ddd3cabd99277cce51 (branch tip: this report;
+                   the tested code SHA is 638d937, a docs-only ancestor)
 ```
 
 Wave content, per the roadmap: Parquet and Feather (pyarrow as an optional
@@ -106,8 +107,11 @@ optional dependency (`pyarrow`) added under the `parquet` extra; the core
 ## CI
 
 ```text
-BRANCH_CI = pending (recorded once observed on FINAL_BRANCH_SHA)
-MAIN_CI   = pending
+BRANCH_CI = run on f7327b74fb8784032ef772ddd3cabd99277cce51 (push): 10/10 jobs
+            completed/success (ubuntu/windows x minimum, minimum + extras,
+            reference, reference + extras, build/install/smoke) -- check-runs
+            verified 2026-10-03.
+MAIN_CI   = pending (recorded once observed on the integrated main SHA)
 ```
 
 ## Scope confirmation
