@@ -9,6 +9,24 @@ Versions before `1.0` may change public interfaces and the artifact schema; see
 First alpha, not yet released: nothing has been published to PyPI, TestPyPI or
 as a GitHub release, and no version is tagged. Everything below is new.
 
+### G1-W4 format expansion: Excel .xlsx
+
+Evidence: `docs/evidence/G1_W4_XLSX_READER_REPORT.md`.
+
+- **Excel `.xlsx`** reader through the new optional `excel` extra (openpyxl).
+  A workbook is one worksheet's table: the first row is the header, and the
+  row/column/cell budgets are enforced from the worksheet's declared dimensions
+  before any cell is materialized. A multi-sheet workbook is refused as
+  ambiguous unless the `sheet=` argument names one; a macro-enabled archive
+  (`xl/vbaProject.bin`) is refused; a corrupt zip is `MalformedInputError`,
+  never a bare openpyxl/zip error. Formulas read as their cached values
+  (`data_only=True`); a missing openpyxl is `MissingDependencyError` naming the
+  extra.
+- `load_table` gains a keyword-only `sheet` argument, refused for every
+  non-xlsx source. CLI audits accept `.xlsx`.
+- Artifact schema remains `1.1`, publication schema `1.0`, fingerprints
+  unchanged. 6 dedicated mutations, 6 killed (`scripts/g1_w4_mutations.py`).
+
 ### G1-W3 format expansion: JSON, JSONL, Parquet, Feather
 
 Evidence: `docs/evidence/G1_W3_FORMAT_READERS_REPORT.md`.
