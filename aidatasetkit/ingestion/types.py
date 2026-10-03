@@ -43,6 +43,7 @@ class TableFormat(StrEnum):
     JSONL = "jsonl"
     PARQUET = "parquet"
     FEATHER = "feather"
+    XLSX = "xlsx"
 
 
 class DelimiterSource(StrEnum):

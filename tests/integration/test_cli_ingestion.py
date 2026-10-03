@@ -134,6 +134,23 @@ class TestFilesAreReadRight:
         assert ingestion["format"] == "parquet"
         assert ingestion["row_count"] == len(ROWS)
 
+    def test_an_xlsx_file_is_audited_end_to_end(self, tmp_path):
+        pytest.importorskip("openpyxl", reason="the excel extra is not installed")
+        path = tmp_path / "rows.xlsx"
+        import openpyxl
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(HEADER)
+        for record in ROWS:
+            ws.append(record)
+        wb.save(path)
+        result = audit(path, tmp_path / "out")
+        assert result.returncode != EXIT_CODES["usage"], result.stderr
+        ingestion = published(tmp_path / "out")[0]["ingestion"]
+        assert ingestion["format"] == "xlsx"
+        assert ingestion["row_count"] == len(ROWS)
+
 
 class TestTheEvidenceSaysHowItWasRead:
     def test_the_report_has_an_input_section(self, semicolon):

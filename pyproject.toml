@@ -56,10 +56,12 @@ viz = ["matplotlib>=3.9.0"]
 # CVE-2023-47248, arbitrary code execution while deserializing a malicious
 # Parquet or Arrow IPC file; older pyarrow is never acceptable.
 parquet = ["pyarrow>=14.0.1"]
+# Excel .xlsx reader.
+excel = ["openpyxl>=3.1.0"]
 # Everything CONTRIBUTING.md and scripts/release_smoke_test.sh ask a contributor
 # to run. Without build and twine the documented release gate cannot execute.
 dev = ["pytest>=8.0.0", "build>=1.0", "twine>=5.0"]
-all = ["aidatasetkit[boosting,viz,parquet,dev]"]
+all = ["aidatasetkit[boosting,viz,parquet,excel,dev]"]
 
 [project.scripts]
 aidatasetkit = "aidatasetkit.cli.main:main"

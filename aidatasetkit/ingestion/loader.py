@@ -26,6 +26,7 @@ from aidatasetkit.core.exceptions import (
 )
 from aidatasetkit.ingestion.columnar import read_columnar
 from aidatasetkit.ingestion.delimited import plan_delimited
+from aidatasetkit.ingestion.excel import read_excel
 from aidatasetkit.ingestion.formats import resolve_format
 from aidatasetkit.ingestion.json_text import read_json_text
 from aidatasetkit.ingestion.types import (
@@ -46,16 +47,19 @@ def load_table(
     *,
     options: LoadOptions | None = None,
     limits: IngestionLimits | None = None,
+    sheet: str | None = None,
 ) -> LoadedTable:
     """Load a table, or refuse it with a structured error. Never a wrong table.
 
     Args:
         source: A path (:class:`pathlib.Path` or any :class:`os.PathLike`) to a
             ``.csv``, ``.tsv``, ``.json``, ``.jsonl``, ``.ndjson``, ``.parquet``,
-            ``.feather`` or ``.arrow`` file; a :class:`pandas.DataFrame`; or a
-            list or tuple of mappings, one per row. A plain ``str`` is refused
-            rather than guessed at -- pass ``Path("data.csv")``.
+            ``.feather``, ``.arrow`` or ``.xlsx`` file; a :class:`pandas.DataFrame`;
+            or a list or tuple of mappings, one per row. A plain ``str`` is
+            refused rather than guessed at -- pass ``Path("data.csv")``.
         options: How a file is read. In-memory sources accept only the defaults.
+        sheet: The worksheet to read from an ``.xlsx`` file. Required when the
+            workbook has more than one sheet; meaningless for any other source.
 
     Returns:
         A :class:`LoadedTable`. Loading profiles nothing and trains nothing.
@@ -67,6 +71,8 @@ def load_table(
     limits = limits if limits is not None else IngestionLimits()
     if isinstance(source, pd.DataFrame):
         _require_default(options, "a DataFrame")
+        if sheet is not None:
+            raise InvalidIngestionOptionsError("sheet= applies to .xlsx files only.")
         return _from_dataframe(source, limits)
     if isinstance(source, (str, bytes)):
         raise UnsupportedFormatError(
@@ -74,14 +80,16 @@ def load_table(
             "be mistaken for data or for a path. Pass pathlib.Path(...) for a file."
         )
     if isinstance(source, os.PathLike):
-        return _from_file(Path(os.fspath(source)), options, limits)
+        return _from_file(Path(os.fspath(source)), options, limits, sheet)
     if isinstance(source, (list, tuple)):
         _require_default(options, "records")
+        if sheet is not None:
+            raise InvalidIngestionOptionsError("sheet= applies to .xlsx files only.")
         return _from_records(source, limits)
     raise UnsupportedFormatError(
         f"Cannot load a {type(source).__name__}. Supported: a path to a .csv, "
-        ".tsv, .json, .jsonl, .parquet or .feather file, a pandas DataFrame, "
-        "or a list of mappings."
+        ".tsv, .json, .jsonl, .parquet, .feather or .xlsx file, a pandas "
+        "DataFrame, or a list of mappings."
     )
 
 
@@ -102,7 +110,9 @@ def _memory(frame: pd.DataFrame) -> int:
 # --------------------------------------------------------------------------- #
 
 
-def _from_file(path: Path, options: LoadOptions, limits: IngestionLimits) -> LoadedTable:
+def _from_file(
+    path: Path, options: LoadOptions, limits: IngestionLimits, sheet: str | None = None
+) -> LoadedTable:
     fmt = resolve_format(path)
     if not path.exists():
         raise InputNotFoundError(f"No such file: {path.name}.")
@@ -117,6 +127,10 @@ def _from_file(path: Path, options: LoadOptions, limits: IngestionLimits) -> Loa
                 observed_value=size, input_kind=SourceKind.FILE.value,
             )
 
+    if fmt is not TableFormat.XLSX and sheet is not None:
+        raise InvalidIngestionOptionsError(
+            f"sheet= applies to .xlsx files only; {path.name} is {fmt.value}."
+        )
     if fmt in (TableFormat.JSON, TableFormat.JSONL):
         records, names, encoding, notes = read_json_text(path, fmt, options, limits)
         frame, frame_notes = _records_frame(records, names, limits, SourceKind.FILE.value)
@@ -138,6 +152,23 @@ def _from_file(path: Path, options: LoadOptions, limits: IngestionLimits) -> Loa
 
     if fmt in (TableFormat.PARQUET, TableFormat.FEATHER):
         frame = read_columnar(path, fmt, options, limits)
+        return LoadedTable(
+            frame=frame,
+            metadata=LoadMetadata(
+                source_kind=SourceKind.FILE,
+                format=fmt,
+                encoding=None,
+                delimiter=None,
+                delimiter_source=None,
+                header=None,
+                row_count=int(len(frame)),
+                column_count=int(frame.shape[1]),
+                memory_bytes=_memory(frame),
+                warnings=(),
+            ),
+        )
+    if fmt is TableFormat.XLSX:
+        frame = read_excel(path, fmt, options, limits, sheet=sheet)
         return LoadedTable(
             frame=frame,
             metadata=LoadMetadata(

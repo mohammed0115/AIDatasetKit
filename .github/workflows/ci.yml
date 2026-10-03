@@ -41,7 +41,7 @@ jobs:
         shell: bash
         run: |
           python -m pip install --upgrade pip
-          if [ "${{ matrix.extras }}" = "true" ]; then EXTRAS="dev,viz,boosting,parquet"; else EXTRAS="dev"; fi
+          if [ "${{ matrix.extras }}" = "true" ]; then EXTRAS="dev,viz,boosting,parquet,excel"; else EXTRAS="dev"; fi
           python -m pip install -c "constraints/${{ matrix.environment }}.txt" -e ".[${EXTRAS}]"
           python -m pip freeze
       - name: Import comes from this checkout
