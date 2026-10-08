@@ -100,6 +100,10 @@ AUDIT_DOCUMENTS       = CORRECT
   fingerprints unchanged. Certified totals are G1 = 16/26 = **61.54%** and
   overall = 108/232 = **46.55%**.
 - Evidence: `docs/evidence/G1_W4_XLSX_READER_REPORT.md`.
+- **Closure defects, fixed on this branch before the full suite at `0143671`:**
+  a header-only sheet is `EmptyInputError`; a blank data row is kept; text
+  `LoadOptions` are refused; the CLI forwards `--sheet`. Mutations 9/9 KILLED.
+  Counts stay 16/26 and 108/232. Branch CI and main CI are still pending.
 
 ## 1. Main integration
 

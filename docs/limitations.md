@@ -51,8 +51,9 @@ files, a pandas DataFrame, or a list of records, and nothing else: no old-format
 `.xls`, databases, URLs or cloud storage. A `.txt` file is refused even when it
 holds CSV. Parquet and Feather need the optional `parquet` extra (pyarrow);
 `.xlsx` needs the `excel` extra (openpyxl) and reads one worksheet (the first
-row is the header; a multi-sheet workbook needs `sheet=`); macro-enabled
-workbooks are refused. JSON is read whole (bounded by the source-byte limit),
+row is the header; a multi-sheet workbook needs `sheet=` or the CLI `--sheet`
+flag); macro-enabled workbooks are refused. A header with no data rows is
+empty input, and a blank data row is kept as missing cells. JSON is read whole (bounded by the source-byte limit),
 while JSONL is checked as it streams.
 
 - **Encodings are never guessed.** utf-8 (default), utf-8-sig, latin-1 and

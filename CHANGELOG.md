@@ -23,7 +23,10 @@ Evidence: `docs/evidence/G1_W4_XLSX_READER_REPORT.md`.
   (`data_only=True`); a missing openpyxl is `MissingDependencyError` naming the
   extra.
 - `load_table` gains a keyword-only `sheet` argument, refused for every
-  non-xlsx source. CLI audits accept `.xlsx`.
+  non-xlsx source. The CLI accepts `.xlsx` and `--sheet`. A header with no
+  data rows is empty input, the same as every other reader; a blank data row
+  is kept. Encoding, delimiter and `header=False` are refused on an Excel
+  file rather than ignored.
 - Artifact schema remains `1.1`, publication schema `1.0`, fingerprints
   unchanged. 6 dedicated mutations, 6 killed (`scripts/g1_w4_mutations.py`).
 
