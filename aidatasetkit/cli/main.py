@@ -137,9 +137,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     audit = subparsers.add_parser(
         "audit",
-        help="Inspect a CSV, TSV, JSON, JSONL, Parquet or Feather file and write audit.json, lineage.json, and report.html.",
+        help="Inspect a CSV, TSV, JSON, JSONL, Parquet, Feather or Excel file and write audit.json, lineage.json, and report.html.",
         description=(
-            "Audit one CSV, TSV, JSON, JSONL, Parquet or Feather file. Writes "
+            "Audit one CSV, TSV, JSON, JSONL, Parquet, Feather or Excel file. Writes "
             "three artifacts: audit.json (the canonical machine-readable record), "
             "lineage.json (each input column and what it became), and report.html "
             "(the same evidence rendered for a person). Nothing is trained, and "
@@ -154,7 +154,11 @@ def build_parser() -> argparse.ArgumentParser:
             "before sharing it outside your team."
         ),
     )
-    audit.add_argument("path", type=Path, help="Path to a .csv, .tsv, .json, .jsonl, .parquet or .feather file.")
+    audit.add_argument(
+        "path",
+        type=Path,
+        help="Path to a .csv, .tsv, .json, .jsonl, .parquet, .feather or .xlsx file.",
+    )
     audit.add_argument(
         "--target", default=None, help="Column holding the label, if there is one."
     )
@@ -227,6 +231,14 @@ def build_parser() -> argparse.ArgumentParser:
             "Field delimiter: ',', ';', '|' or 'tab'. Detected when omitted; a "
             "file that splits consistently under more than one is refused and "
             "needs this flag."
+        ),
+    )
+    audit.add_argument(
+        "--sheet",
+        default=None,
+        help=(
+            "Worksheet to read from an .xlsx workbook. Required when the "
+            "workbook has more than one sheet; refused for every other format."
         ),
     )
     for option, destination, help_text, default in (
@@ -318,6 +330,7 @@ def _audit(args: argparse.Namespace) -> int:
     # line and exit 1 before anything is published.
     loaded = load_table(
         path,
+        sheet=args.sheet,
         options=LoadOptions(
             encoding=args.encoding,
             delimiter=None if args.delimiter is None else _DELIMITER_CHOICES[args.delimiter],

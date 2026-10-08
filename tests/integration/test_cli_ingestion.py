@@ -151,6 +151,27 @@ class TestFilesAreReadRight:
         assert ingestion["format"] == "xlsx"
         assert ingestion["row_count"] == len(ROWS)
 
+    def test_a_named_sheet_is_the_one_audited(self, tmp_path):
+        pytest.importorskip("openpyxl", reason="the excel extra is not installed")
+        import openpyxl
+
+        path = tmp_path / "book.xlsx"
+        wb = openpyxl.Workbook()
+        wb.active.title = "Other"
+        wb.active.append(["x"])
+        wb.active.append([1])
+        data = wb.create_sheet("Data")
+        data.append(HEADER)
+        for record in ROWS[:2]:
+            data.append(record)
+        wb.save(path)
+        result = audit(path, tmp_path / "out", "--sheet", "Data")
+        assert result.returncode != EXIT_CODES["usage"], result.stderr
+        assert "2 sheets" not in result.stderr
+        ingestion = published(tmp_path / "out")[0]["ingestion"]
+        assert ingestion["format"] == "xlsx"
+        assert ingestion["row_count"] == 2
+
 
 class TestTheEvidenceSaysHowItWasRead:
     def test_the_report_has_an_input_section(self, semicolon):

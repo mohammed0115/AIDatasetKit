@@ -103,6 +103,14 @@ MUTATIONS = (
         (f"{EXCEL_TESTS}::TestExcelRefusals::test_text_options_are_refused",),
         (("test_text_options_are_refused", "DID NOT RAISE"),),
     ),
+    Mutation(
+        "M-W4-09", "CLI does not forward the named worksheet",
+        (("aidatasetkit/cli/main.py",
+          "        sheet=args.sheet,\n",
+          ""),),
+        ("tests/integration/test_cli_ingestion.py::TestFilesAreReadRight::test_a_named_sheet_is_the_one_audited",),
+        (("test_a_named_sheet_is_the_one_audited", "2 sheets"),),
+    ),
 )
 
 
