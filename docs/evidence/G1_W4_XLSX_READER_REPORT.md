@@ -9,6 +9,7 @@ Evidence for the G1-W4 wave of `docs/AIDATASETKIT_EXECUTION_ROADMAP.md`
 PRE_CLOSURE_SHA  = dc70d8c60a3defdc35a805fbe7b6996b2fdb800c (main = origin/main after G1-W3)
 BRANCH           = g1-w4-xlsx-reader
 CODE_SHA         = 01436719d36607044e638665b631e465c33c42ba
+CERTIFIED_CODE_SHA = dd537bb4e80c5a2c002a5da448c654d888a3e44b
 ```
 
 Wave content, per the roadmap: XLSX (openpyxl as an optional extra), with
@@ -109,19 +110,39 @@ dependency-contract tests pass. `load_table` gained a keyword-only `sheet`
 argument, and the CLI gains optional `--sheet` (default `None`, the same as
 omitting it). Both are backward-compatible extensions.
 
-Certified counts are unchanged by the defect fixes: G1-04 was already
-`SUPPORTED_AND_TESTED` on this branch. G1 = 16/26 = 61.54%. Overall =
-108/232 = 46.55%. `origin/main` remains 107/232 = 46.12% until this branch
-is integrated.
+G1-04 is `SUPPORTED_AND_TESTED`. G1-24 stays `MISSING`. No other capability
+classification is changed by this seal. Integrated counts on the certified SHA
+are G1 = 16/26 = 61.54% and overall = 108/232 = 46.55%.
 
 ## CI
 
+These runs are for `CERTIFIED_CODE_SHA`. This section does not name a CI run
+of the commit that adds it.
+
 ```text
-BRANCH_CI = pending (this branch has not been pushed; no remote run exists)
-MAIN_CI   = pending (not integrated)
+CERTIFIED_CODE_SHA = dd537bb4e80c5a2c002a5da448c654d888a3e44b
+BRANCH_CI_RUN      = 37818959726
+BRANCH_CI_URL      = https://github.com/mohammed0115/AIDatasetKit/actions/runs/37818959726
+BRANCH_CI_SHA      = dd537bb4e80c5a2c002a5da448c654d888a3e44b
+BRANCH_CI_EVENT    = push
+BRANCH_CI_BRANCH   = g1-w4-xlsx-reader
+BRANCH_CI_RESULT   = success
+BRANCH_CI_JOBS     = 10/10
+BRANCH_CI_STARTED  = 2026-10-08T17:44:59Z
+BRANCH_CI_UPDATED  = 2026-10-08T17:53:27Z
+MAIN_CI_RUN        = 37820723635
+MAIN_CI_URL        = https://github.com/mohammed0115/AIDatasetKit/actions/runs/37820723635
+MAIN_CI_SHA        = dd537bb4e80c5a2c002a5da448c654d888a3e44b
+MAIN_CI_EVENT      = push
+MAIN_CI_BRANCH     = main
+MAIN_CI_RESULT     = success
+MAIN_CI_JOBS       = 10/10
+MAIN_CI_STARTED    = 2026-10-08T17:58:44Z
+MAIN_CI_UPDATED    = 2026-10-08T18:05:03Z
 ```
 
-Local evidence is not branch CI and is not main CI.
+The nine-mutation harness was re-run on this same SHA: 9/9 KILLED. A local
+full suite on this SHA was 4487 passed, 47 skipped, 0 failed, 0 errors.
 
 ## Scope confirmation
 
