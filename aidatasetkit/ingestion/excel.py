@@ -71,9 +71,10 @@ def read_excel(
         MalformedInputError, DuplicateHeadersError, RowLimitError,
         ColumnLimitError, CellLimitError.
     """
-    if options.delimiter is not None:
+    if not options.is_default:
         raise InvalidIngestionOptionsError(
-            f"delimiter applies to delimited text; {path.name} is an Excel file."
+            "LoadOptions (encoding, delimiter, header) apply to text files; "
+            f"{path.name} is an Excel file, which describes itself."
         )
     _openpyxl(path)
     wb = _open(path)
@@ -184,10 +185,15 @@ def _frame(path: Path, rows: list[tuple[Any, ...]], limits: IngestionLimits) -> 
     if not rows:
         raise EmptyInputError(f"{path.name} has no rows; there is no table to load.")
     header = list(rows[0])
-    data = [row for row in rows[1:] if any(cell is not None for cell in row)]
-    # A sheet of only a header row has no data.
-    if not data and not any(cell is not None for cell in header):
-        raise EmptyInputError(f"{path.name} has no data; there is no table to load.")
+    data = list(rows[1:])
+    # A blank data row is a row of missing cells, not a row to drop: the
+    # dimension preflight already counted it, and omitting it would be a silent
+    # shorter table. A header with no data rows is the same empty input every
+    # other reader refuses.
+    if not data:
+        raise EmptyInputError(
+            f"{path.name} has a header row and no data rows; there is nothing to audit."
+        )
 
     names: list[str] = []
     seen: set[str] = set()

@@ -87,6 +87,22 @@ MUTATIONS = (
         (f"{ABSENCE_TESTS}::TestIngestionWithoutOpenpyxl::test_an_xlsx_read_names_the_extra",),
         (("test_an_xlsx_read_names_the_extra", "REFUSED"),),
     ),
+    Mutation(
+        "M-W4-07", "header-only worksheet accepted as an empty frame",
+        ((EXCEL,
+          "    if not data:\n        raise EmptyInputError(",
+          "    if False:\n        raise EmptyInputError("),),
+        (f"{EXCEL_TESTS}::TestExcelRefusals::test_a_header_only_sheet_is_empty_input",),
+        (("test_a_header_only_sheet_is_empty_input", "DID NOT RAISE"),),
+    ),
+    Mutation(
+        "M-W4-08", "text options accepted for an Excel file",
+        ((EXCEL,
+          "    if not options.is_default:\n        raise InvalidIngestionOptionsError(",
+          "    if False:\n        raise InvalidIngestionOptionsError("),),
+        (f"{EXCEL_TESTS}::TestExcelRefusals::test_text_options_are_refused",),
+        (("test_text_options_are_refused", "DID NOT RAISE"),),
+    ),
 )
 
 

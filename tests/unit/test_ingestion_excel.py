@@ -89,6 +89,13 @@ class TestExcelReading:
         path = write_xlsx(tmp_path, [["a", "b"], [1, None]])
         assert pd.isna(load_table(path).frame["b"].iloc[0])
 
+    def test_a_blank_data_row_is_kept(self, tmp_path):
+        frame = load_table(write_xlsx(tmp_path, [["a", "b"], [1, 2], [None, None], [3, 4]])).frame
+        assert frame.shape == (3, 2)
+        assert frame["a"].tolist()[:1] == [1]
+        assert pd.isna(frame["a"].iloc[1]) and pd.isna(frame["b"].iloc[1])
+        assert frame["a"].iloc[2] == 3
+
 
 # --------------------------------------------------------------------------- #
 # Structured refusals
@@ -146,6 +153,18 @@ class TestExcelRefusals:
     def test_a_delimiter_option_is_refused(self, tmp_path):
         with pytest.raises(InvalidIngestionOptionsError, match="delimiter"):
             load_table(write_xlsx(tmp_path), options=LoadOptions(delimiter=","))
+
+    @pytest.mark.parametrize(
+        "options",
+        [LoadOptions(encoding="latin-1"), LoadOptions(header=False), LoadOptions(delimiter="|")],
+    )
+    def test_text_options_are_refused(self, tmp_path, options):
+        with pytest.raises(InvalidIngestionOptionsError, match="LoadOptions"):
+            load_table(write_xlsx(tmp_path), options=options)
+
+    def test_a_header_only_sheet_is_empty_input(self, tmp_path):
+        with pytest.raises(EmptyInputError, match="no data rows"):
+            load_table(write_xlsx(tmp_path, [["a", "b"]]))
 
 
 # --------------------------------------------------------------------------- #
