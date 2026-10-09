@@ -9,7 +9,7 @@ outside this file.
 ```text
 BASELINE_SHA = 749048703fb885ec688bc3c57f91c4e16edbf50e
 BRANCH       = g1-w5-chunked-profiling
-CODE_SHA     = recorded with the bounded-memory repair
+CODE_SHA     = b4a7e28515f2f0eb6844efa729776de74254866f
 ```
 
 `BASELINE_SHA` is certified `main`. G1-25 stays
@@ -43,23 +43,24 @@ and overall 108/232 = 46.55%.
 - Artifact schema `1.2`. `chunked_profiling` is a typed record, `null` on the
   default path. Publication schema `1.0`. Package version `0.1.0a1`.
 
-## Local runs
+## Local runs at CODE_SHA
 
 Interpreter: CPython 3.12.14 (`.venv`). pandas 3.0.5.
 
-The first branch tip's 9/9 matrix is not the result of this repair. The
-bounded-memory repair is measured on its implementation commit. Those figures
-are written into this section when that local run is recorded. They do not
-name a CI run.
+| Run | Result |
+|---|---|
+| Focused chunked tests, then migration, golden, packaging, schema, and architecture tests | 29 chunked tests passed; the wider slice passed 249 |
+| `scripts/g1_w5_mutations.py` | 16/16 KILLED, baseline exit 0, tree restored after each mutation. `rev=b4a7e28515f2f0eb6844efa729776de74254866f` |
+| Full suite | 4520 passed, 47 skipped, 0 failed in 398.68s. JUnit `tests=4567 failures=0 errors=0 skipped=47` |
+| `scripts/release_smoke_test.sh` | wheel and sdist: build, twine check, clean install, CLI audit, schema `1.2`. Version `0.1.0a1`. Nothing published |
 
-The weakenings the harness must kill are: caller row limit ignored, JSON
-accepted, file read in one piece, first chunk treated as the population,
-scratch directory left behind, scratch files group-readable, approximate
-quartile unlabeled, approximation changes the verdict, default audit opts in,
-`max_cells` bypass, chunked evidence falsely claims the full population,
-chunk-size-dependent result, full-table materialization in CLI chunked mode,
-collision-unsafe row encoding, complete scratch-file read into memory, and
-chunked evidence omitted.
+The sixteen weakenings are: caller row limit ignored, JSON accepted, file read
+in one piece, first chunk treated as the population, scratch directory left
+behind, scratch files group-readable, approximate quartile unlabeled,
+approximation changes the verdict, default audit opts in, `max_cells` bypass,
+chunked evidence falsely claims the full population, chunk-size-dependent
+result, full-table materialization in CLI chunked mode, collision-unsafe row
+encoding, complete scratch-file read into memory, and chunked evidence omitted.
 
 ## Not in this wave
 
