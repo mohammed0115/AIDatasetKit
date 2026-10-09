@@ -54,8 +54,8 @@
 | G1-W1 ✅ **منجزة** (`docs/evidence/G1_W1_INGESTION_FOUNDATION_REPORT.md`) | حزمة `aidatasetkit.ingestion` (طبقة فوق `core`): `load_table(path \| frame \| records, *, options) -> LoadedTable(frame, metadata)`. metadata فيها الصيغة، والترميز، والفاصل، والرأس، والصفوف والأعمدة، والذاكرة، والتحذيرات. CSV مع كشف الفاصل (رفض صريح عند الغموض)، وترميز صريح، وTSV، وrecords (list of dicts). خطأ منظم لكل من الصيغة غير المدعومة والمدخل المشوه والمدخل الفارغ. CLI يستخدم الطبقة الجديدة | G0.1 | M |
 | G1-W2 (غير مُفوَّضة؛ تنتظر مراجعة CTO) | حدود موارد مُعلَنة (bytes، rows، columns) وخطأ `ResourceLimitError`؛ استنتاج التواريخ من النص بسياسة معلنة، دون تخمين صامت | W1 | M |
 | G1-W3 ✅ **منجزة** (`docs/evidence/G1_W3_FORMAT_READERS_REPORT.md`) | Parquet وFeather (pyarrow كـextra اختياري)؛ JSON وJSONL | W1 | M |
-| G1-W4 (تنفيذ محلي مُختبر؛ CI الفرع وCI على main لم يُرصدا بعد) (`docs/evidence/G1_W4_XLSX_READER_REPORT.md`) | XLSX (openpyxl كـextra) مع sheets واختيار صريح للـsheet؛ رفض ملفات الماكرو | W1 | M |
-| G1-W5 | chunked profiling للملفات الكبيرة أو sampling مُعلَن، مسجّل في الـartifact | W2 | L |
+| G1-W4 (PASS؛ CI الفرع وCI على main 10/10، انظر `docs/evidence/G1_W4_XLSX_READER_REPORT.md`) | XLSX (openpyxl كـextra) مع sheets واختيار صريح للـsheet؛ رفض ملفات الماكرو | W1 | M |
+| G1-W5 (مُنفَّذ على الفرع؛ غير معتمد) | chunked profiling للملفات الكبيرة أو sampling مُعلَن، مسجّل في الـartifact | W2 | L |
 | G1-W6 | SQLite read-only عبر `sqlite3` من stdlib؛ نتيجة query كجدول | W1 | S |
 
 **Tests:**

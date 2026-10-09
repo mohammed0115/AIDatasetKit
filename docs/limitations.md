@@ -62,15 +62,22 @@ while JSONL is checked as it streams.
   whole file is then validated. A file that is consistent under two delimiters
   is refused as ambiguous; a row with too few or too many fields is refused, not
   padded.
-- **Resource limits are guards, not chunking.** By default files are refused
+- **Resource limits are still guards.** By default files are refused
   above 64 MiB, 1,000,000 data rows, 1,000 columns, 10,000,000 data cells or
   1,000,000 characters in one CSV/TSV field. DataFrames and records are checked
   before analysis/materialization as applicable; callers may provide an
   immutable `IngestionLimits` policy. The CLI uses the same finite defaults and
-  exposes overrides. Accepted files still cost two full passes (validation and
-  pandas parse) plus the sample and are loaded as one pandas table.
-- **Not implemented yet:** date inference, true chunked profiling, generators
-  and arbitrary iterables. A refused input is never published as a new audit.
+  exposes overrides. The default audit still loads an accepted file as one
+  pandas table.
+- **Chunked profiling is opt-in and CSV/TSV only.**
+  `profile_delimited_chunks` (and `aidatasetkit audit --chunked-profile`) scans
+  the whole population in chunks, records exact counts, missing values,
+  minimum, maximum, sum and mean, and fingerprints every row. Quartiles stay
+  exact unless the caller sets a bound; a quartile past that bound is labeled
+  `deterministic_approximation` and is not a verdict input. The default audit
+  does not call this path. It is not certified as G1-25.
+- **Not implemented yet:** date inference, generators and arbitrary iterables.
+  A refused input is never published as a new audit.
 
 ## Detection
 

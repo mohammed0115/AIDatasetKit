@@ -8,19 +8,20 @@ and an audit that disagrees with itself is worthless.
 ## Schema version
 
 ```json
-{ "schema_version": "1.1" }
+{ "schema_version": "1.2" }
 ```
 
 The artifact format is versioned **separately from the package**. Most releases
 will not change the shape of the record; the ones that do must be identifiable
 without consulting a changelog. Adding, removing or redefining a field bumps the
 version: an additive change is a minor bump, anything else a major one. A later
-`0.4.0` may still write `1.1`. `lineage.json` carries the same version.
+`0.4.0` may still write `1.2`. `lineage.json` carries the same version.
 
 | Version | Change |
 |---|---|
 | `1.0` | The first published contract. |
 | `1.1` | G1-W1: the top-level `ingestion` record. |
+| `1.2` | G1-W5: the top-level `chunked_profiling` record. `null` unless the caller opted into chunked CSV/TSV profiling. |
 
 An artifact with an `ingestion` key and `schema_version` `1.0` exists: `main` at
 `90ecfae` wrote it, before the version was corrected. Read it as `1.1`; nothing
@@ -68,6 +69,7 @@ artifact schema below and from the package.
 | `verdict_reasons` | Why, in the order the policy applied them. |
 | `dataset` | Identity: fingerprints, shape, column list. No values. |
 | `ingestion` | How the table was read: source kind, format, encoding, delimiter and whether it was detected, named or fixed by the format, header, rows, columns, memory, warnings. `null` when the caller built the frame itself. No path, no values. |
+| `chunked_profiling` | Opt-in CSV/TSV chunked scan. `null` unless the caller asked for it. Holds the population fingerprint and exact measurements. A `deterministic_approximation` entry is the only place an approximate number may appear, and the verdict does not read it. |
 | `config` | The settings that steered the run, and their fingerprint. |
 | `target` | What the task detector concluded, if a target was named. |
 | `model` | The capability context, if one was supplied. No estimator. |

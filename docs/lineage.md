@@ -10,7 +10,7 @@ so the file is written with an empty `features` list and a `stage` of
 
 ```json
 {
-  "schema_version": "1.1",
+  "schema_version": "1.2",
   "dataset_fingerprint": "8135be14ca667643...",
   "stage": "prepared",
   "features": [

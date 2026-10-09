@@ -103,7 +103,24 @@ AUDIT_DOCUMENTS       = CORRECT
 - **Closure defects, fixed on this branch before the full suite at `0143671`:**
   a header-only sheet is `EmptyInputError`; a blank data row is kept; text
   `LoadOptions` are refused; the CLI forwards `--sheet`. Mutations 9/9 KILLED.
-  Counts stay 16/26 and 108/232. Branch CI and main CI are still pending.
+  Counts stay 16/26 and 108/232. Branch CI and main CI were later recorded in
+  the G1-W4 report.
+
+**تحديث 7 — G1-W5 (chunked CSV/TSV profiling; not certified):**
+
+- Opt-in population scan for `.csv` and `.tsv` only. The default full-table
+  audit is unchanged. Resource limits still refuse an over-limit file.
+  Exact counts, missing values, duplicate rows, minimum, maximum, sum and
+  mean. A quartile is approximate only when the caller sets a bound, and then
+  only under the label `deterministic_approximation`, which the verdict does
+  not read. Scratch files are mode `0600` in a `0700` directory and are
+  removed afterwards. The fingerprint is the population fingerprint.
+- **G1-25 remains `MISSING_PENDING_CERTIFICATION`.** This update does not
+  promote it. Certified totals stay G1 = 16/26 = **61.54%** and overall =
+  108/232 = **46.55%**.
+- Artifact schema `1.2` (additive `chunked_profiling`, `null` by default).
+  Publication schema `1.0`. Package version `0.1.0a1`.
+- Evidence: `docs/evidence/G1_W5_CHUNKED_PROFILING_REPORT.md`.
 
 ## 1. Main integration
 
@@ -208,7 +225,7 @@ G0_MAIN_INTEGRATION = PASS
 | G1-22 | G1 | Type inference incl. dates from text | `PARTIAL` | core/schema.py detects DATETIME only for datetime64 dtype | probe_ingestion.py (exploratory): ISO dates in CSV -> `categorical`, dtype object | Dates never inferred from files | P1 |
 | G1-23 | G1 | Row/column counts and memory estimate | `SUPPORTED_AND_TESTED` | DatasetProfile.row_count/column_count/memory_usage_bytes | tests/unit/test_profiler.py | — | — |
 | G1-24 | G1 | Excel sheets | `MISSING` | no spreadsheet reader | — | No reader | P2 |
-| G1-25 | G1 | Large files: chunking / streaming | `MISSING` | validation pass streams records, but accepted input is still one pandas table | tests/unit/test_ingestion_limits.py; G1-W2 report | No true chunked profiling path; explicitly out of scope | P1 |
+| G1-25 | G1 | Large files: chunking / streaming | `MISSING_PENDING_CERTIFICATION` | validation pass streams records; an opt-in CSV/TSV chunked profile exists and is not the default audit | tests/unit/test_chunked_profiling.py; G1-W5 report | Implemented, not certified. The default path still loads one pandas table | P1 |
 | G1-26 | G1 | Resource limits (size, rows, columns) | `SUPPORTED_AND_TESTED` | ingestion/types.py::IngestionLimits; loader.py and delimited.py enforce finite bytes/rows/columns/cells/field limits before pandas or analysis | unit/integration tests; mutations; wheel/sdist smoke; branch/final/main CI; G1-W2 report | — | — |
 | G1-27 | G1 | Unsupported format refused with a clear message | `SUPPORTED_AND_TESTED` | cli/main.py suffix check | tests/integration/test_audit_end_to_end.py (not really parquet) | — | — |
 | G2-01 | G2 | Missing values per column and dataset | `SUPPORTED_AND_TESTED` | profiler.py _profile_column; checks.check_missing_values | test_profiler.py, test_quality.py | — | — |
@@ -608,7 +625,7 @@ G0_MAIN_INTEGRATION = PASS
 |---|---|---:|---:|---:|---|---|
 | G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
 | G0.1 | Profiling performance hotfix | — | — | — | PASS | P0-1 مغلق (انظر §0) |
-| G1 | Ingestion | 16 | 26 | 61.54% | IN PROGRESS | W1–W4 مغلقة؛ chunked بعدها |
+| G1 | Ingestion | 16 | 26 | 61.54% | IN PROGRESS | W1–W4 مغلقة؛ W5 بانتظار الاعتماد |
 | G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | تواريخ ونص وقيم |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | عمليات جدولية |
 | G4 | EDA & Statistics | 9 | 13 | 69.23% | AUDIT | ارتباط فئوي واختبارات |
