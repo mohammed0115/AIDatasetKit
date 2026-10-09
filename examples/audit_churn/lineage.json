@@ -156,6 +156,6 @@
       "steps": []
     }
   ],
-  "schema_version": "1.1",
+  "schema_version": "1.2",
   "stage": "prepared"
 }

@@ -9,8 +9,10 @@ read correctly or refused; nothing is read into a wrong table without a word.
 
 Not here, on purpose: profiling, quality checks, training, network access,
 scraping, and every format other than CSV, TSV, JSON, JSONL, Parquet, Feather
-and Excel ``.xlsx``. Encodings are never guessed; date inference and chunked
-reading are not implemented yet. Finite resource limits are enforced by
+and Excel ``.xlsx``. Encodings are never guessed; date inference is not
+implemented. Chunked profiling of a CSV or TSV file is a separate opt-in,
+:func:`aidatasetkit.profiling.profile_delimited_chunks`, and is not what
+:func:`load_table` does. Finite resource limits are enforced by
 :func:`load_table` before analysis.
 
 ``load_table`` is resolved lazily (PEP 562), so importing the contracts does not

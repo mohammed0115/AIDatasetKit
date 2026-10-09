@@ -241,6 +241,24 @@ def build_parser() -> argparse.ArgumentParser:
             "workbook has more than one sheet; refused for every other format."
         ),
     )
+    audit.add_argument(
+        "--chunked-profile",
+        action="store_true",
+        help=(
+            "Also profile a CSV or TSV file in chunks and record that scan in "
+            "the artifact. Off by default. The verdict still comes from the "
+            "full-table audit. Refused for every other format."
+        ),
+    )
+    audit.add_argument(
+        "--chunk-rows",
+        type=_positive_integer,
+        default=None,
+        help=(
+            "Rows held at once during --chunked-profile. Requires that flag. "
+            "The default scan uses 10000."
+        ),
+    )
     for option, destination, help_text, default in (
         ("--max-input-bytes", "max_source_bytes", "Maximum source file bytes.", _DEFAULT_INGESTION_LIMITS.max_source_bytes),
         ("--max-rows", "max_rows", "Maximum data rows.", _DEFAULT_INGESTION_LIMITS.max_rows),
@@ -317,6 +335,9 @@ def _audit(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return EXIT_CODES["usage"]
+    if args.chunk_rows is not None and not args.chunked_profile:
+        print("error: --chunk-rows requires --chunked-profile.", file=sys.stderr)
+        return EXIT_CODES["usage"]
 
     from aidatasetkit.core import KitConfig
     from aidatasetkit.ingestion import load_table
@@ -328,20 +349,32 @@ def _audit(args: argparse.Namespace) -> int:
     # delimiter, broken quoting, an undecodable byte, a header with no rows,
     # duplicate headers -- is an IngestionError, which main() reports as one
     # line and exit 1 before anything is published.
+    options = LoadOptions(
+        encoding=args.encoding,
+        delimiter=None if args.delimiter is None else _DELIMITER_CHOICES[args.delimiter],
+    )
+    limits = IngestionLimits(
+        max_source_bytes=args.max_source_bytes,
+        max_rows=args.max_rows,
+        max_columns=args.max_columns,
+        max_cells=args.max_cells,
+        max_field_length=args.max_field_length,
+    )
+    chunked_profile = None
+    if args.chunked_profile:
+        from aidatasetkit.profiling.chunked import profile_delimited_chunks
+
+        chunked_kwargs: dict[str, Any] = {}
+        if args.chunk_rows is not None:
+            chunked_kwargs["chunk_rows"] = args.chunk_rows
+        chunked_profile = profile_delimited_chunks(
+            path, options=options, limits=limits, **chunked_kwargs
+        )
     loaded = load_table(
         path,
         sheet=args.sheet,
-        options=LoadOptions(
-            encoding=args.encoding,
-            delimiter=None if args.delimiter is None else _DELIMITER_CHOICES[args.delimiter],
-        ),
-        limits=IngestionLimits(
-            max_source_bytes=args.max_source_bytes,
-            max_rows=args.max_rows,
-            max_columns=args.max_columns,
-            max_cells=args.max_cells,
-            max_field_length=args.max_field_length,
-        ),
+        options=options,
+        limits=limits,
     )
     frame = loaded.frame
 
@@ -492,6 +525,7 @@ def _audit(args: argparse.Namespace) -> int:
         model=registration,
         kit_config=kit_config,
         ingestion=loaded.metadata,
+        chunked_profiling=chunked_profile,
         # Deliberately excludes --fail-on: it decides this process's exit code
         # and changes nothing about what was found. Two audits that differ only
         # in that flag are the same audit, and the config fingerprint has to say

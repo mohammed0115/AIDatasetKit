@@ -21,6 +21,7 @@ analyst.
 
 from aidatasetkit.profiling.checks import DEFAULT_CHECKS, Check
 from aidatasetkit.profiling.context import QualityContext
+from aidatasetkit.profiling.chunked import profile_delimited_chunks
 from aidatasetkit.profiling.profiler import DataProfiler
 from aidatasetkit.profiling.quality import DataQualityInspector
 from aidatasetkit.profiling.task_detector import UNRESOLVED, TaskDetector
@@ -31,6 +32,7 @@ __all__ = [
     "Check",
     "DataProfiler",
     "DataQualityInspector",
+    "profile_delimited_chunks",
     "QualityContext",
     "TaskDetector",
 ]

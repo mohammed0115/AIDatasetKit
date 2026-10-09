@@ -51,7 +51,10 @@ __all__ = [
 #:
 #: 1.0 -- the first published contract.
 #: 1.1 -- G1-W1: the top-level ``ingestion`` record.
-ARTIFACT_SCHEMA_VERSION = "1.1"
+#: 1.2 -- G1-W5: the top-level ``chunked_profiling`` record. ``null`` unless the
+#:       caller opted into chunked CSV/TSV profiling. Approximate numbers live
+#:       only inside that record and are labeled; they are not verdict inputs.
+ARTIFACT_SCHEMA_VERSION = "1.2"
 
 
 class EvidenceSource(StrEnum):
@@ -497,6 +500,7 @@ class AuditArtifact:
     known_limitations: tuple[str, ...] = ()
     verdict_reasons: tuple[str, ...] = ()
     ingestion: IngestionEvidence | None = None
+    chunked_profiling: Mapping[str, Any] | None = None
 
     # ---------------------------------------------------------------- #
     # Serialisation
@@ -530,6 +534,11 @@ class AuditArtifact:
             "verdict_reasons": list(self.verdict_reasons),
             "dataset": self.dataset.to_dict(include_name=False),
             "ingestion": self.ingestion.to_dict() if self.ingestion else None,
+            "chunked_profiling": (
+                canonical(dict(self.chunked_profiling), path="chunked_profiling")
+                if self.chunked_profiling is not None
+                else None
+            ),
             "config": self.config.to_dict(),
             "target": self.target.to_dict() if self.target else None,
             "model": self.model.to_dict() if self.model else None,

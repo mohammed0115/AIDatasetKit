@@ -1,4 +1,5 @@
 {
+  "chunked_profiling": null,
   "columns": [
     {
       "count": 600,
@@ -889,7 +890,7 @@
     },
     "semantic_fingerprint": "3e93dd5e11b75f51d99c16bee263723627b4f93bebeb10c31e2bf31c92ed6be0"
   },
-  "schema_version": "1.1",
+  "schema_version": "1.2",
   "stage": "prepared",
   "target": {
     "class_counts": {

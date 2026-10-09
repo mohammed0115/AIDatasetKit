@@ -220,6 +220,7 @@ class AuditBuilder:
         environment: EnvironmentVersions | None = None,
         created_at: str | None = None,
         ingestion: LoadMetadata | None = None,
+        chunked_profiling: Any | None = None,
     ) -> AuditArtifact:
         """Assemble the artifact.
 
@@ -246,6 +247,9 @@ class AuditBuilder:
                 the verdict ``BLOCKED`` while still producing an artifact.
             environment: Captured versions. Defaults to the current environment.
             created_at: ISO timestamp. Defaults to now, in UTC.
+            chunked_profiling: An opt-in :class:`~aidatasetkit.profiling.chunked.ChunkedProfile`.
+                Recorded as given and never read by the verdict. ``None`` on the
+                default path, which writes ``chunked_profiling: null``.
 
         Returns:
             A complete :class:`AuditArtifact`.
@@ -256,6 +260,7 @@ class AuditBuilder:
         findings = tuple(self._finding_evidence(issue) for issue in issues)
         decisions = tuple(self._decision_evidence(plan, model)) if plan is not None else ()
         lineage_entries = tuple(self._lineage_evidence(plan, lineage))
+        # Approximations stay in the chunked record; the verdict never reads them.
         verdict, reasons = decide_verdict(
             findings, decisions, blocked_reason=blocked_reason
         )
@@ -295,6 +300,7 @@ class AuditBuilder:
             warnings=tuple(warnings),
             known_limitations=KNOWN_LIMITATIONS,
             ingestion=self._ingestion_evidence(ingestion, frame),
+            chunked_profiling=None if chunked_profiling is None else chunked_profiling.to_dict(),
         )
 
     @staticmethod
