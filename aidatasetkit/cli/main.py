@@ -339,12 +339,6 @@ def _audit(args: argparse.Namespace) -> int:
         print("error: --chunk-rows requires --chunked-profile.", file=sys.stderr)
         return EXIT_CODES["usage"]
 
-    from aidatasetkit.core import KitConfig
-    from aidatasetkit.ingestion import load_table
-    from aidatasetkit.models import ModelFactory
-    from aidatasetkit.preprocessing import PreprocessingPlanner, PreprocessorBuilder
-    from aidatasetkit.profiling import DataProfiler, DataQualityInspector, TaskDetector
-
     # The one reading authority. Every refusal -- an ambiguous or inconsistent
     # delimiter, broken quoting, an undecodable byte, a header with no rows,
     # duplicate headers -- is an IngestionError, which main() reports as one
@@ -360,16 +354,15 @@ def _audit(args: argparse.Namespace) -> int:
         max_cells=args.max_cells,
         max_field_length=args.max_field_length,
     )
-    chunked_profile = None
     if args.chunked_profile:
-        from aidatasetkit.profiling.chunked import profile_delimited_chunks
+        return _audit_chunked(args, path, options, limits)
 
-        chunked_kwargs: dict[str, Any] = {}
-        if args.chunk_rows is not None:
-            chunked_kwargs["chunk_rows"] = args.chunk_rows
-        chunked_profile = profile_delimited_chunks(
-            path, options=options, limits=limits, **chunked_kwargs
-        )
+    from aidatasetkit.core import KitConfig
+    from aidatasetkit.ingestion import load_table
+    from aidatasetkit.models import ModelFactory
+    from aidatasetkit.preprocessing import PreprocessingPlanner, PreprocessorBuilder
+    from aidatasetkit.profiling import DataProfiler, DataQualityInspector, TaskDetector
+
     loaded = load_table(
         path,
         sheet=args.sheet,
@@ -525,7 +518,6 @@ def _audit(args: argparse.Namespace) -> int:
         model=registration,
         kit_config=kit_config,
         ingestion=loaded.metadata,
-        chunked_profiling=chunked_profile,
         # Deliberately excludes --fail-on: it decides this process's exit code
         # and changes nothing about what was found. Two audits that differ only
         # in that flag are the same audit, and the config fingerprint has to say
@@ -537,6 +529,42 @@ def _audit(args: argparse.Namespace) -> int:
         blocked_reason=blocked_reason,
     )
 
+    written = _write(artifact, args.output)
+    _print_summary(artifact, written, args.output)
+    return _exit_code(artifact.verdict, args.fail_on)
+
+
+def _audit_chunked(
+    args: argparse.Namespace,
+    path: Path,
+    options: LoadOptions,
+    limits: IngestionLimits,
+) -> int:
+    """Publish a profile-only artifact. The table is never loaded as one frame."""
+    if args.sheet is not None:
+        print(
+            "error: --sheet cannot be combined with --chunked-profile.",
+            file=sys.stderr,
+        )
+        return EXIT_CODES["usage"]
+    if args.target is not None or args.model is not None:
+        print(
+            "error: --chunked-profile does not run target or model analysis.",
+            file=sys.stderr,
+        )
+        return EXIT_CODES["usage"]
+
+    from aidatasetkit.profiling.chunked import profile_delimited_chunks
+
+    chunked_kwargs: dict[str, Any] = {}
+    if args.chunk_rows is not None:
+        chunked_kwargs["chunk_rows"] = args.chunk_rows
+    profile = profile_delimited_chunks(
+        path, options=options, limits=limits, **chunked_kwargs
+    )
+    artifact = AuditBuilder(
+        redact_values=not args.include_values, dataset_name=path.name
+    ).build_chunked(profile, dataset_name=path.name)
     written = _write(artifact, args.output)
     _print_summary(artifact, written, args.output)
     return _exit_code(artifact.verdict, args.fail_on)

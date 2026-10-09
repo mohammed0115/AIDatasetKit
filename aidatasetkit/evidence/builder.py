@@ -42,6 +42,7 @@ from aidatasetkit.core.types import (
     TargetProfile,
     TaskType,
 )
+from aidatasetkit.evidence.serialization import canonical
 from aidatasetkit.evidence.fingerprint import (
     ALGORITHM,
     config_fingerprint,
@@ -62,6 +63,10 @@ from aidatasetkit.evidence.types import (
     FeatureLineage,
     FindingEvidence,
     FitScope,
+    ChunkedApproximationEvidence,
+    ChunkedColumnEvidence,
+    ChunkedProfilingEvidence,
+    ChunkedSamplingEvidence,
     IngestionEvidence,
     LabelRef,
     ModelEvidence,
@@ -69,7 +74,13 @@ from aidatasetkit.evidence.types import (
     Verdict,
 )
 
-__all__ = ["AuditBuilder", "KNOWN_LIMITATIONS"]
+__all__ = ["AuditBuilder", "CHUNKED_AUDIT_UNAVAILABLE", "KNOWN_LIMITATIONS"]
+
+#: Returned by the chunked route. The full quality, task and preprocessing audit
+#: did not run, so the artifact must not claim a readiness verdict.
+CHUNKED_AUDIT_UNAVAILABLE = (
+    "Full-table audit verdict is unavailable in chunked profiling mode."
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -220,7 +231,6 @@ class AuditBuilder:
         environment: EnvironmentVersions | None = None,
         created_at: str | None = None,
         ingestion: LoadMetadata | None = None,
-        chunked_profiling: Any | None = None,
     ) -> AuditArtifact:
         """Assemble the artifact.
 
@@ -247,9 +257,6 @@ class AuditBuilder:
                 the verdict ``BLOCKED`` while still producing an artifact.
             environment: Captured versions. Defaults to the current environment.
             created_at: ISO timestamp. Defaults to now, in UTC.
-            chunked_profiling: An opt-in :class:`~aidatasetkit.profiling.chunked.ChunkedProfile`.
-                Recorded as given and never read by the verdict. ``None`` on the
-                default path, which writes ``chunked_profiling: null``.
 
         Returns:
             A complete :class:`AuditArtifact`.
@@ -260,7 +267,6 @@ class AuditBuilder:
         findings = tuple(self._finding_evidence(issue) for issue in issues)
         decisions = tuple(self._decision_evidence(plan, model)) if plan is not None else ()
         lineage_entries = tuple(self._lineage_evidence(plan, lineage))
-        # Approximations stay in the chunked record; the verdict never reads them.
         verdict, reasons = decide_verdict(
             findings, decisions, blocked_reason=blocked_reason
         )
@@ -300,7 +306,64 @@ class AuditBuilder:
             warnings=tuple(warnings),
             known_limitations=KNOWN_LIMITATIONS,
             ingestion=self._ingestion_evidence(ingestion, frame),
-            chunked_profiling=None if chunked_profiling is None else chunked_profiling.to_dict(),
+            chunked_profiling=None,
+        )
+
+    def build_chunked(
+        self,
+        profile: Any,
+        *,
+        dataset_name: str = "dataset",
+        settings: Mapping[str, Any] | None = None,
+        environment: EnvironmentVersions | None = None,
+        created_at: str | None = None,
+    ) -> AuditArtifact:
+        """Publish a profile-only artifact for an opt-in chunked scan.
+
+        The frame is not an argument: this route has no table to audit. The
+        verdict is blocked because quality, task detection and preprocessing
+        were not run. Approximate quartiles stay inside ``chunked_profiling``
+        and are not passed to :func:`decide_verdict`.
+        """
+        evidence = _chunked_evidence(profile)
+        # Approximate values are not verdict inputs.
+        verdict, reasons = decide_verdict((), (), blocked_reason=CHUNKED_AUDIT_UNAVAILABLE)
+        identity = DatasetIdentity(
+            name=dataset_name,
+            fingerprint=profile.population_fingerprint,
+            schema_fingerprint=profile.schema_fingerprint,
+            algorithm=ALGORITHM,
+            row_count=profile.population_rows,
+            column_count=profile.population_columns,
+            duplicate_row_count=profile.duplicate_row_count,
+            total_missing_count=sum(column.missing_count for column in profile.columns),
+            columns=tuple(LabelRef.of(column.label) for column in profile.columns),
+        )
+        resolved_settings = canonical(dict(settings or {}))
+        stage = AuditStage.INSPECTED
+        return AuditArtifact(
+            schema_version=ARTIFACT_SCHEMA_VERSION,
+            stage=stage,
+            verdict=verdict,
+            verdict_reasons=reasons,
+            dataset=identity,
+            config=ConfigIdentity(
+                fingerprint=config_fingerprint(resolved_settings),
+                settings=resolved_settings,
+            ),
+            environment=environment or capture_environment(),
+            created_at=created_at or _now(),
+            columns=(),
+            findings=(),
+            decisions=(),
+            lineage=(),
+            target=None,
+            model=None,
+            plan_fingerprint=None,
+            warnings=(),
+            known_limitations=KNOWN_LIMITATIONS,
+            ingestion=None,
+            chunked_profiling=evidence,
         )
 
     @staticmethod
@@ -680,4 +743,65 @@ def _now() -> str:
         .replace(microsecond=0)
         .isoformat()
         .replace("+00:00", "Z")
+    )
+
+
+def _chunked_evidence(profile: Any) -> ChunkedProfilingEvidence:
+    """Copy a chunked scan into the immutable artifact record.
+
+    The scan object stays in the profiling layer. The artifact stores this
+    copy, and the verdict is chosen before any approximate value is read.
+    """
+    return ChunkedProfilingEvidence(
+        mode=profile.mode,
+        format=profile.format,
+        chunk_rows=profile.chunk_rows,
+        rows_scanned=profile.rows_scanned,
+        population_rows=profile.population_rows,
+        population_columns=profile.population_columns,
+        full_population_scanned=profile.full_population_scanned,
+        bounded_memory=profile.bounded_memory,
+        exact_metrics=tuple(profile.exact_metrics),
+        approximate_metrics=tuple(
+            ChunkedApproximationEvidence(
+                column=item.column,
+                field=item.field,
+                method=item.method,
+                label=item.label,
+                value=item.value,
+                seed=item.seed,
+                requested_size=item.requested_size,
+                actual_size=item.actual_size,
+                population_size=item.population_size,
+            )
+            for item in profile.approximations
+        ),
+        unavailable_metrics=tuple(profile.unavailable_metrics),
+        sampling=ChunkedSamplingEvidence(
+            method=profile.sampling_method,
+            seed=profile.sampling_seed,
+            requested_size=profile.sampling_requested_size,
+        ),
+        population_fingerprint=profile.population_fingerprint,
+        fingerprint_algorithm=profile.fingerprint_algorithm,
+        fingerprint_scope=profile.fingerprint_scope,
+        duplicate_row_count=profile.duplicate_row_count,
+        columns=tuple(
+            ChunkedColumnEvidence(
+                name=str(column.label),
+                label_type=type(column.label).__name__,
+                pandas_dtype=column.pandas_dtype,
+                count=column.count,
+                missing_count=column.missing_count,
+                finite_count=column.finite_count,
+                infinite_count=column.infinite_count,
+                unique_count=column.unique_count,
+                minimum=column.minimum,
+                maximum=column.maximum,
+                sum=column.sum,
+                mean=column.mean,
+            )
+            for column in profile.columns
+        ),
+        temporary_storage=profile.temporary_storage,
     )

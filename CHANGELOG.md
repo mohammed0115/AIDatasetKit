@@ -15,19 +15,27 @@ Evidence: `docs/evidence/G1_W5_CHUNKED_PROFILING_REPORT.md`. Not certified.
 
 - **Opt-in chunked profiling** of `.csv` and `.tsv` via
   `profile_delimited_chunks` and `aidatasetkit audit --chunked-profile`. The
+  chunked command does not call `load_table` or `DataProfiler.profile`. The
   default audit still loads the whole table and does not call this path.
   Resource limits are unchanged and still refuse an over-limit file before a
   scratch directory is created.
-- The scan covers the population. Counts, missing values, duplicate rows, and
-  the numeric minimum, maximum, sum and mean are exact. Quartiles are exact
-  unless the caller sets `approximate_quantiles_above`; a quartile past that
-  bound is labeled `deterministic_approximation` and is not a verdict input.
-  The fingerprint is the population fingerprint. Scratch files are private and
-  removed on success and on failure.
-- **Artifact schema `1.2`.** The artifact gains `chunked_profiling`, `null` on
-  the default path. Publication schema remains `1.0`. Package version remains
-  `0.1.0a1`. G1-25 stays `MISSING_PENDING_CERTIFICATION`. Recorded progress
-  stays G1 16/26 and overall 108/232.
+- The scan covers the population in bounded memory. Counts, missing values,
+  finite and infinite counts, duplicate rows, and the numeric minimum, maximum,
+  sum and mean are exact online accumulators. Distinct values and row identity
+  use length-prefixed keys in scratch storage. Quartiles are always a bounded
+  deterministic sample (`deterministic_reservoir`), labeled
+  `deterministic_approximation`, and are not a verdict input. The fingerprint
+  is the population fingerprint, folded from scratch files in fixed-size
+  blocks. Scratch files are private and removed on success, failure and
+  interruption.
+- The chunked artifact is profile-only. Its verdict is blocked with the reason
+  "Full-table audit verdict is unavailable in chunked profiling mode." Quality
+  findings, task detection and preprocessing are recorded as unavailable.
+- **Artifact schema `1.2`.** The artifact gains a typed `chunked_profiling`
+  record, `null` on the default path. Publication schema remains `1.0`.
+  Package version remains `0.1.0a1`. G1-25 stays
+  `MISSING_PENDING_CERTIFICATION`. Recorded progress stays G1 16/26 and
+  overall 108/232.
 
 ### G1-W4 format expansion: Excel .xlsx
 

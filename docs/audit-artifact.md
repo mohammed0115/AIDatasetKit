@@ -69,7 +69,7 @@ artifact schema below and from the package.
 | `verdict_reasons` | Why, in the order the policy applied them. |
 | `dataset` | Identity: fingerprints, shape, column list. No values. |
 | `ingestion` | How the table was read: source kind, format, encoding, delimiter and whether it was detected, named or fixed by the format, header, rows, columns, memory, warnings. `null` when the caller built the frame itself. No path, no values. |
-| `chunked_profiling` | Opt-in CSV/TSV chunked scan. `null` unless the caller asked for it. Holds the population fingerprint and exact measurements. A `deterministic_approximation` entry is the only place an approximate number may appear, and the verdict does not read it. |
+| `chunked_profiling` | Opt-in CSV/TSV chunked scan, or `null` when the caller did not ask for it. A typed record: mode, chunk size, rows scanned, population size, `full_population_scanned`, exact and approximate and unavailable metrics, sampling method/seed/size, population fingerprint, and temporary-storage status. Quartiles are approximate and are not verdict inputs. The chunked route's verdict is blocked because the full audit did not run. |
 | `config` | The settings that steered the run, and their fingerprint. |
 | `target` | What the task detector concluded, if a target was named. |
 | `model` | The capability context, if one was supplied. No estimator. |

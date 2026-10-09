@@ -40,7 +40,7 @@ MUTATIONS = (
     Mutation(
         "M-W5-01", "caller row limit ignored",
         ((CHUNKED,
-          "    plan = plan_delimited(path, fmt, options, limits)\n",
+          "    plan = plan_delimited(path, fmt, options, _cell_limited(limits))\n",
           "    plan = plan_delimited(path, fmt, options, None)\n"),),
         (f"{TESTS}::test_a_row_over_the_limit_is_refused",),
         (("test_a_row_over_the_limit_is_refused", "DID NOT RAISE"),),
@@ -64,8 +64,11 @@ MUTATIONS = (
     Mutation(
         "M-W5-04", "only the first chunk is the population",
         ((CHUNKED,
-          "            seen_rows += len(cast)\n        connection.commit()\n",
-          "            seen_rows += len(cast)\n            break\n        connection.commit()\n"),),
+          "        for chunk in _iter_chunks(path, plan, options, chunk_rows):\n"
+          "            cast = chunk.astype(dtypes)\n",
+          "        for chunk in _iter_chunks(path, plan, options, chunk_rows):\n"
+          "            break\n"
+          "            cast = chunk.astype(dtypes)\n"),),
         (f"{TESTS}::test_the_population_fingerprint_matches_the_full_table",),
         (("test_the_population_fingerprint_matches_the_full_table", "not the"),),
     ),
@@ -94,24 +97,21 @@ MUTATIONS = (
     Mutation(
         "M-W5-07", "an approximate quartile is unlabeled",
         ((CHUNKED,
-          "                if approximated:\n",
-          "                if False:\n"),),
+          "        if label in reservoirs and state.finite:\n",
+          "        if False:\n"),),
         (f"{TESTS}::test_an_approximation_is_labeled",),
         (("test_an_approximation_is_labeled", "approximation was not labeled"),),
     ),
     Mutation(
         "M-W5-08", "an approximation changes the verdict",
         (("aidatasetkit/evidence/builder.py",
-          "        # Approximations stay in the chunked record; the verdict never reads them.\n"
-          "        verdict, reasons = decide_verdict(\n"
-          "            findings, decisions, blocked_reason=blocked_reason\n"
-          "        )\n",
-          "        if chunked_profiling is not None and chunked_profiling.approximations:\n"
-          "            blocked_reason = \"approximate\"\n"
-          "        # Approximations stay in the chunked record; the verdict never reads them.\n"
-          "        verdict, reasons = decide_verdict(\n"
-          "            findings, decisions, blocked_reason=blocked_reason\n"
-          "        )\n"),),
+          "        # Approximate values are not verdict inputs.\n"
+          "        verdict, reasons = decide_verdict((), (), blocked_reason=CHUNKED_AUDIT_UNAVAILABLE)\n",
+          "        blocked = CHUNKED_AUDIT_UNAVAILABLE\n"
+          "        if profile.approximations:\n"
+          "            blocked = \"approximate\"\n"
+          "        # Approximate values are not verdict inputs.\n"
+          "        verdict, reasons = decide_verdict((), (), blocked_reason=blocked)\n"),),
         (f"{TESTS}::test_a_labeled_approximation_does_not_change_the_verdict",),
         (("test_a_labeled_approximation_does_not_change_the_verdict", "approximation changed the verdict inputs"),),
     ),
@@ -122,6 +122,85 @@ MUTATIONS = (
           "    if True:\n"),),
         (f"{TESTS}::test_the_default_audit_does_not_chunk",),
         (("test_the_default_audit_does_not_chunk", "default audit used chunked profiling"),),
+    ),
+    Mutation(
+        "M-W5-10", "max_cells bypass",
+        ((CHUNKED,
+          "def _cell_limited(limits: IngestionLimits) -> IngestionLimits:\n"
+          "    return replace(limits)\n",
+          "def _cell_limited(limits: IngestionLimits) -> IngestionLimits:\n"
+          "    return replace(limits, max_cells=None)\n"),),
+        (f"{TESTS}::test_a_cell_over_the_limit_is_refused",),
+        (("test_a_cell_over_the_limit_is_refused", "DID NOT RAISE"),),
+    ),
+    Mutation(
+        "M-W5-11", "chunked evidence falsely claims the full population",
+        ((CHUNKED,
+          "            seen_rows += len(cast)\n"
+          "        connection.commit()\n"
+          "        for window in windows:\n"
+          "            window.finish()\n"
+          "        for window in windows:\n"
+          "            window.fold(digest)\n"
+          "        scanned = seen_rows == plan.data_rows\n",
+          "            seen_rows += len(cast)\n"
+          "            break\n"
+          "        connection.commit()\n"
+          "        for window in windows:\n"
+          "            window.finish()\n"
+          "        for window in windows:\n"
+          "            window.fold(digest)\n"
+          "        scanned = True\n"),),
+        (f"{TESTS}::test_the_full_population_is_scanned",),
+        (("test_the_full_population_is_scanned", "full population was not scanned"),),
+    ),
+    Mutation(
+        "M-W5-12", "chunk-size-dependent result",
+        ((CHUNKED,
+          "        running.total += number\n",
+          "        running.total += number + len(finite)\n"),),
+        (f"{TESTS}::test_results_do_not_depend_on_chunk_size",),
+        (("test_results_do_not_depend_on_chunk_size", "chunk size changed the result"),),
+    ),
+    Mutation(
+        "M-W5-13", "full-table materialization in CLI chunked mode",
+        (("aidatasetkit/cli/main.py",
+          "    if args.chunked_profile:\n"
+          "        return _audit_chunked(args, path, options, limits)\n",
+          "    if args.chunked_profile:\n"
+          "        _audit_chunked(args, path, options, limits)\n"),),
+        (f"{TESTS}::test_chunked_mode_does_not_materialize_the_table",),
+        (("test_chunked_mode_does_not_materialize_the_table", "chunked mode materialized the full table"),),
+    ),
+    Mutation(
+        "M-W5-14", "collision-unsafe row encoding",
+        ((CHUNKED,
+          "def _row_key(values: tuple[object, ...]) -> bytes:\n"
+          "    return b\"\".join(_encode_cell(value) for value in values)\n",
+          "def _row_key(values: tuple[object, ...]) -> bytes:\n"
+          "    return b\"\\x1e\".join(str(value).encode(\"utf-8\") for value in values)\n"),),
+        (f"{TESTS}::test_row_keys_do_not_collide",),
+        (("test_row_keys_do_not_collide", "row keys collided"),),
+    ),
+    Mutation(
+        "M-W5-15", "complete scratch-file read into memory",
+        ((CHUNKED,
+          "def _update_from_file(digest: \"hashlib._Hash\", path: Path) -> None:\n"
+          "    with path.open(\"rb\") as handle:\n"
+          "        while block := handle.read(_READ_BLOCK):\n"
+          "            digest.update(block)\n",
+          "def _update_from_file(digest: \"hashlib._Hash\", path: Path) -> None:\n"
+          "    digest.update(path.read_bytes())\n"),),
+        (f"{TESTS}::test_scratch_files_are_not_read_whole",),
+        (("test_scratch_files_are_not_read_whole", "complete scratch file was read into memory"),),
+    ),
+    Mutation(
+        "M-W5-16", "chunked evidence omitted",
+        (("aidatasetkit/evidence/builder.py",
+          "            chunked_profiling=evidence,\n",
+          "            chunked_profiling=None,\n"),),
+        (f"{TESTS}::test_chunked_evidence_is_recorded",),
+        (("test_chunked_evidence_is_recorded", "chunked evidence omitted"),),
     ),
 )
 

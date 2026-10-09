@@ -9,7 +9,7 @@ outside this file.
 ```text
 BASELINE_SHA = 749048703fb885ec688bc3c57f91c4e16edbf50e
 BRANCH       = g1-w5-chunked-profiling
-CODE_SHA     = f33eb3975faa5121dcf6fab13336a1360fc8867b
+CODE_SHA     = recorded with the bounded-memory repair
 ```
 
 `BASELINE_SHA` is certified `main`. G1-25 stays
@@ -21,37 +21,45 @@ and overall 108/232 = 46.55%.
 - Opt-in only. `load_table`, `DataProfiler.profile`, and `aidatasetkit audit`
   without `--chunked-profile` do not take the chunked path. The default
   artifact carries `chunked_profiling: null`.
+- With `--chunked-profile`, the command does not call `load_table` or
+  `DataProfiler.profile`. It publishes a profile-only artifact. The verdict
+  is blocked: "Full-table audit verdict is unavailable in chunked profiling
+  mode." Approximate values are not verdict inputs.
 - CSV and TSV only. Any other suffix is `InvalidIngestionOptionsError`.
 - The scan covers every row the validating parser accepted. The fingerprint
   is that population, and it matches `dataset_fingerprint` of the full table.
-- Exact: row count, duplicate rows, per-column count, missing count, distinct
-  count, and, for a numeric column, minimum, maximum, sum and mean.
-- Quartiles are exact unless the caller sets `approximate_quantiles_above`
-  below the number of finite values. That case is returned only as
-  `deterministic_approximation` / `deterministic_even_stride`, and the exact
-  quartile fields stay null. The verdict does not read the record.
-- `IngestionLimits` are unchanged. An over-limit file is refused before a
-  scratch directory is created.
+  Hash bytes are read back in fixed-size blocks.
+- Exact: row count, duplicate rows, per-column count, missing count, finite
+  and infinite counts, distinct count, and, for a numeric column, minimum,
+  maximum, sum and mean. Distinct values and row identity are length-prefixed
+  and stored on disk.
+- Quartiles are always a bounded deterministic reservoir sample
+  (`deterministic_reservoir`), labeled `deterministic_approximation`. They are
+  not stored as exact column fields.
+- `IngestionLimits` are unchanged, including `max_cells`. An over-limit file
+  is refused before a scratch directory is created.
 - Scratch lives in a `0700` directory; files are `0600`; the directory is
-  removed on success and on failure.
-- Artifact schema `1.2` (additive). Publication schema `1.0`. Package version
-  `0.1.0a1`.
+  removed on success, on failure and on interruption.
+- Artifact schema `1.2`. `chunked_profiling` is a typed record, `null` on the
+  default path. Publication schema `1.0`. Package version `0.1.0a1`.
 
-## Local runs at CODE_SHA
+## Local runs
 
 Interpreter: CPython 3.12.14 (`.venv`). pandas 3.0.5.
 
-| Run | Result |
-|---|---|
-| Focused chunked, migration, golden, packaging, and schema tests | passed before the full suite |
-| `scripts/g1_w5_mutations.py` | 9/9 KILLED, baseline exit 0, tree restored after each mutation. `rev=f33eb3975faa5121dcf6fab13336a1360fc8867b` |
-| Full suite | 4508 passed, 47 skipped, 0 failed in 421.02s. JUnit `tests=4555 failures=0 errors=0 skipped=47` |
-| `scripts/release_smoke_test.sh` | wheel and sdist: build, twine check, clean install, CLI audit, schema `1.2`, verdict `blocked` on the synthetic file. Version `0.1.0a1`. Nothing published |
+The first branch tip's 9/9 matrix is not the result of this repair. The
+bounded-memory repair is measured on its implementation commit. Those figures
+are written into this section when that local run is recorded. They do not
+name a CI run.
 
-The nine weakenings are: caller row limit ignored, JSON accepted, file read
-in one piece, first chunk treated as the population, scratch directory left
-behind, scratch files group-readable, approximate quartile unlabeled,
-approximation changes the verdict, default audit opts in.
+The weakenings the harness must kill are: caller row limit ignored, JSON
+accepted, file read in one piece, first chunk treated as the population,
+scratch directory left behind, scratch files group-readable, approximate
+quartile unlabeled, approximation changes the verdict, default audit opts in,
+`max_cells` bypass, chunked evidence falsely claims the full population,
+chunk-size-dependent result, full-table materialization in CLI chunked mode,
+collision-unsafe row encoding, complete scratch-file read into memory, and
+chunked evidence omitted.
 
 ## Not in this wave
 

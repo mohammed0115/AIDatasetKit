@@ -35,6 +35,10 @@ __all__ = [
     "FeatureLineage",
     "FindingEvidence",
     "FitScope",
+    "ChunkedApproximationEvidence",
+    "ChunkedColumnEvidence",
+    "ChunkedProfilingEvidence",
+    "ChunkedSamplingEvidence",
     "IngestionEvidence",
     "LabelRef",
     "ModelEvidence",
@@ -450,6 +454,144 @@ class IngestionEvidence:
 
 
 @dataclass(frozen=True, slots=True)
+class ChunkedSamplingEvidence:
+    """How quartiles were drawn, and the bound on that draw.
+
+    The sample is capped. ``requested_size`` is that cap. Each column's
+    ``actual_size`` lives on its approximation, next to the finite population
+    it was drawn from.
+    """
+
+    method: str
+    seed: int
+    requested_size: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "method": self.method,
+            "seed": self.seed,
+            "requested_size": self.requested_size,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkedApproximationEvidence:
+    """One quartile of a bounded deterministic sample.
+
+    ``label`` is ``deterministic_approximation``. The number is not an exact
+    population quartile and is not a verdict input.
+    """
+
+    column: str
+    field: str
+    method: str
+    label: str
+    value: float
+    seed: int
+    requested_size: int
+    actual_size: int
+    population_size: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "column": self.column,
+            "field": self.field,
+            "method": self.method,
+            "label": self.label,
+            "value": self.value,
+            "seed": self.seed,
+            "requested_size": self.requested_size,
+            "actual_size": self.actual_size,
+            "population_size": self.population_size,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkedColumnEvidence:
+    """Exact online measurements for one column. No quartile, no raw value."""
+
+    name: str
+    label_type: str
+    pandas_dtype: str
+    count: int
+    missing_count: int
+    finite_count: int
+    infinite_count: int
+    unique_count: int
+    minimum: float | None = None
+    maximum: float | None = None
+    sum: float | None = None
+    mean: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "label_type": self.label_type,
+            "pandas_dtype": self.pandas_dtype,
+            "count": self.count,
+            "missing_count": self.missing_count,
+            "finite_count": self.finite_count,
+            "infinite_count": self.infinite_count,
+            "unique_count": self.unique_count,
+            "minimum": self.minimum,
+            "maximum": self.maximum,
+            "sum": self.sum,
+            "mean": self.mean,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkedProfilingEvidence:
+    """The opt-in CSV/TSV scan, recorded only when a caller asked for it.
+
+    ``full_population_scanned`` is true only when every validated row was
+    visited. Quartiles live in ``approximate_metrics``. Quality, task detection
+    and preprocessing are named in ``unavailable_metrics`` and are not invented.
+    """
+
+    mode: str
+    format: str
+    chunk_rows: int
+    rows_scanned: int
+    population_rows: int
+    population_columns: int
+    full_population_scanned: bool
+    bounded_memory: bool
+    exact_metrics: tuple[str, ...]
+    approximate_metrics: tuple[ChunkedApproximationEvidence, ...]
+    unavailable_metrics: tuple[str, ...]
+    sampling: ChunkedSamplingEvidence
+    population_fingerprint: str
+    fingerprint_algorithm: str
+    fingerprint_scope: str
+    duplicate_row_count: int
+    columns: tuple[ChunkedColumnEvidence, ...]
+    temporary_storage: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "mode": self.mode,
+            "format": self.format,
+            "chunk_rows": self.chunk_rows,
+            "rows_scanned": self.rows_scanned,
+            "population_rows": self.population_rows,
+            "population_columns": self.population_columns,
+            "full_population_scanned": self.full_population_scanned,
+            "bounded_memory": self.bounded_memory,
+            "exact_metrics": list(self.exact_metrics),
+            "approximate_metrics": [item.to_dict() for item in self.approximate_metrics],
+            "unavailable_metrics": list(self.unavailable_metrics),
+            "sampling": self.sampling.to_dict(),
+            "population_fingerprint": self.population_fingerprint,
+            "fingerprint_algorithm": self.fingerprint_algorithm,
+            "fingerprint_scope": self.fingerprint_scope,
+            "duplicate_row_count": self.duplicate_row_count,
+            "columns": [column.to_dict() for column in self.columns],
+            "temporary_storage": self.temporary_storage,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ConfigIdentity:
     """Which settings steered the run.
 
@@ -500,7 +642,7 @@ class AuditArtifact:
     known_limitations: tuple[str, ...] = ()
     verdict_reasons: tuple[str, ...] = ()
     ingestion: IngestionEvidence | None = None
-    chunked_profiling: Mapping[str, Any] | None = None
+    chunked_profiling: ChunkedProfilingEvidence | None = None
 
     # ---------------------------------------------------------------- #
     # Serialisation
@@ -535,7 +677,7 @@ class AuditArtifact:
             "dataset": self.dataset.to_dict(include_name=False),
             "ingestion": self.ingestion.to_dict() if self.ingestion else None,
             "chunked_profiling": (
-                canonical(dict(self.chunked_profiling), path="chunked_profiling")
+                canonical(self.chunked_profiling.to_dict(), path="chunked_profiling")
                 if self.chunked_profiling is not None
                 else None
             ),

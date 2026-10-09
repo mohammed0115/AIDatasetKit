@@ -71,11 +71,14 @@ while JSONL is checked as it streams.
   pandas table.
 - **Chunked profiling is opt-in and CSV/TSV only.**
   `profile_delimited_chunks` (and `aidatasetkit audit --chunked-profile`) scans
-  the whole population in chunks, records exact counts, missing values,
-  minimum, maximum, sum and mean, and fingerprints every row. Quartiles stay
-  exact unless the caller sets a bound; a quartile past that bound is labeled
-  `deterministic_approximation` and is not a verdict input. The default audit
-  does not call this path. It is not certified as G1-25.
+  the whole population in chunks and does not load that population as one
+  table. Counts, missing values, finite and infinite counts, minimum, maximum,
+  sum, mean, distinct values and duplicate rows are exact. Distinct values and
+  row identity are kept on disk. Quartiles are a bounded deterministic sample,
+  labeled `deterministic_approximation`, and are not a verdict input. The
+  chunked command publishes a profile-only artifact whose verdict is blocked,
+  because quality, task detection and preprocessing did not run. The default
+  audit does not call this path. It is not certified as G1-25.
 - **Not implemented yet:** date inference, generators and arbitrary iterables.
   A refused input is never published as a new audit.
 

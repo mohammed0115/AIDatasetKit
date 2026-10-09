@@ -295,7 +295,8 @@ Also merged, unreleased: model training, evaluation, model comparison, the
 Not supported yet: anomaly detection, dimensionality reduction, time series,
 text, images, hyperparameter tuning, cross-validation, model persistence,
 databases, cloud storage, automatic encoding detection,
-date inference, true chunked profiling or generators/other arbitrary iterables.
+date inference or generators/other arbitrary iterables. An opt-in CSV/TSV
+chunked scan exists (`--chunked-profile`); it does not replace the default audit.
 
 Every supported input now has finite resource limits before pandas parsing or
 analysis: 64 MiB file bytes, 1,000,000 data rows, 1,000 columns, 10,000,000

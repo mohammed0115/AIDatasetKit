@@ -55,7 +55,7 @@
 | G1-W2 (غير مُفوَّضة؛ تنتظر مراجعة CTO) | حدود موارد مُعلَنة (bytes، rows، columns) وخطأ `ResourceLimitError`؛ استنتاج التواريخ من النص بسياسة معلنة، دون تخمين صامت | W1 | M |
 | G1-W3 ✅ **منجزة** (`docs/evidence/G1_W3_FORMAT_READERS_REPORT.md`) | Parquet وFeather (pyarrow كـextra اختياري)؛ JSON وJSONL | W1 | M |
 | G1-W4 (PASS؛ CI الفرع وCI على main 10/10، انظر `docs/evidence/G1_W4_XLSX_READER_REPORT.md`) | XLSX (openpyxl كـextra) مع sheets واختيار صريح للـsheet؛ رفض ملفات الماكرو | W1 | M |
-| G1-W5 (مُنفَّذ على الفرع؛ غير معتمد) | chunked profiling للملفات الكبيرة أو sampling مُعلَن، مسجّل في الـartifact | W2 | L |
+| G1-W5 (مُنفَّذ على الفرع بذاكرة محدودة وحكم profile-only؛ غير معتمد) | chunked profiling للملفات الكبيرة أو sampling مُعلَن، مسجّل في الـartifact | W2 | L |
 | G1-W6 | SQLite read-only عبر `sqlite3` من stdlib؛ نتيجة query كجدول | W1 | S |
 
 **Tests:**
