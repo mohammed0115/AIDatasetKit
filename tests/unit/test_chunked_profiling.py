@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -175,7 +176,10 @@ def test_temporary_storage_is_private(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(shutil, "rmtree", wrapped)
     profile_delimited_chunks(path, chunk_rows=1)
     assert modes, "temporary storage is group-readable"
-    assert all(mode & 0o077 == 0 for mode in modes), "temporary storage is group-readable"
+    # Windows reports st_mode without Unix permission bits, so chmod(0o600)
+    # cannot be observed there. POSIX is where the mode is the privacy control.
+    if os.name == "posix":
+        assert all(mode & 0o077 == 0 for mode in modes), "temporary storage is group-readable"
 
 
 def test_only_csv_and_tsv_are_accepted(tmp_path: Path):
