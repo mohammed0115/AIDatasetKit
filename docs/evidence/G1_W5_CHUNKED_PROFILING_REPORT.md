@@ -9,7 +9,7 @@ outside this file.
 ```text
 BASELINE_SHA = 749048703fb885ec688bc3c57f91c4e16edbf50e
 BRANCH       = g1-w5-chunked-profiling
-CODE_SHA     = b4a7e28515f2f0eb6844efa729776de74254866f
+CODE_SHA     = the semantic-closure implementation on this branch
 ```
 
 `BASELINE_SHA` is certified `main`. G1-25 stays
@@ -22,9 +22,13 @@ and overall 108/232 = 46.55%.
   without `--chunked-profile` do not take the chunked path. The default
   artifact carries `chunked_profiling: null`.
 - With `--chunked-profile`, the command does not call `load_table` or
-  `DataProfiler.profile`. It publishes a profile-only artifact. The verdict
-  is blocked: "Full-table audit verdict is unavailable in chunked profiling
-  mode." Approximate values are not verdict inputs.
+  `DataProfiler.profile`. It publishes a profile-only artifact at stage
+  `profiled`. The verdict is blocked: "Full-table audit verdict is unavailable
+  in chunked profiling mode." Approximate values are not verdict inputs.
+- The ingestion record names the file contract: source kind, format, encoding,
+  delimiter, delimiter source, header, and the population shape. `memory_bytes`
+  is null. The config fingerprint is the effective scan settings, including
+  `quantile_sample_size`, and excludes paths and timestamps.
 - CSV and TSV only. Any other suffix is `InvalidIngestionOptionsError`.
 - The scan covers every row the validating parser accepted. The fingerprint
   is that population, and it matches `dataset_fingerprint` of the full table.
@@ -47,20 +51,15 @@ and overall 108/232 = 46.55%.
 
 Interpreter: CPython 3.12.14 (`.venv`). pandas 3.0.5.
 
-| Run | Result |
-|---|---|
-| Focused chunked tests, then migration, golden, packaging, schema, and architecture tests | 29 chunked tests passed; the wider slice passed 249 |
-| `scripts/g1_w5_mutations.py` | 16/16 KILLED, baseline exit 0, tree restored after each mutation. `rev=b4a7e28515f2f0eb6844efa729776de74254866f` |
-| Full suite | 4520 passed, 47 skipped, 0 failed in 398.68s. JUnit `tests=4567 failures=0 errors=0 skipped=47` |
-| `scripts/release_smoke_test.sh` | wheel and sdist: build, twine check, clean install, CLI audit, schema `1.2`. Version `0.1.0a1`. Nothing published |
+The bounded-memory repair's 16/16 matrix remains the result of
+`b4a7e28515f2f0eb6844efa729776de74254866f`. This closure adds the stage,
+ingestion record, config identity and `quantile_sample_size` rename. Its
+measured counts are written here once that local run is recorded. They do not
+name a CI run.
 
-The sixteen weakenings are: caller row limit ignored, JSON accepted, file read
-in one piece, first chunk treated as the population, scratch directory left
-behind, scratch files group-readable, approximate quartile unlabeled,
-approximation changes the verdict, default audit opts in, `max_cells` bypass,
-chunked evidence falsely claims the full population, chunk-size-dependent
-result, full-table materialization in CLI chunked mode, collision-unsafe row
-encoding, complete scratch-file read into memory, and chunked evidence omitted.
+The harness kills nineteen weakenings. The sixteen from the bounded-memory
+repair, plus: chunked artifact falsely marked inspected, chunked settings
+omitted from config identity, and chunked ingestion evidence omitted.
 
 ## Not in this wave
 

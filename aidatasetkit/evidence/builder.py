@@ -339,8 +339,10 @@ class AuditBuilder:
             total_missing_count=sum(column.missing_count for column in profile.columns),
             columns=tuple(LabelRef.of(column.label) for column in profile.columns),
         )
-        resolved_settings = canonical(dict(settings or {}))
-        stage = AuditStage.INSPECTED
+        # The scan contract is the identity. Paths, clocks and caller extras stay out.
+        del settings
+        resolved_settings = canonical(_chunked_settings(profile))
+        stage = AuditStage.PROFILED
         return AuditArtifact(
             schema_version=ARTIFACT_SCHEMA_VERSION,
             stage=stage,
@@ -362,7 +364,7 @@ class AuditBuilder:
             plan_fingerprint=None,
             warnings=(),
             known_limitations=KNOWN_LIMITATIONS,
-            ingestion=None,
+            ingestion=_chunked_ingestion(profile),
             chunked_profiling=evidence,
         )
 
@@ -743,6 +745,39 @@ def _now() -> str:
         .replace(microsecond=0)
         .isoformat()
         .replace("+00:00", "Z")
+    )
+
+
+def _chunked_settings(profile: Any) -> dict[str, Any]:
+    """Settings that can change a chunked scan. No path, clock, or environment."""
+    return {
+        "mode": profile.mode,
+        "chunk_rows": profile.chunk_rows,
+        "quantile_sample_size": profile.sampling_requested_size,
+        "sampling_method": profile.sampling_method,
+        "sampling_seed": profile.sampling_seed,
+        "encoding": profile.encoding,
+        "delimiter": profile.delimiter,
+        "delimiter_source": profile.delimiter_source,
+        "header": profile.header,
+        "limits": dict(profile.effective_limits),
+        "fingerprint_algorithm": profile.fingerprint_algorithm,
+    }
+
+
+def _chunked_ingestion(profile: Any) -> IngestionEvidence:
+    """How the chunked scan read the file. ``memory_bytes`` is not applicable."""
+    return IngestionEvidence(
+        source_kind="file",
+        format=profile.format,
+        encoding=profile.encoding,
+        delimiter=profile.delimiter,
+        delimiter_source=profile.delimiter_source,
+        header=profile.header,
+        row_count=profile.population_rows,
+        column_count=profile.population_columns,
+        memory_bytes=None,
+        warnings=tuple(profile.ingestion_warnings),
     )
 
 

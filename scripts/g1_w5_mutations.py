@@ -202,6 +202,46 @@ MUTATIONS = (
         (f"{TESTS}::test_chunked_evidence_is_recorded",),
         (("test_chunked_evidence_is_recorded", "chunked evidence omitted"),),
     ),
+    Mutation(
+        "M-W5-17", "chunked artifact falsely marked inspected",
+        (("aidatasetkit/evidence/builder.py",
+          "        stage = AuditStage.PROFILED\n",
+          "        stage = AuditStage.INSPECTED\n"),),
+        (f"{TESTS}::test_the_chunked_artifact_is_profiled",),
+        (("test_the_chunked_artifact_is_profiled", "chunked artifact claimed inspected"),),
+    ),
+    Mutation(
+        "M-W5-18", "chunked settings omitted from config identity",
+        (("aidatasetkit/evidence/builder.py",
+          "def _chunked_settings(profile: Any) -> dict[str, Any]:\n"
+          "    \"\"\"Settings that can change a chunked scan. No path, clock, or environment.\"\"\"\n"
+          "    return {\n"
+          "        \"mode\": profile.mode,\n"
+          "        \"chunk_rows\": profile.chunk_rows,\n"
+          "        \"quantile_sample_size\": profile.sampling_requested_size,\n"
+          "        \"sampling_method\": profile.sampling_method,\n"
+          "        \"sampling_seed\": profile.sampling_seed,\n"
+          "        \"encoding\": profile.encoding,\n"
+          "        \"delimiter\": profile.delimiter,\n"
+          "        \"delimiter_source\": profile.delimiter_source,\n"
+          "        \"header\": profile.header,\n"
+          "        \"limits\": dict(profile.effective_limits),\n"
+          "        \"fingerprint_algorithm\": profile.fingerprint_algorithm,\n"
+          "    }\n",
+          "def _chunked_settings(profile: Any) -> dict[str, Any]:\n"
+          "    \"\"\"Settings that can change a chunked scan. No path, clock, or environment.\"\"\"\n"
+          "    return {}\n"),),
+        (f"{TESTS}::test_chunked_settings_are_in_the_config_identity",),
+        (("test_chunked_settings_are_in_the_config_identity", "chunked settings omitted from config identity"),),
+    ),
+    Mutation(
+        "M-W5-19", "chunked ingestion evidence omitted",
+        (("aidatasetkit/evidence/builder.py",
+          "            ingestion=_chunked_ingestion(profile),\n",
+          "            ingestion=None,\n"),),
+        (f"{TESTS}::test_the_chunked_ingestion_record_describes_the_file",),
+        (("test_the_chunked_ingestion_record_describes_the_file", "chunked ingestion evidence omitted"),),
+    ),
 )
 
 

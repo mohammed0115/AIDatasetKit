@@ -183,6 +183,12 @@ class ChunkedProfile:
     sampling_method: str
     sampling_seed: int
     sampling_requested_size: int
+    encoding: str
+    delimiter: str | None
+    delimiter_source: str | None
+    header: bool
+    ingestion_warnings: tuple[str, ...]
+    effective_limits: tuple[tuple[str, int | None], ...]
     duplicate_row_count: int
     columns: tuple[ChunkedColumn, ...]
     approximations: tuple[ChunkedApproximation, ...]
@@ -226,7 +232,7 @@ def profile_delimited_chunks(
     options: LoadOptions | None = None,
     limits: IngestionLimits | None = None,
     chunk_rows: int = 10_000,
-    approximate_quantiles_above: int | None = None,
+    quantile_sample_size: int | None = None,
 ) -> ChunkedProfile:
     """Profile a CSV or TSV file in bounded memory, without replacing the default audit.
 
@@ -237,7 +243,7 @@ def profile_delimited_chunks(
         limits: Resource limits. Defaults to :class:`IngestionLimits`. An
             over-limit file is refused before a scratch directory is created.
         chunk_rows: How many data rows are held at once. Must be at least 1.
-        approximate_quantiles_above: Cap on the deterministic quartile sample.
+        quantile_sample_size: Capacity of the deterministic quartile reservoir.
             Quartiles are always approximate. ``None`` uses 4096. The minimum,
             maximum, sum and mean stay exact.
 
@@ -251,7 +257,7 @@ def profile_delimited_chunks(
     path = Path(source)
     options = options if options is not None else LoadOptions()
     limits = limits if limits is not None else IngestionLimits()
-    _check_chunk_settings(chunk_rows, approximate_quantiles_above)
+    _check_chunk_settings(chunk_rows, quantile_sample_size)
     if not path.exists():
         raise InputNotFoundError(f"No such file: {path.name}.")
     if not path.is_file():
@@ -285,16 +291,39 @@ def profile_delimited_chunks(
             directory,
             fmt=fmt,
             chunk_rows=chunk_rows,
-            sample_size=_sample_size(approximate_quantiles_above),
+            sample_size=_sample_size(quantile_sample_size),
         )
     finally:
         if directory is not None:
             shutil.rmtree(directory)
-    return ChunkedProfile(temporary_storage="removed", **scanned)
+    return ChunkedProfile(
+        temporary_storage="removed",
+        encoding=plan.encoding,
+        delimiter=None if plan.single_column else plan.delimiter,
+        delimiter_source=None if plan.single_column else plan.delimiter_source.value,
+        header=options.header,
+        ingestion_warnings=plan.warnings,
+        effective_limits=_limit_pairs(limits),
+        **scanned,
+    )
 
 
 def _cell_limited(limits: IngestionLimits) -> IngestionLimits:
     return replace(limits)
+
+
+def _limit_pairs(limits: IngestionLimits) -> tuple[tuple[str, int | None], ...]:
+    names = (
+        "max_source_bytes",
+        "max_rows",
+        "max_columns",
+        "max_cells",
+        "max_field_length",
+        "max_records",
+        "max_keys_per_record",
+        "max_record_chars",
+    )
+    return tuple((name, getattr(limits, name)) for name in names)
 
 
 def _sample_size(requested: int | None) -> int:
@@ -303,21 +332,21 @@ def _sample_size(requested: int | None) -> int:
     return requested
 
 
-def _check_chunk_settings(chunk_rows: int, approximate_quantiles_above: int | None) -> None:
+def _check_chunk_settings(chunk_rows: int, quantile_sample_size: int | None) -> None:
     if isinstance(chunk_rows, bool) or not isinstance(chunk_rows, int) or chunk_rows < 1:
         raise InvalidIngestionOptionsError(
             f"chunk_rows must be a positive integer, got {chunk_rows!r}."
         )
-    if approximate_quantiles_above is None:
+    if quantile_sample_size is None:
         return
     if (
-        isinstance(approximate_quantiles_above, bool)
-        or not isinstance(approximate_quantiles_above, int)
-        or approximate_quantiles_above < 1
+        isinstance(quantile_sample_size, bool)
+        or not isinstance(quantile_sample_size, int)
+        or quantile_sample_size < 1
     ):
         raise InvalidIngestionOptionsError(
-            "approximate_quantiles_above must be a positive integer or None, "
-            f"got {approximate_quantiles_above!r}."
+            "quantile_sample_size must be a positive integer or None, "
+            f"got {quantile_sample_size!r}."
         )
 
 

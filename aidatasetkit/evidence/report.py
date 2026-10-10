@@ -180,7 +180,12 @@ def _ingestion(artifact) -> str:
         ),
         ("header row", None if record.get("header") is None else ("yes" if record["header"] else "no")),
         ("rows × columns", f"{record.get('row_count', 0):,} × {record.get('column_count', 0):,}"),
-        ("memory", f"{record.get('memory_bytes', 0):,} bytes"),
+        (
+            "memory",
+            "not applicable"
+            if record.get("memory_bytes") is None
+            else f"{record['memory_bytes']:,} bytes",
+        ),
     ]
     body = "".join(
         f"<tr><th>{_e(label)}</th><td>{_e(value)}</td></tr>" for label, value in rows if value is not None

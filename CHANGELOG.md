@@ -28,9 +28,14 @@ Evidence: `docs/evidence/G1_W5_CHUNKED_PROFILING_REPORT.md`. Not certified.
   is the population fingerprint, folded from scratch files in fixed-size
   blocks. Scratch files are private and removed on success, failure and
   interruption.
-- The chunked artifact is profile-only. Its verdict is blocked with the reason
-  "Full-table audit verdict is unavailable in chunked profiling mode." Quality
-  findings, task detection and preprocessing are recorded as unavailable.
+- The chunked artifact is profile-only, at stage `profiled`. Its verdict is
+  blocked with the reason "Full-table audit verdict is unavailable in chunked
+  profiling mode." Quality findings, task detection and preprocessing are
+  recorded as unavailable. The ingestion record describes the file;
+  `memory_bytes` is null because no frame was built. The config fingerprint
+  covers the scan contract (chunk size, reservoir size, sampling, encoding,
+  delimiter, header, resource limits, fingerprint algorithm) and not the path
+  or the clock. The reservoir capacity parameter is `quantile_sample_size`.
 - **Artifact schema `1.2`.** The artifact gains a typed `chunked_profiling`
   record, `null` on the default path. Publication schema remains `1.0`.
   Package version remains `0.1.0a1`. G1-25 stays

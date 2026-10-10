@@ -114,7 +114,9 @@ AUDIT_DOCUMENTS       = CORRECT
   missing values, finite and infinite counts, duplicate rows, minimum,
   maximum, sum and mean. Quartiles are a bounded deterministic sample labeled
   `deterministic_approximation` and are not verdict inputs. The chunked
-  artifact's verdict is blocked because the full audit did not run. Scratch
+  artifact's stage is `profiled` and its verdict is blocked because the full
+  audit did not run. Ingestion evidence is recorded with `memory_bytes` null.
+  Scratch
   files are mode `0600` in a `0700` directory and are removed afterwards. The
   fingerprint is the population fingerprint.
 - **G1-25 remains `MISSING_PENDING_CERTIFICATION`.** This update does not

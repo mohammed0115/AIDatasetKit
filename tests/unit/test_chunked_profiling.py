@@ -24,8 +24,8 @@ from aidatasetkit.core.exceptions import (
 from aidatasetkit.evidence import AuditBuilder
 from aidatasetkit.evidence.builder import CHUNKED_AUDIT_UNAVAILABLE
 from aidatasetkit.evidence.fingerprint import dataset_fingerprint, schema_fingerprint
-from aidatasetkit.evidence.types import Verdict
-from aidatasetkit.ingestion import IngestionLimits, load_table
+from aidatasetkit.evidence.types import AuditStage, Verdict
+from aidatasetkit.ingestion import IngestionLimits, LoadOptions, load_table
 from aidatasetkit.profiling import DataProfiler
 from aidatasetkit.profiling.chunked import profile_delimited_chunks
 
@@ -203,7 +203,7 @@ def test_a_tsv_file_is_profiled(tmp_path: Path):
 
 def test_an_approximation_is_labeled(tmp_path: Path):
     path = _csv(tmp_path)
-    profile = profile_delimited_chunks(path, chunk_rows=2, approximate_quantiles_above=2)
+    profile = profile_delimited_chunks(path, chunk_rows=2, quantile_sample_size=2)
     assert profile.approximations, "approximation was not labeled"
     assert {item.label for item in profile.approximations} == {"deterministic_approximation"}
     assert {item.method for item in profile.approximations} == {"deterministic_reservoir"}
@@ -226,7 +226,7 @@ def test_an_approximation_is_labeled(tmp_path: Path):
 
 def test_a_labeled_approximation_does_not_change_the_verdict(tmp_path: Path):
     path = _csv(tmp_path)
-    chunked = profile_delimited_chunks(path, chunk_rows=1, approximate_quantiles_above=2)
+    chunked = profile_delimited_chunks(path, chunk_rows=1, quantile_sample_size=2)
     assert chunked.approximations
     artifact = AuditBuilder().build_chunked(chunked)
     assert artifact.verdict is Verdict.BLOCKED
@@ -304,7 +304,9 @@ def test_the_opt_in_records_the_population_and_keeps_the_verdict(tmp_path: Path)
     plain_artifact = load(plain_dir)
     opted_artifact = load(opted_dir)
     assert plain_artifact["chunked_profiling"] is None
+    assert plain_artifact["stage"] == "inspected"
     assert plain_artifact["verdict"] != "blocked"
+    assert opted_artifact["stage"] == "profiled"
     assert opted_artifact["verdict"] == "blocked"
     assert opted_artifact["verdict_reasons"] == [CHUNKED_AUDIT_UNAVAILABLE]
     assert opted_artifact["findings"] == []
@@ -499,6 +501,122 @@ def test_the_default_builder_still_writes_null_chunked_evidence(tmp_path: Path):
     assert artifact.chunked_profiling is None
     assert artifact.semantic_dict()["chunked_profiling"] is None
     assert artifact.schema_version == "1.2"
+    assert artifact.stage is AuditStage.INSPECTED
+
+
+def test_the_chunked_artifact_is_profiled(tmp_path: Path):
+    artifact = AuditBuilder().build_chunked(
+        profile_delimited_chunks(_csv(tmp_path), chunk_rows=1)
+    )
+    assert artifact.stage is AuditStage.PROFILED, "chunked artifact claimed inspected"
+    assert artifact.stage is not AuditStage.INSPECTED
+    assert artifact.schema_version == "1.2"
+
+
+def test_the_chunked_ingestion_record_describes_the_file(tmp_path: Path):
+    path = _csv(tmp_path)
+    detected = AuditBuilder().build_chunked(profile_delimited_chunks(path, chunk_rows=1))
+    ingestion = detected.ingestion
+    assert ingestion is not None, "chunked ingestion evidence omitted"
+    assert ingestion.source_kind == "file"
+    assert ingestion.format == "csv"
+    assert ingestion.encoding == "utf-8"
+    assert ingestion.delimiter == ","
+    assert ingestion.delimiter_source == "detected"
+    assert ingestion.header is True
+    assert ingestion.row_count == detected.dataset.row_count
+    assert ingestion.column_count == detected.dataset.column_count
+    assert ingestion.memory_bytes is None
+
+    explicit = AuditBuilder().build_chunked(
+        profile_delimited_chunks(path, options=LoadOptions(delimiter=","), chunk_rows=1)
+    )
+    assert explicit.ingestion is not None
+    assert explicit.ingestion.delimiter == ","
+    assert explicit.ingestion.delimiter_source == "explicit"
+    assert explicit.ingestion.delimiter_source != detected.ingestion.delimiter_source
+
+    headerless = tmp_path / "bare.csv"
+    headerless.write_text("1,a\n2,b\n3,c\n", encoding="utf-8")
+    bare = AuditBuilder().build_chunked(
+        profile_delimited_chunks(headerless, options=LoadOptions(header=False), chunk_rows=1)
+    )
+    assert bare.ingestion is not None
+    assert bare.ingestion.header is False
+    assert bare.ingestion.row_count == 3
+
+    latin = tmp_path / "latin.csv"
+    latin.write_bytes("age,city\n1,a\n".encode("latin-1"))
+    encoded = AuditBuilder().build_chunked(
+        profile_delimited_chunks(latin, options=LoadOptions(encoding="latin-1"), chunk_rows=1)
+    )
+    assert encoded.ingestion is not None
+    assert encoded.ingestion.encoding == "latin-1"
+
+
+def test_chunked_settings_are_in_the_config_identity(tmp_path: Path):
+    path = _csv(tmp_path)
+    limits = IngestionLimits(max_rows=5000)
+    artifact = AuditBuilder().build_chunked(
+        profile_delimited_chunks(path, limits=limits, chunk_rows=2, quantile_sample_size=8)
+    )
+    settings = artifact.config.settings
+    assert settings.get("mode") == "chunked_profile", "chunked settings omitted from config identity"
+    assert settings["chunk_rows"] == 2
+    assert settings["quantile_sample_size"] == 8
+    assert settings["sampling_method"] == "deterministic_reservoir"
+    assert settings["sampling_seed"] == 0
+    assert settings["encoding"] == "utf-8"
+    assert settings["delimiter"] == ","
+    assert settings["delimiter_source"] == "detected"
+    assert settings["header"] is True
+    assert settings["limits"]["max_rows"] == 5000
+    assert settings["limits"]["max_cells"] == IngestionLimits().max_cells
+    assert settings["fingerprint_algorithm"] == "sha256/pandas-hash-v1"
+    assert artifact.config.fingerprint
+
+
+def test_the_config_fingerprint_tracks_the_scan_contract(tmp_path: Path):
+    path = _csv(tmp_path)
+    other = tmp_path / "elsewhere" / "copy.csv"
+    other.parent.mkdir()
+    other.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    left = AuditBuilder().build_chunked(
+        profile_delimited_chunks(path, chunk_rows=2),
+        dataset_name="people.csv",
+        created_at="2020-01-01T00:00:00Z",
+    )
+    right = AuditBuilder().build_chunked(
+        profile_delimited_chunks(other, chunk_rows=2),
+        dataset_name="copy.csv",
+        created_at="2024-06-01T00:00:00Z",
+    )
+    assert left.config.fingerprint == right.config.fingerprint
+    assert left.created_at != right.created_at
+    assert "people.csv" not in json.dumps(left.config.settings)
+    assert str(path) not in json.dumps(left.config.settings)
+
+    wider = AuditBuilder().build_chunked(
+        profile_delimited_chunks(path, chunk_rows=4)
+    )
+    assert wider.config.fingerprint != left.config.fingerprint
+
+    small_sample = AuditBuilder().build_chunked(
+        profile_delimited_chunks(path, chunk_rows=2, quantile_sample_size=3)
+    )
+    assert small_sample.config.fingerprint != left.config.fingerprint
+
+    tighter = AuditBuilder().build_chunked(
+        profile_delimited_chunks(path, chunk_rows=2, limits=IngestionLimits(max_rows=5000))
+    )
+    assert tighter.config.fingerprint != left.config.fingerprint
+
+
+def test_quantile_sample_size_must_be_a_positive_integer(tmp_path: Path):
+    path = _csv(tmp_path)
+    for value in (0, -3, False):
+        with pytest.raises(InvalidIngestionOptionsError, match="quantile_sample_size"):
+            profile_delimited_chunks(path, quantile_sample_size=value)
 
 
 def _without_chunk_rows(profile) -> dict:

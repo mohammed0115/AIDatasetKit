@@ -99,8 +99,12 @@ class AuditStage(StrEnum):
     An audit is useful before a preprocessor exists and useful again after one
     has been fitted. Recording which of those produced the file stops a reader
     from taking the absence of lineage as evidence that nothing was transformed.
+    ``profiled`` is earlier than ``inspected``: the population was measured, and
+    quality inspection, task detection and preprocessing did not run.
     """
 
+    #: Dataset profiling completed. Quality, task detection and preprocessing did not run.
+    PROFILED = "profiled"
     #: Profiled and quality-checked. No preprocessing was planned.
     INSPECTED = "inspected"
     #: A preprocessing plan exists. Nothing has been fitted.
@@ -422,9 +426,14 @@ class DatasetIdentity:
 class IngestionEvidence:
     """How the audited table was read, as :mod:`aidatasetkit.ingestion` recorded it.
 
-    Present only when the table came through ``load_table``; an artifact built
-    from a frame the caller loaded some other way records ``null`` rather than a
-    reconstruction. Holds no path and no cell value.
+    Present when this library read the source: ``load_table``, or the opt-in
+    chunked CSV/TSV scan. An artifact built from a frame the caller loaded some
+    other way records ``null`` rather than a reconstruction. Holds no path and
+    no cell value.
+
+    ``memory_bytes`` is pandas' deep size of a materialized frame. It is
+    ``null`` when the source was profiled in chunks and no frame was built, so
+    the figure is not applicable. A materialized table always records an integer.
     """
 
     source_kind: str
@@ -435,7 +444,7 @@ class IngestionEvidence:
     header: bool | None
     row_count: int
     column_count: int
-    memory_bytes: int
+    memory_bytes: int | None
     warnings: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:

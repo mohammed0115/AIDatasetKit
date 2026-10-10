@@ -64,7 +64,7 @@ artifact schema below and from the package.
 | Key | What it holds |
 |---|---|
 | `schema_version` | The artifact contract this file was written against. |
-| `stage` | `inspected`, `planned`, or `prepared` — how far the run got. |
+| `stage` | `profiled`, `inspected`, `planned`, or `prepared` — how far the run got. |
 | `verdict` | `ready`, `ready_with_warnings`, `review_required`, `blocked`. |
 | `verdict_reasons` | Why, in the order the policy applied them. |
 | `dataset` | Identity: fingerprints, shape, column list. No values. |
@@ -97,7 +97,10 @@ deep memory estimate and differs between pandas versions):
 `delimiter_source` is `detected`, `explicit` (the caller named it) or `format`
 (a `.tsv` is tab-separated). A single-column file has `delimiter: null` and a
 warning. Fields that do not apply — the encoding of a DataFrame — are `null`, not
-invented. `AuditBuilder.build(..., ingestion=loaded.metadata)` records it and
+invented. `memory_bytes` is pandas' deep size of a materialized frame. The
+chunked CSV/TSV scan records the same ingestion fields and sets `memory_bytes`
+to `null`, because no frame was built and the figure is not applicable.
+`AuditBuilder.build(..., ingestion=loaded.metadata)` records it and
 refuses metadata whose row or column count disagrees with the frame. The HTML
 report shows it as its *Input* section. The record was added in G1-W1, and the
 schema moved to `1.1` with it. Each moved the semantic fingerprint, and
@@ -110,6 +113,8 @@ and then removing the key reproduces the one before G1-W1.
 An audit is useful before a preprocessor exists and useful again afterwards, so
 the artifact records which it is:
 
+- **`profiled`** — dataset profiling completed. Quality inspection, task
+  detection and preprocessing did not run. This is the chunked CSV/TSV route.
 - **`inspected`** — profiled and quality-checked. No preprocessing was planned.
 - **`planned`** — a plan exists; nothing has been fitted. Lineage steps are
   *intended*, and each lineage entry has `"observed": false`.
