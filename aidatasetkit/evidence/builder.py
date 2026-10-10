@@ -314,7 +314,6 @@ class AuditBuilder:
         profile: Any,
         *,
         dataset_name: str = "dataset",
-        settings: Mapping[str, Any] | None = None,
         environment: EnvironmentVersions | None = None,
         created_at: str | None = None,
     ) -> AuditArtifact:
@@ -324,6 +323,10 @@ class AuditBuilder:
         verdict is blocked because quality, task detection and preprocessing
         were not run. Approximate quartiles stay inside ``chunked_profiling``
         and are not passed to :func:`decide_verdict`.
+
+        The config identity is only the scan contract from the profile. There
+        is no ``settings`` argument: a caller cannot pass a mapping that this
+        method would ignore, and cannot add a path or a clock to the fingerprint.
         """
         evidence = _chunked_evidence(profile)
         # Approximate values are not verdict inputs.
@@ -339,8 +342,6 @@ class AuditBuilder:
             total_missing_count=sum(column.missing_count for column in profile.columns),
             columns=tuple(LabelRef.of(column.label) for column in profile.columns),
         )
-        # The scan contract is the identity. Paths, clocks and caller extras stay out.
-        del settings
         resolved_settings = canonical(_chunked_settings(profile))
         stage = AuditStage.PROFILED
         return AuditArtifact(

@@ -612,6 +612,16 @@ def test_the_config_fingerprint_tracks_the_scan_contract(tmp_path: Path):
     assert tighter.config.fingerprint != left.config.fingerprint
 
 
+def test_build_chunked_has_no_settings_parameter(tmp_path: Path):
+    import inspect
+
+    parameters = inspect.signature(AuditBuilder.build_chunked).parameters
+    assert "settings" not in parameters
+    profile = profile_delimited_chunks(_csv(tmp_path), chunk_rows=1)
+    with pytest.raises(TypeError, match="settings"):
+        AuditBuilder().build_chunked(profile, settings={"chunk_rows": 1})
+
+
 def test_quantile_sample_size_must_be_a_positive_integer(tmp_path: Path):
     path = _csv(tmp_path)
     for value in (0, -3, False):
