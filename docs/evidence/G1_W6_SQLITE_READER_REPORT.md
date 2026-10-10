@@ -21,6 +21,14 @@ the mutation harness. `IMPLEMENTATION_SHA` is that commit plus the two test
 and harness adjustments that make the missing-path and unwrapped-error
 weakenings fail for the reason they name.
 
+```text
+REPAIR_SHA = c923d4b2036a210d6ad3e3243ea7e42fd64c5e49
+```
+
+`REPAIR_SHA` excludes shadow tables by `PRAGMA table_list` type. It does not
+change the artifact schema, the public API, the publication schema, or the
+package version. The repair is not a certification.
+
 Recorded progress stays G1 17/26 = 65.38% and overall 109/232 = 46.98%.
 Artifact schema `1.3`. Publication schema `1.0`. Package version `0.1.0a1`.
 G1-25 stays `SUPPORTED_AND_TESTED`.
@@ -28,12 +36,18 @@ G1-25 stays `SUPPORTED_AND_TESTED`.
 ## Contract
 
 - Local files ending in `.sqlite` or `.sqlite3` only. `.db` is refused.
-- One ordinary user table. A view, a virtual table, and any name that begins
-  with `sqlite_` are not eligible. Zero eligible tables is empty input. Exactly
-  one is selected when `table` is omitted. More than one requires
+- One ordinary user table. A view (`type="view"`), a virtual table
+  (`type="virtual"`), a shadow table (`type="shadow"`), and any name that
+  begins with `sqlite_` are not eligible. Shadow tables are excluded by the
+  catalog type, not by a name suffix. Zero eligible tables is empty input.
+  Exactly one is selected when `table` is omitted. More than one requires
   `load_table(..., table="name")` or `aidatasetkit audit --table NAME`.
-  A missing, view, virtual, or internal name is a structured refusal. `table=`
-  on any other format is a structured option error.
+  A missing, view, virtual, shadow, or internal name is a structured refusal.
+  `table=` on any other format is a structured option error.
+- When `PRAGMA table_list` is supported, its relation type is the allowlist.
+  When it is unavailable and the file defines no virtual table, ordinary
+  tables still come from `sqlite_master`. When it is unavailable and a virtual
+  table is defined, the file is refused. Shadow names are not guessed.
 - The name is resolved against the catalog allowlist, then quoted by
   `quote_identifier`. Caller SQL, `ATTACH`, `executescript`, and extension
   loading are not accepted.
@@ -120,6 +134,24 @@ was restored. Non-zero exit alone was not accepted.
 | M-W6-16 | `table=` accepted for a non-SQLite format | `test_table_is_refused_for_other_formats` — `table=` was accepted for another format |
 | M-W6-17 | SQLite error leaks raw path/SQL or escapes unwrapped | `test_a_corrupt_database_does_not_leak_the_driver_error` — the driver error escaped the stable malformed-input error |
 | M-W6-18 | schema incorrectly remains `1.2` | `test_the_artifact_records_the_table` — the artifact schema was not `1.3` |
+| M-W6-19 | shadow tables treated as ordinary | `test_one_user_table_beside_fts_is_selected` — an FTS shadow relation became eligible and changed automatic selection |
+| M-W6-20 | fallback accepts relations beside virtual tables | `test_fallback_refuses_virtual_tables_when_classification_is_unavailable` — an unsafe relation was accepted instead of the classification refusal |
+
+The same twenty weakenings were killed again at `REPAIR_SHA`
+`c923d4b2036a210d6ad3e3243ea7e42fd64c5e49`: 20/20 KILLED, 0 SURVIVED, baseline
+exit 0, tree restored. python=3.12.14.
+
+## Repair runs at REPAIR_SHA
+
+Interpreter: CPython 3.12.14 (`.venv`). pandas 3.0.5.
+
+| Run | Result |
+|---|---|
+| Focused SQLite tests | 46 passed (`tests/unit/test_ingestion_sqlite.py`) |
+| Schema, migration, golden, G1-W5, packaging, architecture | 257 passed |
+| `scripts/g1_w6_mutations.py` | 20/20 KILLED at `c923d4b2036a210d6ad3e3243ea7e42fd64c5e49` |
+| Full suite | 4577 passed, 47 skipped, 0 failed, 0 errors in 472.76s. JUnit `tests=4624 failures=0 errors=0 skipped=47 time=472.710` |
+| `scripts/release_smoke_test.sh` | wheel `aidatasetkit-0.1.0a1-py3-none-any.whl` and sdist `aidatasetkit-0.1.0a1.tar.gz`: build, twine check, clean install, CLI audit, schema `1.3`. Version `0.1.0a1`. Nothing published |
 
 ## Status
 

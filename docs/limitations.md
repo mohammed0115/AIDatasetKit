@@ -52,7 +52,7 @@ nothing else: no old-format `.xls`, no `.db`, no PostgreSQL, no SQLAlchemy, no
 database URLs, and no cloud storage. A `.txt` file is refused even when it
 holds CSV. A SQLite file is one ordinary table, opened read-only. The only
 table is selected automatically; more than one needs `table=` or `--table`.
-Views, virtual tables, `sqlite_*` tables and caller-supplied SQL are refused.
+Views, virtual tables, shadow tables that belong to virtual tables, `sqlite_*` tables and caller-supplied SQL are refused. Eligibility uses `PRAGMA table_list` when that catalog classification exists. When it does not, a file that defines a virtual table is refused rather than guessed.
 There is no chunked SQLite scan. Parquet and Feather need the optional `parquet` extra (pyarrow);
 `.xlsx` needs the `excel` extra (openpyxl) and reads one worksheet (the first
 row is the header; a multi-sheet workbook needs `sheet=` or the CLI `--sheet`

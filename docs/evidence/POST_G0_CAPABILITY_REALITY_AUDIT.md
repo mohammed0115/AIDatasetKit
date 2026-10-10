@@ -145,8 +145,10 @@ AUDIT_DOCUMENTS       = CORRECT
 
 - A local `.sqlite` or `.sqlite3` file can be read as one ordinary table through
   stdlib `sqlite3`, opened `mode=ro` with `query_only`. No caller SQL, no
-  `.db`, no views, no virtual tables, no `sqlite_*` tables, and no chunked
-  SQLite scan. PostgreSQL and SQLAlchemy stay unsupported.
+  `.db`, no views, no virtual tables, no shadow tables, no `sqlite_*` tables,
+  and no chunked SQLite scan. `PRAGMA table_list` classifies relations when
+  SQLite provides it; otherwise a file that defines a virtual table is refused.
+  PostgreSQL and SQLAlchemy stay unsupported. This repair is not a certification.
 - **G1-14 remains `MISSING_PENDING_CERTIFICATION`.** This update does not
   promote it. Recorded progress stays G1 = 17/26 = **65.38%** and overall =
   109/232 = **46.98%**.

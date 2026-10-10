@@ -19,7 +19,10 @@ Evidence: `docs/evidence/G1_W6_SQLITE_READER_REPORT.md`. Not certified.
   `load_table(..., table="name")` and `aidatasetkit audit --table NAME` name
   one when several exist. The file is opened with `mode=ro` and
   `PRAGMA query_only=ON`. Caller SQL, `ATTACH`, `executescript`, views, virtual
-  tables and `sqlite_*` tables are refused. `.db` is not a supported suffix.
+  tables, their shadow tables, and `sqlite_*` tables are refused. Ordinary
+  tables are classified with `PRAGMA table_list` when SQLite provides it. If
+  that classification is unavailable and the file defines a virtual table, the
+  file is refused. `.db` is not a supported suffix.
   PostgreSQL, SQLAlchemy and database URLs are not supported. Chunked profiling
   stays CSV/TSV only.
 - INTEGER, REAL, TEXT, BLOB and NULL are preserved as `int`, `float`, `str`,
