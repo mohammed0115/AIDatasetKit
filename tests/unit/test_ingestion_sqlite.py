@@ -50,6 +50,18 @@ def _people(path: Path) -> Path:
     )
 
 
+def _fts(path: Path, prefix: str = "") -> Path:
+    connection = sqlite3.connect(path)
+    try:
+        if prefix:
+            connection.executescript(prefix)
+        connection.execute("CREATE VIRTUAL TABLE docs USING fts5(body)")
+        connection.commit()
+    finally:
+        connection.close()
+    return path
+
+
 class _ConnectionLog:
     """A stand-in that records calls and forwards them. sqlite3.Connection is immutable."""
 
@@ -226,18 +238,88 @@ class TestSelection:
         raise AssertionError("view accepted")
 
     def test_a_virtual_table_is_excluded(self, tmp_path: Path):
-        path = tmp_path / "virtual.sqlite"
-        connection = sqlite3.connect(path)
-        try:
-            connection.execute("CREATE VIRTUAL TABLE docs USING fts5(body)")
-            connection.commit()
-        finally:
-            connection.close()
+        path = _fts(tmp_path / "virtual.sqlite")
         try:
             load_table(path, table="docs")
         except MalformedInputError:
             return
         raise AssertionError("virtual table accepted")
+
+    def test_fts_shadow_tables_are_excluded(self, tmp_path: Path):
+        path = _fts(tmp_path / "shadows.sqlite")
+        with pytest.raises(EmptyInputError, match="no ordinary table"):
+            load_table(path)
+        for name in ("docs_data", "docs_idx", "docs_content", "docs_docsize", "docs_config"):
+            try:
+                load_table(path, table=name)
+            except MalformedInputError as error:
+                text = str(error)
+                assert str(path) not in text, "raw path"
+                assert "SELECT" not in text, "raw path"
+                assert "CREATE" not in text, "raw path"
+                continue
+            raise AssertionError("shadow table became eligible")
+
+    def test_one_user_table_beside_fts_is_selected(self, tmp_path: Path):
+        path = _fts(tmp_path / "beside.sqlite", "CREATE TABLE people (n INTEGER); INSERT INTO people VALUES (1);")
+        try:
+            loaded = load_table(path)
+        except Exception as error:
+            raise AssertionError("shadow table became eligible") from error
+        assert loaded.selector is not None and loaded.selector.name == "people", (
+            "shadow table became eligible"
+        )
+        assert list(loaded.frame.columns) == ["n"]
+        assert loaded.frame["n"].tolist() == [1]
+
+    def test_two_user_tables_beside_fts_need_an_explicit_name(self, tmp_path: Path):
+        path = _fts(
+            tmp_path / "two-beside.sqlite",
+            "CREATE TABLE a (n INTEGER); INSERT INTO a VALUES (1);"
+            "CREATE TABLE b (n INTEGER); INSERT INTO b VALUES (2);",
+        )
+        with pytest.raises(MalformedInputError, match="pass table="):
+            load_table(path)
+        loaded = load_table(path, table="b")
+        assert loaded.selector is not None and loaded.selector.name == "b"
+        assert loaded.frame["n"].tolist() == [2]
+
+    def test_a_user_table_with_a_shadow_like_name_stays_eligible(self, tmp_path: Path):
+        path = _write(
+            tmp_path / "named-like-shadow.sqlite",
+            "CREATE TABLE docs_data (n INTEGER); INSERT INTO docs_data VALUES (3);",
+        )
+        loaded = load_table(path)
+        assert loaded.selector is not None and loaded.selector.name == "docs_data"
+        assert list(loaded.frame.columns) == ["n"]
+        assert loaded.frame["n"].tolist() == [3]
+
+    def test_fallback_reads_an_ordinary_database_without_table_list(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(sqlite_reader, "_relation_types", lambda _connection: None)
+        loaded = load_table(_people(tmp_path / "fallback.sqlite"))
+        assert loaded.selector is not None and loaded.selector.name == "people"
+        assert list(loaded.frame.columns) == ["n", "label", "amount", "blob"]
+
+    def test_fallback_refuses_virtual_tables_when_classification_is_unavailable(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        path = _fts(
+            tmp_path / "unclassified.sqlite",
+            "CREATE TABLE people (n INTEGER); INSERT INTO people VALUES (1);",
+        )
+        monkeypatch.setattr(sqlite_reader, "_relation_types", lambda _connection: None)
+        try:
+            load_table(path)
+        except MalformedInputError as error:
+            text = str(error)
+            assert str(path) not in text, "raw path"
+            assert "SELECT" not in text, "raw path"
+            assert "CREATE" not in text, "raw path"
+            assert "cannot classify" in text, "unsafe relation was accepted"
+            return
+        raise AssertionError("unsafe relation was accepted")
 
     def test_sqlite_and_sqlite3_suffixes_are_read(self, tmp_path: Path):
         for suffix in (".sqlite", ".sqlite3"):

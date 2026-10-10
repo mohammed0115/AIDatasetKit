@@ -1,9 +1,9 @@
 """Read one ordinary table from a local SQLite file.
 
 The file is opened read-only. The caller names a table, or the file has exactly
-one ordinary table and that one is used. Views, virtual tables, and SQLite's
-own ``sqlite_*`` tables are not tables this reader will load. No SQL text is
-accepted from the caller.
+one ordinary table and that one is used. Views, virtual tables, the shadow
+tables that belong to virtual tables, and SQLite's own ``sqlite_*`` tables are
+not tables this reader will load. No SQL text is accepted from the caller.
 """
 
 from __future__ import annotations
@@ -134,7 +134,7 @@ def _read(
 
 
 def _choose(connection: sqlite3.Connection, path: Path, table: str | None) -> str:
-    names = _eligible_names(connection)
+    names = _eligible_names(connection, path)
     if table is None:
         if len(names) == 0:
             raise EmptyInputError(
@@ -154,18 +154,81 @@ def _choose(connection: sqlite3.Connection, path: Path, table: str | None) -> st
     return table
 
 
-def _eligible_names(connection: sqlite3.Connection) -> tuple[str, ...]:
-    rows = connection.execute("SELECT name, type, sql FROM sqlite_master").fetchall()
-    names = [
+def _eligible_names(connection: sqlite3.Connection, path: Path) -> tuple[str, ...]:
+    """Ordinary user tables, in catalog order.
+
+    ``PRAGMA table_list`` classifies view, virtual, shadow and table. When that
+    pragma is absent, a database with no virtual-table definition still uses
+    ``sqlite_master``. A virtual table without ``table_list`` is refused: its
+    shadow tables cannot be told apart from ordinary tables without guessing
+    their names.
+    """
+    classified = _relation_types(connection)
+    if classified is None:
+        if _defines_virtual_table(connection):
+            raise MalformedInputError(
+                f"{path.name} has a virtual table whose shadow tables this "
+                "SQLite cannot classify."
+            )
+        rows = connection.execute(
+            "SELECT name, type, sql FROM sqlite_master"
+        ).fetchall()
+        return tuple(
+            name
+            for name, kind, sql in rows
+            if _is_ordinary_table(name, kind, sql)
+        )
+    return tuple(
         name
-        for name, kind, sql in rows
-        if _is_ordinary_table(name, kind, sql)
+        for name, kind in classified
+        if _is_ordinary_table(name, kind, "")
+    )
+
+
+def _relation_types(connection: sqlite3.Connection) -> list[tuple[str, str]] | None:
+    """``(name, type)`` from ``PRAGMA table_list``, or None when it is absent.
+
+    An unknown pragma returns no rows. A supported catalog always names
+    ``sqlite_schema``, so an empty result means the classification is missing.
+    """
+    rows = connection.execute("PRAGMA table_list").fetchall()
+    if not rows or len(rows[0]) < 3:
+        return None
+    return [
+        (str(name), str(kind))
+        for schema, name, kind, *_rest in rows
+        if schema == "main"
     ]
-    return tuple(names)
+
+
+def _defines_virtual_table(connection: sqlite3.Connection) -> bool:
+    rows = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table'"
+    ).fetchall()
+    return any(
+        sql is not None and sql.lstrip().upper().startswith("CREATE VIRTUAL")
+        for (sql,) in rows
+    )
 
 
 def _is_ordinary_table(name: str, kind: str, sql: str | None) -> bool:
-    if kind != "table":
+    """True for a catalog type of ``table`` that is not an internal name.
+
+    View, virtual and shadow are excluded by the type SQLite reports. The kind
+    check below them refuses any other non-table type. It allows those three
+    through so each has its own exclusion. Names are never used as a guess
+    about shadow storage. On the ``sqlite_master`` fallback, a virtual table
+    is stored with type ``table`` and is excluded by its ``CREATE VIRTUAL``
+    statement; shadow tables of that virtual table are not on this path,
+    because the database was refused before the fallback built an allowlist.
+    """
+    if kind == "view":
+        return False
+    if kind == "virtual":
+        return False
+    if kind == "shadow":
+        return False
+    if kind != "table" and kind not in {"view", "virtual", "shadow"}:
         return False
     if name.startswith("sqlite_"):
         return False
