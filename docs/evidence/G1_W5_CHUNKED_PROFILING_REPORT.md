@@ -9,7 +9,7 @@ outside this file.
 ```text
 BASELINE_SHA = 749048703fb885ec688bc3c57f91c4e16edbf50e
 BRANCH       = g1-w5-chunked-profiling
-CODE_SHA     = the semantic-closure implementation on this branch
+CODE_SHA     = 70586eaa031434e978f216927f51ade8083bca88
 ```
 
 `BASELINE_SHA` is certified `main`. G1-25 stays
@@ -51,15 +51,17 @@ and overall 108/232 = 46.55%.
 
 Interpreter: CPython 3.12.14 (`.venv`). pandas 3.0.5.
 
-The bounded-memory repair's 16/16 matrix remains the result of
-`b4a7e28515f2f0eb6844efa729776de74254866f`. This closure adds the stage,
-ingestion record, config identity and `quantile_sample_size` rename. Its
-measured counts are written here once that local run is recorded. They do not
-name a CI run.
+| Run | Result |
+|---|---|
+| Focused chunked tests | 34 passed |
+| Migration, golden, artifact, and packaging tests | 244 passed |
+| `scripts/g1_w5_mutations.py` | 19/19 KILLED, baseline exit 0, tree restored after each mutation. `rev=70586eaa031434e978f216927f51ade8083bca88` |
+| Full suite | 4525 passed, 47 skipped, 0 failed in 440.92s. JUnit `tests=4572 failures=0 errors=0 skipped=47` |
+| `scripts/release_smoke_test.sh` | wheel and sdist: build, twine check, clean install, CLI audit, schema `1.2`. Version `0.1.0a1`. Nothing published |
 
-The harness kills nineteen weakenings. The sixteen from the bounded-memory
-repair, plus: chunked artifact falsely marked inspected, chunked settings
-omitted from config identity, and chunked ingestion evidence omitted.
+The nineteen weakenings are the sixteen from the bounded-memory repair, plus
+chunked artifact falsely marked inspected, chunked settings omitted from
+config identity, and chunked ingestion evidence omitted.
 
 ## Not in this wave
 
