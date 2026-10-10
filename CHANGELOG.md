@@ -9,6 +9,28 @@ Versions before `1.0` may change public interfaces and the artifact schema; see
 First alpha, not yet released: nothing has been published to PyPI, TestPyPI or
 as a GitHub release, and no version is tagged. Everything below is new.
 
+### G1-W6 read-only SQLite table
+
+Evidence: `docs/evidence/G1_W6_SQLITE_READER_REPORT.md`. Not certified.
+
+- **Local SQLite** `.sqlite` and `.sqlite3` files, through the standard-library
+  `sqlite3` module. One ordinary table is loaded into a DataFrame after the
+  resource checks. Exactly one eligible table is selected automatically;
+  `load_table(..., table="name")` and `aidatasetkit audit --table NAME` name
+  one when several exist. The file is opened with `mode=ro` and
+  `PRAGMA query_only=ON`. Caller SQL, `ATTACH`, `executescript`, views, virtual
+  tables and `sqlite_*` tables are refused. `.db` is not a supported suffix.
+  PostgreSQL, SQLAlchemy and database URLs are not supported. Chunked profiling
+  stays CSV/TSV only.
+- INTEGER, REAL, TEXT, BLOB and NULL are preserved as `int`, `float`, `str`,
+  `bytes` and `None`. An empty table keeps its columns. A zero-byte file is
+  empty input.
+- **Artifact schema `1.3`.** Every artifact gains `source_selector`, `null`
+  unless a relation inside the file was chosen. The selected table is part of
+  the config fingerprint. Publication schema remains `1.0`. Package version
+  remains `0.1.0a1`. G1-14 stays `MISSING_PENDING_CERTIFICATION`. Recorded
+  progress stays G1 17/26 = 65.38% and overall 109/232 = 46.98%.
+
 ### G1-W5 chunked profiling for CSV and TSV
 
 Evidence: `docs/evidence/G1_W5_CHUNKED_PROFILING_REPORT.md`. Status: PASS.

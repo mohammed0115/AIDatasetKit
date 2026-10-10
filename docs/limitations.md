@@ -44,12 +44,16 @@ The readiness verdict has not been verified for a clustering run either. Its
 thresholds and its leakage checks were built against a target, and a clustering
 frame has none.
 
-**Delimited text, JSON, columnar and Excel files only.** `aidatasetkit.ingestion.load_table`
+**Delimited text, JSON, columnar, Excel and local SQLite files.** `aidatasetkit.ingestion.load_table`
 — which the CLI uses — reads `.csv`, `.tsv`, `.json` (an array of flat
-objects), `.jsonl`/`.ndjson`, `.parquet`, `.feather`/`.arrow` and `.xlsx`
-files, a pandas DataFrame, or a list of records, and nothing else: no old-format
-`.xls`, databases, URLs or cloud storage. A `.txt` file is refused even when it
-holds CSV. Parquet and Feather need the optional `parquet` extra (pyarrow);
+objects), `.jsonl`/`.ndjson`, `.parquet`, `.feather`/`.arrow`, `.xlsx`,
+`.sqlite` and `.sqlite3` files, a pandas DataFrame, or a list of records, and
+nothing else: no old-format `.xls`, no `.db`, no PostgreSQL, no SQLAlchemy, no
+database URLs, and no cloud storage. A `.txt` file is refused even when it
+holds CSV. A SQLite file is one ordinary table, opened read-only. The only
+table is selected automatically; more than one needs `table=` or `--table`.
+Views, virtual tables, `sqlite_*` tables and caller-supplied SQL are refused.
+There is no chunked SQLite scan. Parquet and Feather need the optional `parquet` extra (pyarrow);
 `.xlsx` needs the `excel` extra (openpyxl) and reads one worksheet (the first
 row is the header; a multi-sheet workbook needs `sheet=` or the CLI `--sheet`
 flag); macro-enabled workbooks are refused. A header with no data rows is

@@ -8,20 +8,21 @@ and an audit that disagrees with itself is worthless.
 ## Schema version
 
 ```json
-{ "schema_version": "1.2" }
+{ "schema_version": "1.3" }
 ```
 
 The artifact format is versioned **separately from the package**. Most releases
 will not change the shape of the record; the ones that do must be identifiable
 without consulting a changelog. Adding, removing or redefining a field bumps the
 version: an additive change is a minor bump, anything else a major one. A later
-`0.4.0` may still write `1.2`. `lineage.json` carries the same version.
+`0.4.0` may still write `1.3`. `lineage.json` carries the same version.
 
 | Version | Change |
 |---|---|
 | `1.0` | The first published contract. |
 | `1.1` | G1-W1: the top-level `ingestion` record. |
 | `1.2` | G1-W5: the top-level `chunked_profiling` record. `null` unless the caller opted into chunked CSV/TSV profiling. |
+| `1.3` | G1-W6: the top-level `source_selector` record. `null` unless a relation inside the file was chosen. A SQLite table is `{"kind": "table", "name": "<table>"}`. |
 
 An artifact with an `ingestion` key and `schema_version` `1.0` exists: `main` at
 `90ecfae` wrote it, before the version was corrected. Read it as `1.1`; nothing
@@ -70,6 +71,7 @@ artifact schema below and from the package.
 | `dataset` | Identity: fingerprints, shape, column list. No values. |
 | `ingestion` | How the table was read: source kind, format, encoding, delimiter and whether it was detected, named or fixed by the format, header, rows, columns, memory, warnings. `null` when the caller built the frame itself. No path, no values. |
 | `chunked_profiling` | Opt-in CSV/TSV chunked scan, or `null` when the caller did not ask for it. A typed record: mode, chunk size, rows scanned, population size, `full_population_scanned`, exact and approximate and unavailable metrics, sampling method/seed/size, population fingerprint, and temporary-storage status. Quartiles are approximate and are not verdict inputs. The chunked route's verdict is blocked because the full audit did not run. |
+| `source_selector` | The relation chosen inside the file, or `null` when the source is already one table. Shape: `{"kind": "table", "name": "<catalog name>"}`. The name is not SQL. It is included in the config fingerprint, so two SQLite audits that differ only by the selected table do not share a config identity. |
 | `config` | The settings that steered the run, and their fingerprint. |
 | `target` | What the task detector concluded, if a target was named. |
 | `model` | The capability context, if one was supplied. No estimator. |

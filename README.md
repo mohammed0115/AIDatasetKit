@@ -283,7 +283,9 @@ named; utf-8, utf-8-sig, latin-1 or cp1256, never guessed), `.json` files
 holding an array of flat objects, `.jsonl`/`.ndjson` files holding one object
 per line, `.parquet` and `.feather`/`.arrow` files (via the optional `parquet`
 extra), `.xlsx` workbooks (one sheet, via the optional `excel` extra; a
-multi-sheet workbook needs `sheet=` or `--sheet`), pandas DataFrames and lists
+multi-sheet workbook needs `sheet=` or `--sheet`), local `.sqlite` and
+`.sqlite3` databases (one ordinary table, read-only; more than one table needs
+`table=` or `--table`), pandas DataFrames and lists
 of records · tabular data · binary and multiclass classification readiness ·
 regression model contexts · scikit-learn model contexts · profiling · quality
 and leakage diagnostics · capability-driven preprocessing plans · feature
@@ -294,7 +296,7 @@ Also merged, unreleased: model training, evaluation, model comparison, the
 
 Not supported yet: anomaly detection, dimensionality reduction, time series,
 text, images, hyperparameter tuning, cross-validation, model persistence,
-databases, cloud storage, automatic encoding detection,
+PostgreSQL, SQLAlchemy, `.db` files, database URLs, cloud storage, automatic encoding detection,
 date inference or generators/other arbitrary iterables. An opt-in CSV/TSV
 chunked scan exists (`--chunked-profile`); it does not replace the default audit.
 
@@ -392,7 +394,7 @@ The repository includes a reproducible [comparative research lab](https://github
 ## Status
 
 An unreleased alpha (`0.1.0a1`): not published to PyPI, TestPyPI or as a GitHub release, and no version is tagged. Apache-2.0 licensed. The artifact schema is versioned independently of the
-package (currently `1.2`) so that stored artifacts stay readable as the library changes.
+package (currently `1.3`) so that stored artifacts stay readable as the library changes.
 Interfaces may still move. Feedback on the audit artifact — what is missing, what
 is unclear, what you would want to fail a build on — is the most useful thing you
 can send.

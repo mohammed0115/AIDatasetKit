@@ -141,6 +141,20 @@ AUDIT_DOCUMENTS       = CORRECT
   `0.1.0a1`. G1-24 stays `MISSING`.
 - Evidence: `docs/evidence/G1_W5_CHUNKED_PROFILING_REPORT.md`.
 
+**تحديث 9 — G1-W6 (local SQLite reader; not certified):**
+
+- A local `.sqlite` or `.sqlite3` file can be read as one ordinary table through
+  stdlib `sqlite3`, opened `mode=ro` with `query_only`. No caller SQL, no
+  `.db`, no views, no virtual tables, no `sqlite_*` tables, and no chunked
+  SQLite scan. PostgreSQL and SQLAlchemy stay unsupported.
+- **G1-14 remains `MISSING_PENDING_CERTIFICATION`.** This update does not
+  promote it. Recorded progress stays G1 = 17/26 = **65.38%** and overall =
+  109/232 = **46.98%**.
+- Artifact schema `1.3` adds `source_selector` (`null` except when a relation
+  inside the file was chosen). The selected table is part of the config
+  fingerprint. Publication schema `1.0`. Package version `0.1.0a1`.
+- Evidence: `docs/evidence/G1_W6_SQLITE_READER_REPORT.md`.
+
 ## 1. Main integration
 
 | البند | القيمة |
@@ -233,7 +247,7 @@ G0_MAIN_INTEGRATION = PASS
 | G1-11 | G1 | YAML | `MISSING` | no reader; PyYAML not a dependency | probe_ingestion.py (exploratory): refused | No reader | P3 |
 | G1-12 | G1 | pandas DataFrame in memory (Python API) | `SUPPORTED_AND_TESTED` | DataProfiler.profile, DataQualityInspector.inspect, AIDataFacade.load | tests/unit/test_profiler.py, test_quality.py, integration/test_facade.py | — | — |
 | G1-13 | G1 | list of dicts / records / iterables | `PARTIAL` | ingestion/loader.py::_from_records (G1-W1): list or tuple of mappings | tests/unit/test_ingestion.py::TestRecords | Generators and other iterables refused (`UnsupportedFormatError`); not reachable from AIDataFacade.load | P2 |
-| G1-14 | G1 | SQLite | `MISSING` | no reader | — | No reader | P2 |
+| G1-14 | G1 | SQLite | `MISSING_PENDING_CERTIFICATION` | ingestion/sqlite.py (G1-W6, not certified): one ordinary local table, read-only; views, virtual tables, sqlite_* and caller SQL refused | tests/unit/test_ingestion_sqlite.py; scripts/g1_w6_mutations.py | Implemented, not certified. PostgreSQL and SQLAlchemy remain absent | P2 |
 | G1-15 | G1 | PostgreSQL / SQLAlchemy / query results | `MISSING` | no reader; no DB dependency | — | No reader; connection handling undecided | P2 |
 | G1-16 | G1 | Document extraction (TXT, Markdown, HTML, PDF, DOCX) | `OUT_OF_SCOPE` | no reader, by design of a tabular library | probe_ingestion.py (exploratory): all refused | Belongs upstream (MWIE/connectors): extract to a table first | — |
 | G1-17 | G1 | Non-UTF-8 encodings / encoding detection | `PARTIAL` | LoadOptions.encoding (G1-W1): utf-8, utf-8-sig, latin-1, cp1256 when named; `EncodingError` otherwise | tests/unit/test_ingestion.py::TestEncodings, tests/integration/test_cli_ingestion.py::test_cp1256_is_read_when_named | Explicit encodings SUPPORTED_AND_TESTED; automatic detection not implemented (by decision) | P2 |
@@ -644,7 +658,7 @@ G0_MAIN_INTEGRATION = PASS
 |---|---|---:|---:|---:|---|---|
 | G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
 | G0.1 | Profiling performance hotfix | — | — | — | PASS | P0-1 مغلق (انظر §0) |
-| G1 | Ingestion | 17 | 26 | 65.38% | IN PROGRESS | W1–W5 مغلقة؛ W6 لم تبدأ |
+| G1 | Ingestion | 17 | 26 | 65.38% | IN PROGRESS | W1–W5 مغلقة؛ W6 مُنفَّذ وغير معتمد |
 | G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | تواريخ ونص وقيم |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | عمليات جدولية |
 | G4 | EDA & Statistics | 9 | 13 | 69.23% | AUDIT | ارتباط فئوي واختبارات |
