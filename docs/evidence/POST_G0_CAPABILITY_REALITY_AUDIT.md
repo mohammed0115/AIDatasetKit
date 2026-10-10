@@ -1,16 +1,16 @@
 # POST-G0 Capability Reality Audit — AIDatasetKit
 
 ```text
-CURRENT_GATE                 = G0 closed; G1-W2 closed
-CURRENT_ACTIVITY             = G1-W2 resource governance certified; awaiting CTO review for G1-W3
+CURRENT_GATE                 = G0 closed; G1-W1 through G1-W5 closed
+CURRENT_ACTIVITY             = G1-W5 PASS; stop before G1-W6
 G0_STATUS                    = PASS (16/16)
 G0_MAIN_INTEGRATION          = PASS
 GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
-OVERALL_CERTIFIED_PROGRESS   = 46.55%   (108 proven / 232 applicable, G0–G12; updated after G1-W4, §0)
+OVERALL_CERTIFIED_PROGRESS   = 46.98%   (109 proven / 232 applicable, G0–G12; updated after G1-W5, §0)
 AUDIT_GATE                   = PASS     (the audit is complete with evidence; G1–G12 are not)
-READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W2 complete; G1-W3 requires separate CTO authorization)
-NEXT_AUTHORIZED_ACTION       = CTO review before any G1-W3 work; G1-W3 is NO_GO pending authorization
+READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W5 complete; G1-W6 requires separate CTO authorization)
+NEXT_AUTHORIZED_ACTION       = stop; G1-W6 is not authorized by the G1-W5 seal
 ```
 
 **حدود هذا المستند:**
@@ -126,6 +126,21 @@ AUDIT_DOCUMENTS       = CORRECT
   Publication schema `1.0`. Package version `0.1.0a1`.
 - Evidence: `docs/evidence/G1_W5_CHUNKED_PROFILING_REPORT.md`.
 
+**تحديث 8 — G1-W5 closure (PASS):**
+
+- **G1-25: `SUPPORTED_AND_TESTED`.** The opt-in CSV/TSV scan is the accepted
+  chunked profile. `AuditBuilder.build_chunked` takes no `settings` argument;
+  the config identity is only `_chunked_settings(profile)`. The artifact stage
+  is `profiled`, ingestion evidence records `memory_bytes` null, and the
+  verdict stays blocked because the full audit did not run.
+- **G1-W5 = PASS.** Code branch CI and code main CI are 10/10 on
+  `CERTIFIED_CODE_SHA` `5f65a20331823e49f35b25a657c37868aea509bd`. This update
+  does not name the CI run of the documentation commit that adds it.
+- Recorded progress is G1 = 17/26 = **65.38%** and overall = 109/232 =
+  **46.98%**. Artifact schema `1.2`. Publication schema `1.0`. Package version
+  `0.1.0a1`. G1-24 stays `MISSING`.
+- Evidence: `docs/evidence/G1_W5_CHUNKED_PROFILING_REPORT.md`.
+
 ## 1. Main integration
 
 | البند | القيمة |
@@ -229,7 +244,7 @@ G0_MAIN_INTEGRATION = PASS
 | G1-22 | G1 | Type inference incl. dates from text | `PARTIAL` | core/schema.py detects DATETIME only for datetime64 dtype | probe_ingestion.py (exploratory): ISO dates in CSV -> `categorical`, dtype object | Dates never inferred from files | P1 |
 | G1-23 | G1 | Row/column counts and memory estimate | `SUPPORTED_AND_TESTED` | DatasetProfile.row_count/column_count/memory_usage_bytes | tests/unit/test_profiler.py | — | — |
 | G1-24 | G1 | Excel sheets | `MISSING` | no spreadsheet reader | — | No reader | P2 |
-| G1-25 | G1 | Large files: chunking / streaming | `MISSING_PENDING_CERTIFICATION` | validation pass streams records; an opt-in bounded CSV/TSV profile exists, publishes a blocked profile-only artifact, and is not the default audit | tests/unit/test_chunked_profiling.py; G1-W5 report | Implemented, not certified. The default path still loads one pandas table | P1 |
+| G1-25 | G1 | Large files: chunking / streaming | `SUPPORTED_AND_TESTED` | opt-in bounded CSV/TSV profile (G1-W5): blocked profile-only artifact at stage `profiled`; config identity from the scan contract only; not the default audit | tests/unit/test_chunked_profiling.py; scripts/g1_w5_mutations.py (19/19); G1-W5 report | Default path still loads one pandas table. JSON, Parquet, Feather, and Excel stay on the full-table path | P1 |
 | G1-26 | G1 | Resource limits (size, rows, columns) | `SUPPORTED_AND_TESTED` | ingestion/types.py::IngestionLimits; loader.py and delimited.py enforce finite bytes/rows/columns/cells/field limits before pandas or analysis | unit/integration tests; mutations; wheel/sdist smoke; branch/final/main CI; G1-W2 report | — | — |
 | G1-27 | G1 | Unsupported format refused with a clear message | `SUPPORTED_AND_TESTED` | cli/main.py suffix check | tests/integration/test_audit_end_to_end.py (not really parquet) | — | — |
 | G2-01 | G2 | Missing values per column and dataset | `SUPPORTED_AND_TESTED` | profiler.py _profile_column; checks.check_missing_values | test_profiler.py, test_quality.py | — | — |
@@ -629,7 +644,7 @@ G0_MAIN_INTEGRATION = PASS
 |---|---|---:|---:|---:|---|---|
 | G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
 | G0.1 | Profiling performance hotfix | — | — | — | PASS | P0-1 مغلق (انظر §0) |
-| G1 | Ingestion | 16 | 26 | 61.54% | IN PROGRESS | W1–W4 مغلقة؛ W5 بانتظار الاعتماد |
+| G1 | Ingestion | 17 | 26 | 65.38% | IN PROGRESS | W1–W5 مغلقة؛ W6 لم تبدأ |
 | G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | تواريخ ونص وقيم |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | عمليات جدولية |
 | G4 | EDA & Statistics | 9 | 13 | 69.23% | AUDIT | ارتباط فئوي واختبارات |
@@ -641,14 +656,14 @@ G0_MAIN_INTEGRATION = PASS
 | G10 | Provenance/Security/Privacy/Errors | 18 | 28 | 64.29% | AUDIT | أخطاء الموارد والمدخلات |
 | G11 | Performance & Certification | 5 | 21 | 23.81% | AUDIT | 4 بنود MISSING→PARTIAL في G0.1؛ benchmarks في CI |
 | G12 | Masari Consumer Integration | 2 | 14 | 14.29% | AUDIT | بعد G1–G9 |
-| **All** | G0–G12 | **108** | **232** | **46.55%** | — | — |
+| **All** | G0–G12 | **109** | **232** | **46.98%** | — | — |
 
 **تفصيل الحالات لكل بوابة** (حتى لا يختفي العمل الموجود غير المكتمل):
 
 | Gate | SUPPORTED_AND_TESTED | SUPPORTED_NOT_SUFFICIENTLY_TESTED | PARTIAL | MISSING | BLOCKED | NOT_APPLICABLE | OUT_OF_SCOPE |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | G0 | 16 | 0 | 0 | 0 | 0 | 0 | 0 |
-| G1 | 16 | 0 | 3 | 7 | 0 | 0 | 1 |
+| G1 | 17 | 0 | 3 | 6 | 0 | 0 | 1 |
 | G2 | 15 | 0 | 2 | 5 | 0 | 0 | 0 |
 | G3 | 2 | 0 | 5 | 10 | 0 | 1 | 0 |
 | G4 | 9 | 0 | 2 | 2 | 0 | 0 | 0 |

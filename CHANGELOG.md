@@ -11,7 +11,7 @@ as a GitHub release, and no version is tagged. Everything below is new.
 
 ### G1-W5 chunked profiling for CSV and TSV
 
-Evidence: `docs/evidence/G1_W5_CHUNKED_PROFILING_REPORT.md`. Not certified.
+Evidence: `docs/evidence/G1_W5_CHUNKED_PROFILING_REPORT.md`. Status: PASS.
 
 - **Opt-in chunked profiling** of `.csv` and `.tsv` via
   `profile_delimited_chunks` and `aidatasetkit audit --chunked-profile`. The
@@ -39,9 +39,9 @@ Evidence: `docs/evidence/G1_W5_CHUNKED_PROFILING_REPORT.md`. Not certified.
   The reservoir capacity parameter is `quantile_sample_size`.
 - **Artifact schema `1.2`.** The artifact gains a typed `chunked_profiling`
   record, `null` on the default path. Publication schema remains `1.0`.
-  Package version remains `0.1.0a1`. G1-25 stays
-  `MISSING_PENDING_CERTIFICATION`. Recorded progress stays G1 16/26 and
-  overall 108/232.
+  Package version remains `0.1.0a1`. G1-25 is
+  `SUPPORTED_AND_TESTED`. Recorded progress is G1 17/26 = 65.38% and
+  overall 109/232 = 46.98%.
 
 ### G1-W4 format expansion: Excel .xlsx
 
