@@ -35,7 +35,8 @@ Evidence: `docs/evidence/G1_W5_CHUNKED_PROFILING_REPORT.md`. Not certified.
   `memory_bytes` is null because no frame was built. The config fingerprint
   covers the scan contract (chunk size, reservoir size, sampling, encoding,
   delimiter, header, resource limits, fingerprint algorithm) and not the path
-  or the clock. The reservoir capacity parameter is `quantile_sample_size`.
+  or the clock. `AuditBuilder.build_chunked` takes no `settings` argument.
+  The reservoir capacity parameter is `quantile_sample_size`.
 - **Artifact schema `1.2`.** The artifact gains a typed `chunked_profiling`
   record, `null` on the default path. Publication schema remains `1.0`.
   Package version remains `0.1.0a1`. G1-25 stays
