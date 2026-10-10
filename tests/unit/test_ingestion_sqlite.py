@@ -300,7 +300,12 @@ class TestSecurity:
             read_sqlite(path, TableFormat.SQLITE, LoadOptions(), IngestionLimits())
         except InputNotFoundError:
             pass
-        assert not path.exists(), "missing path creates a database"
+        except Exception:
+            if path.exists():
+                raise AssertionError("missing path creates a database") from None
+            raise
+        if path.exists():
+            raise AssertionError("missing path creates a database")
 
     def test_the_database_bytes_are_unchanged(self, tmp_path: Path):
         path = _people(tmp_path / "bytes.sqlite")

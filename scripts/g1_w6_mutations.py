@@ -169,14 +169,14 @@ MUTATIONS = (
     Mutation(
         "M-W6-17", "SQLite error leaks raw path or escapes unwrapped",
         ((SQLITE,
-          "        connection = sqlite3.connect(uri, uri=True)\n"
-          "    except sqlite3.Error:\n"
-          "        raise MalformedInputError(\n"
-          "            f\"{path.name} is not a readable SQLite database.\"\n"
-          "        ) from None\n",
-          "        connection = sqlite3.connect(uri, uri=True)\n"
-          "    except sqlite3.Error as error:\n"
-          "        raise error\n"),),
+          "            return _read(connection, path, limits, table)\n"
+          "        except sqlite3.Error:\n"
+          "            raise MalformedInputError(\n"
+          "                f\"{path.name} is not a readable SQLite database.\"\n"
+          "            ) from None\n",
+          "            return _read(connection, path, limits, table)\n"
+          "        except sqlite3.Error as error:\n"
+          "            raise error\n"),),
         (f"{TESTS}::TestSecurity::test_a_corrupt_database_does_not_leak_the_driver_error",),
         (("test_a_corrupt_database_does_not_leak_the_driver_error", "raw path"),),
     ),
