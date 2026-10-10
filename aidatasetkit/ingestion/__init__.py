@@ -1,15 +1,18 @@
 """Ingestion: the one authority that turns a source into a table.
 
 :func:`load_table` accepts a ``.csv``, ``.tsv``, ``.json``, ``.jsonl``,
-``.ndjson``, ``.parquet``, ``.feather``, ``.arrow`` or ``.xlsx`` path, a pandas
-DataFrame, or a list of records, and returns a :class:`LoadedTable` -- the
-frame and typed :class:`LoadMetadata` about how it was read -- or raises an
-:class:`~aidatasetkit.core.exceptions.IngestionError`. Every input is either
-read correctly or refused; nothing is read into a wrong table without a word.
+``.ndjson``, ``.parquet``, ``.feather``, ``.arrow``, ``.xlsx``, ``.sqlite`` or
+``.sqlite3`` path, a pandas DataFrame, or a list of records, and returns a
+:class:`LoadedTable` -- the frame and typed :class:`LoadMetadata` about how it
+was read -- or raises an :class:`~aidatasetkit.core.exceptions.IngestionError`.
+Every input is either read correctly or refused; nothing is read into a wrong
+table without a word.
 
 Not here, on purpose: profiling, quality checks, training, network access,
-scraping, and every format other than CSV, TSV, JSON, JSONL, Parquet, Feather
-and Excel ``.xlsx``. Encodings are never guessed; date inference is not
+scraping, and every format other than CSV, TSV, JSON, JSONL, Parquet, Feather,
+Excel ``.xlsx`` and local SQLite. A SQLite file is one ordinary table, opened
+read-only; views, virtual tables, ``sqlite_*`` tables and caller SQL are
+refused. Encodings are never guessed; date inference is not
 implemented. Chunked profiling of a CSV or TSV file is a separate opt-in,
 :func:`aidatasetkit.profiling.profile_delimited_chunks`, and is not what
 :func:`load_table` does. Finite resource limits are enforced by

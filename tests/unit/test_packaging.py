@@ -43,7 +43,7 @@ class TestVersionHasOneSource:
         import aidatasetkit
         from aidatasetkit.evidence import ARTIFACT_SCHEMA_VERSION
 
-        assert ARTIFACT_SCHEMA_VERSION == "1.2"
+        assert ARTIFACT_SCHEMA_VERSION == "1.3"
         assert ARTIFACT_SCHEMA_VERSION != aidatasetkit.__version__
 
 

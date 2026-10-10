@@ -58,7 +58,10 @@ __all__ = [
 #: 1.2 -- G1-W5: the top-level ``chunked_profiling`` record. ``null`` unless the
 #:       caller opted into chunked CSV/TSV profiling. Approximate numbers live
 #:       only inside that record and are labeled; they are not verdict inputs.
-ARTIFACT_SCHEMA_VERSION = "1.2"
+#: 1.3 -- G1-W6: the top-level ``source_selector`` record. ``null`` unless a
+#:       relation inside the file was chosen. A SQLite table is
+#:       ``{"kind": "table", "name": ...}``.
+ARTIFACT_SCHEMA_VERSION = "1.3"
 
 
 class EvidenceSource(StrEnum):
@@ -423,6 +426,22 @@ class DatasetIdentity:
 
 
 @dataclass(frozen=True, slots=True)
+class SourceSelectorEvidence:
+    """The relation chosen inside a source file.
+
+    ``kind`` is ``table`` for an ordinary SQLite table. ``name`` is the catalog
+    name. This is not SQL text, and it is ``null`` on every source that is
+    already one table.
+    """
+
+    kind: str
+    name: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {"kind": self.kind, "name": self.name}
+
+
+@dataclass(frozen=True, slots=True)
 class IngestionEvidence:
     """How the audited table was read, as :mod:`aidatasetkit.ingestion` recorded it.
 
@@ -652,6 +671,7 @@ class AuditArtifact:
     verdict_reasons: tuple[str, ...] = ()
     ingestion: IngestionEvidence | None = None
     chunked_profiling: ChunkedProfilingEvidence | None = None
+    source_selector: SourceSelectorEvidence | None = None
 
     # ---------------------------------------------------------------- #
     # Serialisation
@@ -689,6 +709,9 @@ class AuditArtifact:
                 canonical(self.chunked_profiling.to_dict(), path="chunked_profiling")
                 if self.chunked_profiling is not None
                 else None
+            ),
+            "source_selector": (
+                self.source_selector.to_dict() if self.source_selector is not None else None
             ),
             "config": self.config.to_dict(),
             "target": self.target.to_dict() if self.target else None,

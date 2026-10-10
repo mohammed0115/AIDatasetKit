@@ -22,6 +22,7 @@ __all__ = [
     "SUPPORTED_DELIMITERS",
     "SUPPORTED_ENCODINGS",
     "SourceKind",
+    "SourceSelector",
     "TableFormat",
 ]
 
@@ -44,6 +45,22 @@ class TableFormat(StrEnum):
     PARQUET = "parquet"
     FEATHER = "feather"
     XLSX = "xlsx"
+    SQLITE = "sqlite"
+
+
+@dataclass(frozen=True, slots=True)
+class SourceSelector:
+    """Which relation inside a file was read.
+
+    ``kind`` names the kind of relation (``table`` for an ordinary SQLite
+    table). ``name`` is that relation's catalog name, never a SQL statement.
+    """
+
+    kind: str
+    name: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {"kind": self.kind, "name": self.name}
 
 
 class DelimiterSource(StrEnum):
@@ -226,7 +243,10 @@ class LoadedTable:
         frame: The table. For a DataFrame source this is the caller's own object,
             returned as-is: loading reads it and never writes to it.
         metadata: How it was read.
+        selector: The relation chosen inside a multi-relation file, or ``None``
+            when the source is itself one table.
     """
 
     frame: Any
     metadata: LoadMetadata = field(repr=False)
+    selector: SourceSelector | None = None

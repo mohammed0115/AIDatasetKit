@@ -22,6 +22,8 @@ SUPPORTED_SUFFIXES: dict[str, TableFormat] = {
     ".feather": TableFormat.FEATHER,
     ".arrow": TableFormat.FEATHER,
     ".xlsx": TableFormat.XLSX,
+    ".sqlite": TableFormat.SQLITE,
+    ".sqlite3": TableFormat.SQLITE,
 }
 
 
@@ -38,6 +40,6 @@ def resolve_format(path: Path) -> TableFormat:
         raise UnsupportedFormatError(
             f"{suffix or 'a file without a suffix'} is not a supported format. "
             "Supported now: .csv, .tsv, .json, .jsonl, .ndjson, .parquet, "
-            ".feather, .arrow and .xlsx files, or a pandas DataFrame or a list "
-            "of records from Python."
+            ".feather, .arrow, .xlsx, .sqlite and .sqlite3 files, or a pandas "
+            "DataFrame or a list of records from Python."
         ) from None

@@ -94,7 +94,7 @@ run = read_current(sys.argv[1])
 assert sorted(run.contents) == ["audit.json", "lineage.json", "report.html"], sorted(run.contents)
 assert all(run.contents.values()), "an artifact is empty"
 a = run.json("audit.json")
-assert a["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.2", a["schema_version"]
+assert a["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.3", a["schema_version"]
 assert a["verdict"] == "blocked", a["verdict"]
 assert a["columns"] and a["findings"], "artifact is empty"
 PY

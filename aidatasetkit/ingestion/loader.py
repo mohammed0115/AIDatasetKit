@@ -38,6 +38,7 @@ from aidatasetkit.ingestion.types import (
     TableFormat,
     _cells_exceed,
 )
+from aidatasetkit.ingestion.sqlite import read_sqlite
 
 __all__ = ["load_table"]
 
@@ -48,18 +49,23 @@ def load_table(
     options: LoadOptions | None = None,
     limits: IngestionLimits | None = None,
     sheet: str | None = None,
+    table: str | None = None,
 ) -> LoadedTable:
     """Load a table, or refuse it with a structured error. Never a wrong table.
 
     Args:
         source: A path (:class:`pathlib.Path` or any :class:`os.PathLike`) to a
             ``.csv``, ``.tsv``, ``.json``, ``.jsonl``, ``.ndjson``, ``.parquet``,
-            ``.feather``, ``.arrow`` or ``.xlsx`` file; a :class:`pandas.DataFrame`;
+            ``.feather``, ``.arrow``, ``.xlsx``, ``.sqlite`` or ``.sqlite3`` file;
+            a :class:`pandas.DataFrame`;
             or a list or tuple of mappings, one per row. A plain ``str`` is
             refused rather than guessed at -- pass ``Path("data.csv")``.
         options: How a file is read. In-memory sources accept only the defaults.
         sheet: The worksheet to read from an ``.xlsx`` file. Required when the
             workbook has more than one sheet; meaningless for any other source.
+        table: The ordinary table to read from a ``.sqlite`` or ``.sqlite3``
+            file. Required when the database has more than one; meaningless for
+            any other source.
 
     Returns:
         A :class:`LoadedTable`. Loading profiles nothing and trains nothing.
@@ -73,6 +79,8 @@ def load_table(
         _require_default(options, "a DataFrame")
         if sheet is not None:
             raise InvalidIngestionOptionsError("sheet= applies to .xlsx files only.")
+        if table is not None:
+            raise InvalidIngestionOptionsError("table= applies to SQLite files only.")
         return _from_dataframe(source, limits)
     if isinstance(source, (str, bytes)):
         raise UnsupportedFormatError(
@@ -80,16 +88,18 @@ def load_table(
             "be mistaken for data or for a path. Pass pathlib.Path(...) for a file."
         )
     if isinstance(source, os.PathLike):
-        return _from_file(Path(os.fspath(source)), options, limits, sheet)
+        return _from_file(Path(os.fspath(source)), options, limits, sheet, table)
     if isinstance(source, (list, tuple)):
         _require_default(options, "records")
         if sheet is not None:
             raise InvalidIngestionOptionsError("sheet= applies to .xlsx files only.")
+        if table is not None:
+            raise InvalidIngestionOptionsError("table= applies to SQLite files only.")
         return _from_records(source, limits)
     raise UnsupportedFormatError(
         f"Cannot load a {type(source).__name__}. Supported: a path to a .csv, "
-        ".tsv, .json, .jsonl, .parquet, .feather or .xlsx file, a pandas "
-        "DataFrame, or a list of mappings."
+        ".tsv, .json, .jsonl, .parquet, .feather, .xlsx, .sqlite or .sqlite3 "
+        "file, a pandas DataFrame, or a list of mappings."
     )
 
 
@@ -111,7 +121,11 @@ def _memory(frame: pd.DataFrame) -> int:
 
 
 def _from_file(
-    path: Path, options: LoadOptions, limits: IngestionLimits, sheet: str | None = None
+    path: Path,
+    options: LoadOptions,
+    limits: IngestionLimits,
+    sheet: str | None = None,
+    table: str | None = None,
 ) -> LoadedTable:
     fmt = resolve_format(path)
     if not path.exists():
@@ -130,6 +144,10 @@ def _from_file(
     if fmt is not TableFormat.XLSX and sheet is not None:
         raise InvalidIngestionOptionsError(
             f"sheet= applies to .xlsx files only; {path.name} is {fmt.value}."
+        )
+    if fmt is not TableFormat.SQLITE and table is not None:
+        raise InvalidIngestionOptionsError(
+            f"table= applies to SQLite files only; {path.name} is {fmt.value}."
         )
     if fmt in (TableFormat.JSON, TableFormat.JSONL):
         records, names, encoding, notes = read_json_text(path, fmt, options, limits)
@@ -166,6 +184,24 @@ def _from_file(
                 memory_bytes=_memory(frame),
                 warnings=(),
             ),
+        )
+    if fmt is TableFormat.SQLITE:
+        frame, selector = read_sqlite(path, fmt, options, limits, table=table)
+        return LoadedTable(
+            frame=frame,
+            metadata=LoadMetadata(
+                source_kind=SourceKind.FILE,
+                format=fmt,
+                encoding=None,
+                delimiter=None,
+                delimiter_source=None,
+                header=None,
+                row_count=int(len(frame)),
+                column_count=int(frame.shape[1]),
+                memory_bytes=_memory(frame),
+                warnings=(),
+            ),
+            selector=selector,
         )
     if fmt is TableFormat.XLSX:
         frame = read_excel(path, fmt, options, limits, sheet=sheet)

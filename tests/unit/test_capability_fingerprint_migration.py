@@ -63,6 +63,13 @@ opt into chunked profiling, so the record is ``null``. The version moves with
 the key: undoing the step deletes the key and sets the version back to 1.1,
 and that alone reproduces the previous identity. Publication schema 1.0 and
 the package version are not part of this fingerprint.
+
+**G1-W6 -- artifact schema 1.2 to 1.3.** The artifact gained a top-level
+``source_selector`` record. The example is built from a frame, so the record is
+``null``. Undoing the step deletes the key and sets the version back to 1.2,
+and that alone reproduces the previous identity. The selected SQLite table is
+recorded on SQLite artifacts and in their config fingerprint; this fixture has
+no table to select.
 """
 
 from __future__ import annotations
@@ -122,6 +129,11 @@ def _rollback_schema_1_1(semantic: dict) -> None:
 def _rollback_schema_1_2(semantic: dict) -> None:
     semantic["schema_version"] = "1.1"
     del semantic["chunked_profiling"]
+
+
+def _rollback_schema_1_3(semantic: dict) -> None:
+    semantic["schema_version"] = "1.2"
+    del semantic["source_selector"]
 
 
 def _rollback_threshold(name: str) -> Callable[[dict], None]:
@@ -190,6 +202,12 @@ CHAIN: tuple[Step, ...] = (
         before="3e93dd5e11b75f51d99c16bee263723627b4f93bebeb10c31e2bf31c92ed6be0",
         after="39f4c43867f1b30f47a42986187c3cce4b8dbad1540e5e7a369e0e142d5d5d47",
         rollback=_rollback_schema_1_2,
+    ),
+    Step(
+        "G1-W6 artifact schema 1.2 -> 1.3 and source_selector record",
+        before="39f4c43867f1b30f47a42986187c3cce4b8dbad1540e5e7a369e0e142d5d5d47",
+        after="2a33aff562bf32116d2f48587eda19af85e9a2db956a7e6c00b8a89c1bcf7c75",
+        rollback=_rollback_schema_1_3,
     ),
 )
 
@@ -318,6 +336,7 @@ class TestTheIngestionStep:
 
     def test_nothing_but_the_key_moved(self):
         stored = _stored()
+        _rollback_schema_1_3(stored)
         _rollback_schema_1_2(stored)
         _rollback_schema_1_1(stored)
         del stored["ingestion"]
@@ -332,17 +351,18 @@ def _step(prefix: str) -> Step:
 class TestTheSchemaStep:
     """The version says what the record is, without comparing fingerprints."""
 
-    def test_the_current_code_writes_1_2(self, semantic):
+    def test_the_current_code_writes_1_3(self, semantic):
         from aidatasetkit.evidence import ARTIFACT_SCHEMA_VERSION
 
-        assert semantic["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.2"
+        assert semantic["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.3"
 
-    def test_the_fixture_declares_1_2(self):
-        assert _stored()["schema_version"] == "1.2"
+    def test_the_fixture_declares_1_3(self):
+        assert _stored()["schema_version"] == "1.3"
 
     def test_setting_the_version_back_reproduces_the_intermediate_artifact(self):
         """The 1.0-with-ingestion artifact that 90ecfae published."""
         stored = _stored()
+        _rollback_schema_1_3(stored)
         _rollback_schema_1_2(stored)
         _rollback_schema_1_1(stored)
         assert "ingestion" in stored
@@ -350,6 +370,7 @@ class TestTheSchemaStep:
 
     def test_then_removing_the_key_reproduces_the_pre_g1_artifact(self):
         stored = _stored()
+        _rollback_schema_1_3(stored)
         _rollback_schema_1_2(stored)
         _rollback_schema_1_1(stored)
         del stored["ingestion"]
@@ -358,6 +379,8 @@ class TestTheSchemaStep:
     def test_only_the_version_moved(self):
         """Data, findings, decisions and lineage are what they were in 1.0."""
         current, previous = _stored(), _stored()
+        _rollback_schema_1_3(current)
+        _rollback_schema_1_3(previous)
         _rollback_schema_1_2(current)
         _rollback_schema_1_2(previous)
         _rollback_schema_1_1(previous)
@@ -366,6 +389,7 @@ class TestTheSchemaStep:
 
     def test_a_1_0_artifact_is_recognisable_as_the_older_contract(self):
         older = _stored()
+        _rollback_schema_1_3(older)
         _rollback_schema_1_2(older)
         _rollback_schema_1_1(older)
         assert older["schema_version"] == "1.0" != _stored()["schema_version"]
@@ -379,6 +403,7 @@ class TestTheChunkedSchemaStep:
 
     def test_deleting_the_key_and_the_version_reproduces_1_1(self):
         stored = _stored()
+        _rollback_schema_1_3(stored)
         _rollback_schema_1_2(stored)
         assert stored["schema_version"] == "1.1"
         assert "chunked_profiling" not in stored
@@ -386,12 +411,36 @@ class TestTheChunkedSchemaStep:
 
     def test_only_the_record_and_the_version_moved(self):
         current, previous = _stored(), _stored()
+        _rollback_schema_1_3(current)
+        _rollback_schema_1_3(previous)
         _rollback_schema_1_2(previous)
         changed = set(current) ^ set(previous)
         changed.update(
             key for key in current.keys() & previous.keys() if current[key] != previous[key]
         )
         assert changed == {"schema_version", "chunked_profiling"}
+
+
+class TestTheSourceSelectorSchemaStep:
+    def test_the_key_is_present_and_null_for_a_frame_built_artifact(self, semantic):
+        assert "source_selector" in semantic
+        assert semantic["source_selector"] is None
+
+    def test_deleting_the_key_and_the_version_reproduces_1_2(self):
+        stored = _stored()
+        _rollback_schema_1_3(stored)
+        assert stored["schema_version"] == "1.2"
+        assert "source_selector" not in stored
+        assert config_fingerprint(stored) == _step("G1-W5 artifact schema").after
+
+    def test_only_the_record_and_the_version_moved(self):
+        current, previous = _stored(), _stored()
+        _rollback_schema_1_3(previous)
+        changed = set(current) ^ set(previous)
+        changed.update(
+            key for key in current.keys() & previous.keys() if current[key] != previous[key]
+        )
+        assert changed == {"schema_version", "source_selector"}
 
 
 class TestTheCvFoldsStep:

@@ -137,9 +137,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     audit = subparsers.add_parser(
         "audit",
-        help="Inspect a CSV, TSV, JSON, JSONL, Parquet, Feather or Excel file and write audit.json, lineage.json, and report.html.",
+        help="Inspect a CSV, TSV, JSON, JSONL, Parquet, Feather, Excel or SQLite file and write audit.json, lineage.json, and report.html.",
         description=(
-            "Audit one CSV, TSV, JSON, JSONL, Parquet, Feather or Excel file. Writes "
+            "Audit one CSV, TSV, JSON, JSONL, Parquet, Feather, Excel or SQLite file. Writes "
             "three artifacts: audit.json (the canonical machine-readable record), "
             "lineage.json (each input column and what it became), and report.html "
             "(the same evidence rendered for a person). Nothing is trained, and "
@@ -157,7 +157,7 @@ def build_parser() -> argparse.ArgumentParser:
     audit.add_argument(
         "path",
         type=Path,
-        help="Path to a .csv, .tsv, .json, .jsonl, .parquet, .feather or .xlsx file.",
+        help="Path to a .csv, .tsv, .json, .jsonl, .parquet, .feather, .xlsx, .sqlite or .sqlite3 file.",
     )
     audit.add_argument(
         "--target", default=None, help="Column holding the label, if there is one."
@@ -239,6 +239,16 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Worksheet to read from an .xlsx workbook. Required when the "
             "workbook has more than one sheet; refused for every other format."
+        ),
+    )
+    audit.add_argument(
+        "--table",
+        default=None,
+        help=(
+            "Ordinary table to read from a .sqlite or .sqlite3 database. "
+            "Required when the database has more than one; refused for every "
+            "other format. Views, virtual tables and sqlite_* tables are not "
+            "accepted."
         ),
     )
     audit.add_argument(
@@ -366,6 +376,7 @@ def _audit(args: argparse.Namespace) -> int:
     loaded = load_table(
         path,
         sheet=args.sheet,
+        table=args.table,
         options=options,
         limits=limits,
     )
@@ -518,6 +529,7 @@ def _audit(args: argparse.Namespace) -> int:
         model=registration,
         kit_config=kit_config,
         ingestion=loaded.metadata,
+        source_selector=loaded.selector,
         # Deliberately excludes --fail-on: it decides this process's exit code
         # and changes nothing about what was found. Two audits that differ only
         # in that flag are the same audit, and the config fingerprint has to say
@@ -544,6 +556,12 @@ def _audit_chunked(
     if args.sheet is not None:
         print(
             "error: --sheet cannot be combined with --chunked-profile.",
+            file=sys.stderr,
+        )
+        return EXIT_CODES["usage"]
+    if args.table is not None:
+        print(
+            "error: --table cannot be combined with --chunked-profile.",
             file=sys.stderr,
         )
         return EXIT_CODES["usage"]

@@ -50,7 +50,7 @@ from aidatasetkit.evidence.fingerprint import (
     schema_fingerprint,
 )
 from aidatasetkit.evidence.policy import decide_verdict
-from aidatasetkit.ingestion.types import LoadMetadata
+from aidatasetkit.ingestion.types import LoadMetadata, SourceSelector
 from aidatasetkit.evidence.types import (
     ARTIFACT_SCHEMA_VERSION,
     AuditArtifact,
@@ -68,6 +68,7 @@ from aidatasetkit.evidence.types import (
     ChunkedProfilingEvidence,
     ChunkedSamplingEvidence,
     IngestionEvidence,
+    SourceSelectorEvidence,
     LabelRef,
     ModelEvidence,
     TargetEvidence,
@@ -231,6 +232,7 @@ class AuditBuilder:
         environment: EnvironmentVersions | None = None,
         created_at: str | None = None,
         ingestion: LoadMetadata | None = None,
+        source_selector: SourceSelector | None = None,
     ) -> AuditArtifact:
         """Assemble the artifact.
 
@@ -283,6 +285,7 @@ class AuditBuilder:
             name=self._dataset_name,
         )
         resolved_settings = self._settings(settings, plan, model, target, kit_config)
+        resolved_settings = _with_source_selector(resolved_settings, source_selector)
 
         return AuditArtifact(
             schema_version=ARTIFACT_SCHEMA_VERSION,
@@ -307,6 +310,7 @@ class AuditBuilder:
             known_limitations=KNOWN_LIMITATIONS,
             ingestion=self._ingestion_evidence(ingestion, frame),
             chunked_profiling=None,
+            source_selector=_selector_evidence(source_selector),
         )
 
     def build_chunked(
@@ -367,6 +371,7 @@ class AuditBuilder:
             known_limitations=KNOWN_LIMITATIONS,
             ingestion=_chunked_ingestion(profile),
             chunked_profiling=evidence,
+            source_selector=None,
         )
 
     @staticmethod
@@ -764,6 +769,23 @@ def _chunked_settings(profile: Any) -> dict[str, Any]:
         "limits": dict(profile.effective_limits),
         "fingerprint_algorithm": profile.fingerprint_algorithm,
     }
+
+
+def _with_source_selector(
+    settings: dict[str, Any], selector: SourceSelector | None
+) -> dict[str, Any]:
+    """Put the chosen relation into the settings the config fingerprint covers."""
+    if selector is None:
+        return settings
+    recorded = dict(settings)
+    recorded["source_selector"] = {"kind": selector.kind, "name": selector.name}
+    return recorded
+
+
+def _selector_evidence(selector: SourceSelector | None) -> SourceSelectorEvidence | None:
+    if selector is None:
+        return None
+    return SourceSelectorEvidence(kind=selector.kind, name=selector.name)
 
 
 def _chunked_ingestion(profile: Any) -> IngestionEvidence:

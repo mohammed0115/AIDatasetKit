@@ -254,10 +254,10 @@ class TestBuildingChangesNothing:
 
 class TestSchemaVersionAndStages:
     def test_the_artifact_declares_its_own_schema_version(self, full):
-        assert full.schema_version == ARTIFACT_SCHEMA_VERSION == "1.2"
+        assert full.schema_version == ARTIFACT_SCHEMA_VERSION == "1.3"
 
     def test_the_version_is_in_the_serialised_form(self, full):
-        assert json.loads(canonical_json(full.to_dict()))["schema_version"] == "1.2"
+        assert json.loads(canonical_json(full.to_dict()))["schema_version"] == "1.3"
 
     def test_lineage_carries_the_same_contract_version(self, full):
         assert full.lineage_dict()["schema_version"] == ARTIFACT_SCHEMA_VERSION
