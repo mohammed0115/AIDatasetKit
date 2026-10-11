@@ -11,7 +11,7 @@ as a GitHub release, and no version is tagged. Everything below is new.
 
 ### G1-W6 read-only SQLite table
 
-Evidence: `docs/evidence/G1_W6_SQLITE_READER_REPORT.md`. Not certified.
+Evidence: `docs/evidence/G1_W6_SQLITE_READER_REPORT.md`. Status: PASS.
 
 - **Local SQLite** `.sqlite` and `.sqlite3` files, through the standard-library
   `sqlite3` module. One ordinary table is loaded into a DataFrame after the
@@ -31,8 +31,8 @@ Evidence: `docs/evidence/G1_W6_SQLITE_READER_REPORT.md`. Not certified.
 - **Artifact schema `1.3`.** Every artifact gains `source_selector`, `null`
   unless a relation inside the file was chosen. The selected table is part of
   the config fingerprint. Publication schema remains `1.0`. Package version
-  remains `0.1.0a1`. G1-14 stays `MISSING_PENDING_CERTIFICATION`. Recorded
-  progress stays G1 17/26 = 65.38% and overall 109/232 = 46.98%.
+  remains `0.1.0a1`. G1-14 is `SUPPORTED_AND_TESTED`. Recorded progress is
+  G1 18/26 = 69.23% and overall 110/232 = 47.41%.
 
 ### G1-W5 chunked profiling for CSV and TSV
 

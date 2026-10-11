@@ -1,16 +1,16 @@
 # POST-G0 Capability Reality Audit — AIDatasetKit
 
 ```text
-CURRENT_GATE                 = G0 closed; G1-W1 through G1-W5 closed
-CURRENT_ACTIVITY             = G1-W5 PASS; stop before G1-W6
+CURRENT_GATE                 = G0 closed; G1-W1 through G1-W6 closed
+CURRENT_ACTIVITY             = G1-W6 PASS; stop before G1-W7
 G0_STATUS                    = PASS (16/16)
 G0_MAIN_INTEGRATION          = PASS
 GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
-OVERALL_CERTIFIED_PROGRESS   = 46.98%   (109 proven / 232 applicable, G0–G12; updated after G1-W5, §0)
+OVERALL_CERTIFIED_PROGRESS   = 47.41%   (110 proven / 232 applicable, G0–G12; updated after G1-W6, §0)
 AUDIT_GATE                   = PASS     (the audit is complete with evidence; G1–G12 are not)
-READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W5 complete; G1-W6 requires separate CTO authorization)
-NEXT_AUTHORIZED_ACTION       = stop; G1-W6 is not authorized by the G1-W5 seal
+READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W6 complete; G1-W7 requires separate CTO authorization)
+NEXT_AUTHORIZED_ACTION       = stop; G1-W7 is not authorized by the G1-W6 seal
 ```
 
 **حدود هذا المستند:**
@@ -157,6 +157,24 @@ AUDIT_DOCUMENTS       = CORRECT
   fingerprint. Publication schema `1.0`. Package version `0.1.0a1`.
 - Evidence: `docs/evidence/G1_W6_SQLITE_READER_REPORT.md`.
 
+**تحديث 10 — G1-W6 closure (PASS):**
+
+- **G1-14: `SUPPORTED_AND_TESTED`.** A local `.sqlite` or `.sqlite3` file is
+  one ordinary user table, opened read-only through stdlib `sqlite3`. Views,
+  virtual tables, shadow tables, and `sqlite_*` relations are excluded.
+  `PRAGMA table_list` classifies relations when SQLite provides it. When that
+  classification is unavailable and the file defines a virtual table, the file
+  is refused. No caller SQL. Resource limits run before materialization. The
+  selected table is `source_selector` and part of the config fingerprint.
+- **G1-W6 = PASS.** Code branch CI and code main CI are 10/10 on
+  `CERTIFIED_CODE_SHA` `0d5788b8f1a0006b387e57f9e7bde62ff1fe8109`. This update
+  does not name the CI run of the documentation commit that adds it.
+- **G1-15 stays `MISSING`.** **G1-25 stays `SUPPORTED_AND_TESTED`.**
+- Recorded progress is G1 = 18/26 = **69.23%** and overall = 110/232 =
+  **47.41%**. Artifact schema `1.3`. Publication schema `1.0`. Package version
+  `0.1.0a1`.
+- Evidence: `docs/evidence/G1_W6_SQLITE_READER_REPORT.md`.
+
 ## 1. Main integration
 
 | البند | القيمة |
@@ -249,7 +267,7 @@ G0_MAIN_INTEGRATION = PASS
 | G1-11 | G1 | YAML | `MISSING` | no reader; PyYAML not a dependency | probe_ingestion.py (exploratory): refused | No reader | P3 |
 | G1-12 | G1 | pandas DataFrame in memory (Python API) | `SUPPORTED_AND_TESTED` | DataProfiler.profile, DataQualityInspector.inspect, AIDataFacade.load | tests/unit/test_profiler.py, test_quality.py, integration/test_facade.py | — | — |
 | G1-13 | G1 | list of dicts / records / iterables | `PARTIAL` | ingestion/loader.py::_from_records (G1-W1): list or tuple of mappings | tests/unit/test_ingestion.py::TestRecords | Generators and other iterables refused (`UnsupportedFormatError`); not reachable from AIDataFacade.load | P2 |
-| G1-14 | G1 | SQLite | `MISSING_PENDING_CERTIFICATION` | ingestion/sqlite.py (G1-W6, not certified): one ordinary local table, read-only; views, virtual tables, sqlite_* and caller SQL refused | tests/unit/test_ingestion_sqlite.py; scripts/g1_w6_mutations.py | Implemented, not certified. PostgreSQL and SQLAlchemy remain absent | P2 |
+| G1-14 | G1 | SQLite | `SUPPORTED_AND_TESTED` | ingestion/sqlite.py (G1-W6 PASS): one ordinary local `.sqlite`/`.sqlite3` table, read-only; views, virtual tables, shadow tables, sqlite_* and caller SQL refused; `PRAGMA table_list` with a safe fallback | tests/unit/test_ingestion_sqlite.py; scripts/g1_w6_mutations.py (20/20); G1-W6 report | PostgreSQL and SQLAlchemy remain absent (G1-15) | P2 |
 | G1-15 | G1 | PostgreSQL / SQLAlchemy / query results | `MISSING` | no reader; no DB dependency | — | No reader; connection handling undecided | P2 |
 | G1-16 | G1 | Document extraction (TXT, Markdown, HTML, PDF, DOCX) | `OUT_OF_SCOPE` | no reader, by design of a tabular library | probe_ingestion.py (exploratory): all refused | Belongs upstream (MWIE/connectors): extract to a table first | — |
 | G1-17 | G1 | Non-UTF-8 encodings / encoding detection | `PARTIAL` | LoadOptions.encoding (G1-W1): utf-8, utf-8-sig, latin-1, cp1256 when named; `EncodingError` otherwise | tests/unit/test_ingestion.py::TestEncodings, tests/integration/test_cli_ingestion.py::test_cp1256_is_read_when_named | Explicit encodings SUPPORTED_AND_TESTED; automatic detection not implemented (by decision) | P2 |
@@ -660,7 +678,7 @@ G0_MAIN_INTEGRATION = PASS
 |---|---|---:|---:|---:|---|---|
 | G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
 | G0.1 | Profiling performance hotfix | — | — | — | PASS | P0-1 مغلق (انظر §0) |
-| G1 | Ingestion | 17 | 26 | 65.38% | IN PROGRESS | W1–W5 مغلقة؛ W6 مُنفَّذ وغير معتمد |
+| G1 | Ingestion | 18 | 26 | 69.23% | IN PROGRESS | W1–W6 مغلقة؛ W7 لم تبدأ |
 | G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | تواريخ ونص وقيم |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | عمليات جدولية |
 | G4 | EDA & Statistics | 9 | 13 | 69.23% | AUDIT | ارتباط فئوي واختبارات |
@@ -672,14 +690,14 @@ G0_MAIN_INTEGRATION = PASS
 | G10 | Provenance/Security/Privacy/Errors | 18 | 28 | 64.29% | AUDIT | أخطاء الموارد والمدخلات |
 | G11 | Performance & Certification | 5 | 21 | 23.81% | AUDIT | 4 بنود MISSING→PARTIAL في G0.1؛ benchmarks في CI |
 | G12 | Masari Consumer Integration | 2 | 14 | 14.29% | AUDIT | بعد G1–G9 |
-| **All** | G0–G12 | **109** | **232** | **46.98%** | — | — |
+| **All** | G0–G12 | **110** | **232** | **47.41%** | — | — |
 
 **تفصيل الحالات لكل بوابة** (حتى لا يختفي العمل الموجود غير المكتمل):
 
 | Gate | SUPPORTED_AND_TESTED | SUPPORTED_NOT_SUFFICIENTLY_TESTED | PARTIAL | MISSING | BLOCKED | NOT_APPLICABLE | OUT_OF_SCOPE |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | G0 | 16 | 0 | 0 | 0 | 0 | 0 | 0 |
-| G1 | 17 | 0 | 3 | 6 | 0 | 0 | 1 |
+| G1 | 18 | 0 | 3 | 5 | 0 | 0 | 1 |
 | G2 | 15 | 0 | 2 | 5 | 0 | 0 | 0 |
 | G3 | 2 | 0 | 5 | 10 | 0 | 1 | 0 |
 | G4 | 9 | 0 | 2 | 2 | 0 | 0 | 0 |

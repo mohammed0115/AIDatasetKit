@@ -1,19 +1,22 @@
 # G1-W6 — read-only SQLite table
 
-G1-W6 is not a PASS. G1-14 stays `MISSING_PENDING_CERTIFICATION`.
+G1-W6 is **PASS**. G1-14 is `SUPPORTED_AND_TESTED`.
 
-This file records the local evidence for the implementation on
-`IMPLEMENTATION_SHA`. It does not name a CI run. Branch CI on the tip that
-adds this file is a later gate and is not a certification. `main` was not
-moved.
+`CERTIFIED_CODE_SHA` is the tip integrated to `main` before this record.
+`DOCS_SEAL_SHA` is the documentation-only commit that adds this certification.
+This file names `CERTIFIED_CODE_SHA` and does not name `DOCS_SEAL_SHA` or any
+CI run started by that documentation commit.
 
 ## Identity
 
 ```text
 STARTING_HEAD       = 431570c06dbf54125396909c2909c85f8e32e9de
+CERTIFIED_CODE_SHA  = 0d5788b8f1a0006b387e57f9e7bde62ff1fe8109
 IMPLEMENTATION_SHA  = 97d5283c632ef385c05e827a65fc1ac11da12e78
+REPAIR_SHA          = c923d4b2036a210d6ad3e3243ea7e42fd64c5e49
 BRANCH              = g1-w6-sqlite-reader
 BASELINE_MAIN_SHA   = 431570c06dbf54125396909c2909c85f8e32e9de
+DOCS_SEAL_SHA       = not recorded in this file
 ```
 
 `318d61cbf7aa9564280bf9b9a623fbc0ccc87495` adds the reader, schema `1.3`, and
@@ -21,15 +24,14 @@ the mutation harness. `IMPLEMENTATION_SHA` is that commit plus the two test
 and harness adjustments that make the missing-path and unwrapped-error
 weakenings fail for the reason they name.
 
-```text
-REPAIR_SHA = c923d4b2036a210d6ad3e3243ea7e42fd64c5e49
-```
+`REPAIR_SHA` `c923d4b2036a210d6ad3e3243ea7e42fd64c5e49` excludes shadow tables
+by `PRAGMA table_list` type. It does not change the artifact schema, the
+public API, the publication schema, or the package version.
 
-`REPAIR_SHA` excludes shadow tables by `PRAGMA table_list` type. It does not
-change the artifact schema, the public API, the publication schema, or the
-package version. The repair is not a certification.
-
-Recorded progress stays G1 17/26 = 65.38% and overall 109/232 = 46.98%.
+`CERTIFIED_CODE_SHA` is that repair plus the record of the exclusion. Recorded
+progress after this seal is G1 18/26 = 69.23% and overall 110/232 = 47.41%.
+Before this seal the recorded progress was G1 17/26 = 65.38% and overall
+109/232 = 46.98%.
 Artifact schema `1.3`. Publication schema `1.0`. Package version `0.1.0a1`.
 G1-25 stays `SUPPORTED_AND_TESTED`.
 
@@ -153,7 +155,51 @@ Interpreter: CPython 3.12.14 (`.venv`). pandas 3.0.5.
 | Full suite | 4577 passed, 47 skipped, 0 failed, 0 errors in 472.76s. JUnit `tests=4624 failures=0 errors=0 skipped=47 time=472.710` |
 | `scripts/release_smoke_test.sh` | wheel `aidatasetkit-0.1.0a1-py3-none-any.whl` and sdist `aidatasetkit-0.1.0a1.tar.gz`: build, twine check, clean install, CLI audit, schema `1.3`. Version `0.1.0a1`. Nothing published |
 
+## Certification runs at CERTIFIED_CODE_SHA
+
+Interpreter: CPython 3.12.14 (`.venv`). pandas 3.0.5.
+
+| Run | Result |
+|---|---|
+| Focused SQLite tests | 46 passed (`tests/unit/test_ingestion_sqlite.py`) |
+| Schema, migration, fingerprint, golden | 42 passed |
+| G1-W5 chunked profiling | 35 passed (`tests/unit/test_chunked_profiling.py`) |
+| Packaging and architecture | 180 passed |
+| `scripts/g1_w6_mutations.py` | 20/20 KILLED, 0 SURVIVED, baseline exit 0, tree restored. `rev=0d5788b8f1a0006b387e57f9e7bde62ff1fe8109` python=3.12.14 |
+| Full suite | 4577 passed, 47 skipped, 0 failed, 0 errors in 517.81s. JUnit `tests=4624 failures=0 errors=0 skipped=47 time=517.753` |
+| `scripts/release_smoke_test.sh` | wheel `aidatasetkit-0.1.0a1-py3-none-any.whl` and sdist `aidatasetkit-0.1.0a1.tar.gz`: build, twine check, clean install, CLI audit, schema `1.3`. Version `0.1.0a1`. Nothing published |
+| Installed-wheel SQLite CLI | `aidatasetkit audit` of a local `.sqlite` file: format `sqlite`, `source_selector` `{"kind": "table", "name": "people"}`, artifact schema `1.3`, publication schema `1.0` |
+
+## CI
+
+These runs are for `CERTIFIED_CODE_SHA`. This section does not name a CI run
+of the commit that adds it.
+
+```text
+CERTIFIED_CODE_SHA = 0d5788b8f1a0006b387e57f9e7bde62ff1fe8109
+BRANCH_CI_RUN      = 38077874706
+BRANCH_CI_URL      = https://github.com/mohammed0115/AIDatasetKit/actions/runs/38077874706
+BRANCH_CI_SHA      = 0d5788b8f1a0006b387e57f9e7bde62ff1fe8109
+BRANCH_CI_EVENT    = push
+BRANCH_CI_BRANCH   = g1-w6-sqlite-reader
+BRANCH_CI_RESULT   = success
+BRANCH_CI_JOBS     = 10/10
+BRANCH_CI_STARTED  = 2026-10-10T18:57:39Z
+BRANCH_CI_UPDATED  = 2026-10-10T19:04:33Z
+MAIN_CI_RUN        = 38133266783
+MAIN_CI_URL        = https://github.com/mohammed0115/AIDatasetKit/actions/runs/38133266783
+MAIN_CI_SHA        = 0d5788b8f1a0006b387e57f9e7bde62ff1fe8109
+MAIN_CI_EVENT      = push
+MAIN_CI_BRANCH     = main
+MAIN_CI_RESULT     = success
+MAIN_CI_JOBS       = 10/10
+MAIN_CI_STARTED    = 2026-10-11T10:48:28Z
+MAIN_CI_UPDATED    = 2026-10-11T10:55:04Z
+```
+
 ## Status
 
-Not certified. Expected only after a later certification: G1 18/26 = 69.23%
-and overall 110/232 = 47.41%.
+G1-W6 = PASS. G1-14 = `SUPPORTED_AND_TESTED`. G1-15 stays `MISSING`. G1-25
+stays `SUPPORTED_AND_TESTED`. Artifact schema `1.3`. Publication schema `1.0`.
+Package version `0.1.0a1`. Recorded progress is G1 18/26 = 69.23% and overall
+110/232 = 47.41%.
