@@ -11,8 +11,7 @@ as a GitHub release, and no version is tagged. Everything below is new.
 
 ### G1-W7 worksheet selection evidence
 
-Evidence: `docs/evidence/G1_W7_EXCEL_SHEET_EVIDENCE_REPORT.md`. Status: pending
-later review. This section does not close the capability.
+Evidence: `docs/evidence/G1_W7_EXCEL_SHEET_EVIDENCE_REPORT.md`. Status: PASS.
 
 - An `.xlsx` workbook still loads through `load_table(..., sheet=)` and
   `aidatasetkit audit --sheet`. The match is the exact worksheet title. One
@@ -25,8 +24,8 @@ later review. This section does not close the capability.
   measured against the row, column, cell or field-length limits. The
   source-byte limit still covers the whole file.
 - Artifact schema stays `1.3`. Publication schema stays `1.0`. Package version
-  stays `0.1.0a1`. G1-24 is not promoted. Recorded progress stays G1 18/26 =
-  69.23% and overall 110/232 = 47.41%.
+  stays `0.1.0a1`. G1-24 is `SUPPORTED_AND_TESTED`. Recorded progress is
+  G1 19/26 = 73.08% and overall 111/232 = 47.84%.
 
 ### G1-W6 read-only SQLite table
 

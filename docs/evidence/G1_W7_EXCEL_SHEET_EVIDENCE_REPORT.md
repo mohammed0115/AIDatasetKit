@@ -1,30 +1,33 @@
 # G1-W7 — Excel worksheet selection evidence
 
-G1-W7 is **not PASS**. G1-24 is `PARTIAL_PENDING_CERTIFICATION`.
+G1-W7 is **PASS**. G1-24 is `SUPPORTED_AND_TESTED`.
 
-This file records the implementation that is waiting for review. It does not
-promote G1-24 and it does not change recorded progress. It names the
-implementation commit and does not name a CI run started by the documentation
-commit that adds this file.
+`CERTIFIED_CODE_SHA` is the tip integrated to `main` before this record.
+`DOCS_SEAL_SHA` is the documentation-only commit that adds this certification.
+This file names `CERTIFIED_CODE_SHA` and does not name `DOCS_SEAL_SHA` or any
+CI run started by that documentation commit.
 
 ## Identity
 
 ```text
 STARTING_HEAD        = 59368ea382ce1cde0a3ceb4bcd7dfbb19f54ab66
+CERTIFIED_CODE_SHA   = 1321766da1c128dfbc6faf4943d5c3a9ab4324bb
 IMPLEMENTATION_SHA   = b5b5403e5877889c3ec13ddc98a21cbd4ca7b379
 BRANCH               = g1-w7-excel-sheet-evidence
 BASELINE_MAIN_SHA    = 59368ea382ce1cde0a3ceb4bcd7dfbb19f54ab66
-G1_24_STATUS         = PARTIAL_PENDING_CERTIFICATION
-G1_PROGRESS          = 18/26 = 69.23%
-OVERALL_PROGRESS     = 110/232 = 47.41%
+DOCS_SEAL_SHA        = not recorded in this file
+G1_24_STATUS         = SUPPORTED_AND_TESTED
+G1_PROGRESS          = 19/26 = 73.08%
+OVERALL_PROGRESS     = 111/232 = 47.84%
 ARTIFACT_SCHEMA      = 1.3
 PUBLICATION_SCHEMA   = 1.0
 PACKAGE_VERSION      = 0.1.0a1
 ```
 
-Recorded progress stays at the G1-W6 seal. A later review that promotes G1-24
-would move those figures to G1 19/26 = 73.08% and overall 111/232 = 47.84%.
-That promotion is not made here.
+`IMPLEMENTATION_SHA` records the selected worksheet. `CERTIFIED_CODE_SHA` is
+that commit plus the pre-review evidence record. Recorded progress after this
+seal is G1 19/26 = 73.08% and overall 111/232 = 47.84%. Before this seal the
+recorded progress was G1 18/26 = 69.23% and overall 110/232 = 47.41%.
 
 ## Contract
 
@@ -115,3 +118,57 @@ is part of the same review and uses that wheel plus the excel extra.
   `read_only=True` can open it. Eligibility uses `Workbook.worksheets`, which
   excludes chartsheets. A chartsheet name is refused before any row scan.
 - Historical G1-W4 and G1-W5 reports are unchanged.
+
+## Certification runs at CERTIFIED_CODE_SHA
+
+Interpreter: CPython 3.12.14 (`.venv`).
+
+| Run | Result |
+|---|---|
+| Excel, openpyxl-absence, and CLI ingestion | 89 passed |
+| Schema, artifact, and fingerprint | 198 passed |
+| Golden fixtures | 5 passed |
+| G1-W6 SQLite | 46 passed |
+| G1-W5 chunked profiling | 35 passed |
+| Packaging and architecture | 180 passed |
+| Those groups together | 553 passed |
+| `scripts/g1_w7_mutations.py` | 17/17 KILLED, 0 SURVIVED, baseline exit 0, tree restored. `rev=1321766da1c128dfbc6faf4943d5c3a9ab4324bb` python=3.12.14 |
+| Full suite | 4615 passed, 47 skipped, 0 failed, 0 errors in 696.07s. JUnit `tests=4662 failures=0 errors=0 skipped=47 time=695.992` |
+| `scripts/release_smoke_test.sh` | wheel `aidatasetkit-0.1.0a1-py3-none-any.whl` and sdist `aidatasetkit-0.1.0a1.tar.gz`: build, twine check, clean install, CLI audit, schema `1.3`. Version `0.1.0a1`. Nothing published |
+| Installed wheel without the excel extra | openpyxl absent. `.xlsx` audit exit 1. No `CURRENT` |
+| Installed wheel with the excel extra | `aidatasetkit audit --sheet Data`: exit 0 with `--fail-on never`, format `xlsx`, `source_selector` `{"kind": "sheet", "name": "Data"}`, artifact schema `1.3`, publication schema `1.0` |
+
+## CI
+
+These runs are for `CERTIFIED_CODE_SHA`. This section does not name a CI run
+of the commit that adds it.
+
+```text
+CERTIFIED_CODE_SHA = 1321766da1c128dfbc6faf4943d5c3a9ab4324bb
+BRANCH_CI_RUN      = 38160770773
+BRANCH_CI_URL      = https://github.com/mohammed0115/AIDatasetKit/actions/runs/38160770773
+BRANCH_CI_SHA      = 1321766da1c128dfbc6faf4943d5c3a9ab4324bb
+BRANCH_CI_EVENT    = push
+BRANCH_CI_BRANCH   = g1-w7-excel-sheet-evidence
+BRANCH_CI_RESULT   = success
+BRANCH_CI_JOBS     = 10/10
+BRANCH_CI_STARTED  = 2026-10-11T17:42:31Z
+BRANCH_CI_UPDATED  = 2026-10-11T17:49:16Z
+MAIN_CI_RUN        = 38163105938
+MAIN_CI_URL        = https://github.com/mohammed0115/AIDatasetKit/actions/runs/38163105938
+MAIN_CI_SHA        = 1321766da1c128dfbc6faf4943d5c3a9ab4324bb
+MAIN_CI_EVENT      = push
+MAIN_CI_BRANCH     = main
+MAIN_CI_RESULT     = success
+MAIN_CI_JOBS       = 10/10
+MAIN_CI_STARTED    = 2026-10-11T18:16:18Z
+MAIN_CI_UPDATED    = 2026-10-11T18:22:49Z
+```
+
+## Status
+
+G1-W7 = PASS. G1-24 = `SUPPORTED_AND_TESTED`. G1-14 stays
+`SUPPORTED_AND_TESTED`. G1-25 stays `SUPPORTED_AND_TESTED`. G1-15, G1-05,
+G1-10, and G1-11 stay `MISSING`. Artifact schema `1.3`. Publication schema
+`1.0`. Package version `0.1.0a1`. Recorded progress is G1 19/26 = 73.08% and
+overall 111/232 = 47.84%.
