@@ -2,15 +2,15 @@
 
 ```text
 CURRENT_GATE                 = G0 closed; G1-W1 through G1-W6 closed
-CURRENT_ACTIVITY             = G1-W6 PASS; stop before G1-W7
+CURRENT_ACTIVITY             = G1-W7 implemented, pending later review; not PASS
 G0_STATUS                    = PASS (16/16)
 G0_MAIN_INTEGRATION          = PASS
 GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
-OVERALL_CERTIFIED_PROGRESS   = 47.41%   (110 proven / 232 applicable, G0–G12; updated after G1-W6, §0)
+OVERALL_CERTIFIED_PROGRESS   = 47.41%   (110 proven / 232 applicable, G0–G12; unchanged by G1-W7, §0)
 AUDIT_GATE                   = PASS     (the audit is complete with evidence; G1–G12 are not)
-READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W6 complete; G1-W7 requires separate CTO authorization)
-NEXT_AUTHORIZED_ACTION       = stop; G1-W7 is not authorized by the G1-W6 seal
+READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W7 awaits review; G1-24 is not promoted)
+NEXT_AUTHORIZED_ACTION       = stop for review of G1-W7; do not promote G1-24 in this update
 ```
 
 **حدود هذا المستند:**
@@ -175,6 +175,22 @@ AUDIT_DOCUMENTS       = CORRECT
   `0.1.0a1`.
 - Evidence: `docs/evidence/G1_W6_SQLITE_READER_REPORT.md`.
 
+**تحديث 11 — G1-W7 worksheet selection evidence (pending later review):**
+
+- **G1-24: `PARTIAL_PENDING_CERTIFICATION`.** A local `.xlsx` workbook yields
+  one table from one eligible worksheet. The worksheet is chosen by exact name,
+  or automatically when exactly one eligible worksheet exists. Hidden and
+  very-hidden worksheets stay eligible. Chartsheets are excluded and do not
+  create a false ambiguity. The selected title is `source_selector`
+  `{"kind": "sheet", "name": ...}` and part of the config fingerprint.
+  `max_field_length` applies to the selected worksheet only. Schema stays
+  `1.3`. This update does not mark G1-W7 PASS and does not promote G1-24.
+- Recorded progress stays G1 = 18/26 = **69.23%** and overall = 110/232 =
+  **47.41%**. The status-detail counts below stay 18 / 0 / 3 / 5 because this
+  row is not promoted. After a later review the expected figures would be
+  G1 19/26 = 73.08% and overall 111/232 = 47.84%.
+- Evidence: `docs/evidence/G1_W7_EXCEL_SHEET_EVIDENCE_REPORT.md`.
+
 ## 1. Main integration
 
 | البند | القيمة |
@@ -277,7 +293,7 @@ G0_MAIN_INTEGRATION = PASS
 | G1-21 | G1 | Malformed rows | `SUPPORTED_AND_TESTED` | delimited._validate: every record's width, strict quoting; `MalformedInputError` names the record and line (G1-W1) | tests/unit/test_ingestion.py::TestRefusals (too few/many fields, after the sample, unclosed quote); tests/integration/test_cli_ingestion.py | No tolerant/skip mode, by design: refuse | — |
 | G1-22 | G1 | Type inference incl. dates from text | `PARTIAL` | core/schema.py detects DATETIME only for datetime64 dtype | probe_ingestion.py (exploratory): ISO dates in CSV -> `categorical`, dtype object | Dates never inferred from files | P1 |
 | G1-23 | G1 | Row/column counts and memory estimate | `SUPPORTED_AND_TESTED` | DatasetProfile.row_count/column_count/memory_usage_bytes | tests/unit/test_profiler.py | — | — |
-| G1-24 | G1 | Excel sheets | `MISSING` | no spreadsheet reader | — | No reader | P2 |
+| G1-24 | G1 | Excel sheets | `PARTIAL_PENDING_CERTIFICATION` | ingestion/excel.py (G1-W7, not PASS): exact worksheet name or the only eligible worksheet; hidden and very-hidden stay eligible; chartsheets excluded; `source_selector` kind `sheet`; selected name in the config fingerprint; `max_field_length` on the selected worksheet | tests/unit/test_ingestion_excel.py; scripts/g1_w7_mutations.py | Awaiting review. Not `SUPPORTED_AND_TESTED`. G1-04 remains the certified XLSX reader | P2 |
 | G1-25 | G1 | Large files: chunking / streaming | `SUPPORTED_AND_TESTED` | opt-in bounded CSV/TSV profile (G1-W5): blocked profile-only artifact at stage `profiled`; config identity from the scan contract only; not the default audit | tests/unit/test_chunked_profiling.py; scripts/g1_w5_mutations.py (19/19); G1-W5 report | Default path still loads one pandas table. JSON, Parquet, Feather, and Excel stay on the full-table path | P1 |
 | G1-26 | G1 | Resource limits (size, rows, columns) | `SUPPORTED_AND_TESTED` | ingestion/types.py::IngestionLimits; loader.py and delimited.py enforce finite bytes/rows/columns/cells/field limits before pandas or analysis | unit/integration tests; mutations; wheel/sdist smoke; branch/final/main CI; G1-W2 report | — | — |
 | G1-27 | G1 | Unsupported format refused with a clear message | `SUPPORTED_AND_TESTED` | cli/main.py suffix check | tests/integration/test_audit_end_to_end.py (not really parquet) | — | — |
@@ -678,7 +694,7 @@ G0_MAIN_INTEGRATION = PASS
 |---|---|---:|---:|---:|---|---|
 | G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
 | G0.1 | Profiling performance hotfix | — | — | — | PASS | P0-1 مغلق (انظر §0) |
-| G1 | Ingestion | 18 | 26 | 69.23% | IN PROGRESS | W1–W6 مغلقة؛ W7 لم تبدأ |
+| G1 | Ingestion | 18 | 26 | 69.23% | IN PROGRESS | W1–W6 مغلقة؛ W7 منفَّذة وتنتظر المراجعة |
 | G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | تواريخ ونص وقيم |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | عمليات جدولية |
 | G4 | EDA & Statistics | 9 | 13 | 69.23% | AUDIT | ارتباط فئوي واختبارات |

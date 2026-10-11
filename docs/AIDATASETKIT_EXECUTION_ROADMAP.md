@@ -43,7 +43,7 @@
 
 - ~~**P0-2:** فاصل غير `,` يُقرأ خطأً دون تحذير.~~ **مغلق في G1-W1.**
 - **P1:** XLSX وParquet وJSON/JSONL؛ استنتاج التواريخ؛ حدود الموارد؛ chunking. (الترميزات الصريحة والأسطر المشوهة وTSV وrecords أُنجزت في G1-W1؛ اكتشاف الترميز التلقائي غير مخطط.)
-- **P2:** XLS وsheets وFeather وSQLite وPostgreSQL.
+- **P2:** XLS وPostgreSQL. Feather وSQLite مُنجزان. اختيار ورقة Excel (G1-24) نُفِّذ في G1-W7 وينتظر المراجعة؛ ليس «لا يوجد قارئ جداول».
 - **P3:** XML وYAML.
 - المستندات: `OUT_OF_SCOPE`.
 
@@ -52,11 +52,12 @@
 | Wave | المحتوى | Depends | Complexity |
 |---|---|---|---|
 | G1-W1 ✅ **منجزة** (`docs/evidence/G1_W1_INGESTION_FOUNDATION_REPORT.md`) | حزمة `aidatasetkit.ingestion` (طبقة فوق `core`): `load_table(path \| frame \| records, *, options) -> LoadedTable(frame, metadata)`. metadata فيها الصيغة، والترميز، والفاصل، والرأس، والصفوف والأعمدة، والذاكرة، والتحذيرات. CSV مع كشف الفاصل (رفض صريح عند الغموض)، وترميز صريح، وTSV، وrecords (list of dicts). خطأ منظم لكل من الصيغة غير المدعومة والمدخل المشوه والمدخل الفارغ. CLI يستخدم الطبقة الجديدة | G0.1 | M |
-| G1-W2 (غير مُفوَّضة؛ تنتظر مراجعة CTO) | حدود موارد مُعلَنة (bytes، rows، columns) وخطأ `ResourceLimitError`؛ استنتاج التواريخ من النص بسياسة معلنة، دون تخمين صامت | W1 | M |
+| G1-W2 ✅ **منجزة** (`docs/evidence/G1_W2_RESOURCE_GOVERNANCE_REPORT.md`) | حدود موارد مُعلَنة (bytes، rows، columns) وخطأ `ResourceLimitError`. استنتاج التواريخ من النص لم يُنفَّذ | W1 | M |
 | G1-W3 ✅ **منجزة** (`docs/evidence/G1_W3_FORMAT_READERS_REPORT.md`) | Parquet وFeather (pyarrow كـextra اختياري)؛ JSON وJSONL | W1 | M |
 | G1-W4 (PASS؛ CI الفرع وCI على main 10/10، انظر `docs/evidence/G1_W4_XLSX_READER_REPORT.md`) | XLSX (openpyxl كـextra) مع sheets واختيار صريح للـsheet؛ رفض ملفات الماكرو | W1 | M |
 | G1-W5 (PASS؛ CI الفرع وCI على main 10/10، انظر `docs/evidence/G1_W5_CHUNKED_PROFILING_REPORT.md`) | chunked profiling للملفات الكبيرة أو sampling مُعلَن، مسجّل في الـartifact | W2 | L |
 | G1-W6 (PASS؛ CI الفرع وCI على main 10/10، انظر `docs/evidence/G1_W6_SQLITE_READER_REPORT.md`) | SQLite read-only عبر `sqlite3` من stdlib؛ جدول عادي واحد، بلا SQL من المتصل؛ بلا views أو virtual أو shadow | W1 | S |
+| G1-W7 (تنفيذ مكتمل؛ ينتظر المراجعة؛ ليس PASS) | إغلاق دليل اختيار ورقة `.xlsx`: اسم مطابق حرفيًا أو الورقة الوحيدة المؤهلة، `source_selector` من النوع `sheet`، والاسم داخل بصمة الإعداد. الأوراق المخفية تبقى مؤهلة. أوراق المخططات لا تُحسب. `max_field_length` على الورقة المختارة فقط. G1-24 يبقى `PARTIAL_PENDING_CERTIFICATION`. التقدم المعتمد لا يتغير | W4, W6 | S |
 
 **Tests:**
 

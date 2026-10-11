@@ -54,9 +54,15 @@ holds CSV. A SQLite file is one ordinary table, opened read-only. The only
 table is selected automatically; more than one needs `table=` or `--table`.
 Views, virtual tables, shadow tables that belong to virtual tables, `sqlite_*` tables and caller-supplied SQL are refused. Eligibility uses `PRAGMA table_list` when that catalog classification exists. When it does not, a file that defines a virtual table is refused rather than guessed.
 There is no chunked SQLite scan. Parquet and Feather need the optional `parquet` extra (pyarrow);
-`.xlsx` needs the `excel` extra (openpyxl) and reads one worksheet (the first
-row is the header; a multi-sheet workbook needs `sheet=` or the CLI `--sheet`
-flag); macro-enabled workbooks are refused. A header with no data rows is
+`.xlsx` needs the `excel` extra (openpyxl) and reads one eligible worksheet.
+The name match is exact: case, spaces and Unicode are kept as written. One
+eligible worksheet is selected when `sheet=` is omitted; more than one needs
+`sheet=` or the CLI `--sheet` flag. Hidden and very-hidden worksheets stay
+eligible. Chartsheets are not worksheets. The selected title is recorded as
+`source_selector` with kind `sheet` and is part of the config fingerprint.
+The first row is the header. Macro-enabled workbooks are refused. Row, column
+and cell limits, and the field-length limit, apply to the selected worksheet;
+the file-size limit still covers the whole workbook. A header with no data rows is
 empty input, and a blank data row is kept as missing cells. JSON is read whole (bounded by the source-byte limit),
 while JSONL is checked as it streams.
 
@@ -68,7 +74,8 @@ while JSONL is checked as it streams.
   padded.
 - **Resource limits are still guards.** By default files are refused
   above 64 MiB, 1,000,000 data rows, 1,000 columns, 10,000,000 data cells or
-  1,000,000 characters in one CSV/TSV field. DataFrames and records are checked
+  1,000,000 characters in one CSV/TSV field or in one textual or binary cell of
+  the selected worksheet. DataFrames and records are checked
   before analysis/materialization as applicable; callers may provide an
   immutable `IngestionLimits` policy. The CLI uses the same finite defaults and
   exposes overrides. The default audit still loads an accepted file as one
