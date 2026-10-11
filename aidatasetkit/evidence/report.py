@@ -179,7 +179,10 @@ def _ingestion(artifact) -> str:
             else f"{_DELIMITER_NAMES.get(delimiter, delimiter)}, {record.get('delimiter_source')}",
         ),
         ("header row", None if record.get("header") is None else ("yes" if record["header"] else "no")),
-        ("table", (artifact.get("source_selector") or {}).get("name")),
+        (
+            (artifact.get("source_selector") or {}).get("kind") or "selector",
+            (artifact.get("source_selector") or {}).get("name"),
+        ),
         ("rows × columns", f"{record.get('row_count', 0):,} × {record.get('column_count', 0):,}"),
         (
             "memory",

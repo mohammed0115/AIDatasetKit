@@ -60,7 +60,9 @@ __all__ = [
 #:       only inside that record and are labeled; they are not verdict inputs.
 #: 1.3 -- G1-W6: the top-level ``source_selector`` record. ``null`` unless a
 #:       relation inside the file was chosen. A SQLite table is
-#:       ``{"kind": "table", "name": ...}``.
+#:       ``{"kind": "table", "name": ...}``. An Excel worksheet is
+#:       ``{"kind": "sheet", "name": ...}``. The kind is an open string; ``sheet``
+#:       does not require a new schema version.
 ARTIFACT_SCHEMA_VERSION = "1.3"
 
 
@@ -429,9 +431,9 @@ class DatasetIdentity:
 class SourceSelectorEvidence:
     """The relation chosen inside a source file.
 
-    ``kind`` is ``table`` for an ordinary SQLite table. ``name`` is the catalog
-    name. This is not SQL text, and it is ``null`` on every source that is
-    already one table.
+    ``kind`` is ``table`` for an ordinary SQLite table and ``sheet`` for an
+    Excel worksheet. ``name`` is that relation's exact name. This is ``null``
+    on every source that is already one table.
     """
 
     kind: str

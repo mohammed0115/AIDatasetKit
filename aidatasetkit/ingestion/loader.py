@@ -75,6 +75,10 @@ def load_table(
     """
     options = options if options is not None else LoadOptions()
     limits = limits if limits is not None else IngestionLimits()
+    if not isinstance(sheet, str) and sheet is not None:
+        raise InvalidIngestionOptionsError(
+            f"sheet must name a worksheet, got {type(sheet).__name__}."
+        )
     if isinstance(source, pd.DataFrame):
         _require_default(options, "a DataFrame")
         if sheet is not None:
@@ -204,7 +208,7 @@ def _from_file(
             selector=selector,
         )
     if fmt is TableFormat.XLSX:
-        frame = read_excel(path, fmt, options, limits, sheet=sheet)
+        frame, selector = read_excel(path, fmt, options, limits, sheet=sheet)
         return LoadedTable(
             frame=frame,
             metadata=LoadMetadata(
@@ -219,6 +223,7 @@ def _from_file(
                 memory_bytes=_memory(frame),
                 warnings=(),
             ),
+            selector=selector,
         )
 
     plan = plan_delimited(path, fmt, options, limits)

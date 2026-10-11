@@ -126,6 +126,7 @@ class TestSelection:
     def test_one_table_is_selected(self, tmp_path: Path):
         loaded = load_table(_people(tmp_path / "one.sqlite"))
         assert loaded.selector is not None
+        assert loaded.selector.kind == "table", "SQLite table selector behavior changes"
         assert loaded.selector.to_dict() == {"kind": "table", "name": "people"}
         assert list(loaded.frame.columns) == ["n", "label", "amount", "blob"]
         assert len(loaded.frame) == 2

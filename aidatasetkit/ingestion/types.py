@@ -52,8 +52,8 @@ class TableFormat(StrEnum):
 class SourceSelector:
     """Which relation inside a file was read.
 
-    ``kind`` names the kind of relation (``table`` for an ordinary SQLite
-    table). ``name`` is that relation's catalog name, never a SQL statement.
+    ``kind`` names the kind of relation: ``table`` for an ordinary SQLite table,
+    ``sheet`` for an Excel worksheet. ``name`` is that relation's exact name.
     """
 
     kind: str
@@ -243,8 +243,10 @@ class LoadedTable:
         frame: The table. For a DataFrame source this is the caller's own object,
             returned as-is: loading reads it and never writes to it.
         metadata: How it was read.
-        selector: The relation chosen inside a multi-relation file, or ``None``
-            when the source is itself one table.
+        selector: The relation chosen inside the file. A SQLite table is
+            ``kind="table"``. An Excel worksheet is ``kind="sheet"``, including
+            when that worksheet was the only eligible one. ``None`` when the
+            source is itself one table.
     """
 
     frame: Any

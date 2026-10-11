@@ -15,16 +15,23 @@ here are strict where the delimited and JSON readers are:
 - A workbook carrying VBA macros (an ``xl/vbaProject.bin`` member) is refused:
   a ``.xlsx`` is a data container, and macro-enabled content is out of the
   trust this library extends to an input file.
-- A workbook with more than one worksheet is ambiguous: choosing a sheet
-  would be a guess. Pass ``sheet=`` to name the one to read.
+- Eligible relations are worksheets, including hidden and very-hidden ones.
+  Chartsheets are not worksheets and never count as a second table.
+- A workbook with more than one eligible worksheet is ambiguous: choosing a
+  sheet would be a guess. Pass ``sheet=`` to name the one to read. The name is
+  matched exactly. One eligible worksheet is selected automatically.
+- Every successful read records that worksheet as ``source_selector`` with
+  ``kind`` ``sheet`` and the exact title.
 - The first row of the sheet is the header. Duplicate header cells are refused
   (``DuplicateHeadersError``), and an empty cell in the header is named by its
   column position so the file can be fixed.
 - Formulas are read as their cached values (``data_only=True``); a formula
   whose value was never computed reads as missing, which the profiling layer
   reports like any other missing cell. The formula text is never executed.
-- The row, column and cell budgets are enforced from the worksheet's declared
-  dimensions **before** the cells are materialized.
+- The row, column and cell budgets are enforced from the selected worksheet's
+  declared dimensions **before** its cells are materialized. ``max_field_length``
+  is enforced while those cells are scanned, before a DataFrame is built.
+  An unselected worksheet is not measured against those logical limits.
 """
 
 from __future__ import annotations
@@ -41,6 +48,7 @@ from aidatasetkit.core.exceptions import (
     ColumnLimitError,
     DuplicateHeadersError,
     EmptyInputError,
+    FieldLengthLimitError,
     InvalidIngestionOptionsError,
     MalformedInputError,
     MissingDependencyError,
@@ -50,6 +58,7 @@ from aidatasetkit.ingestion.types import (
     IngestionLimits,
     LoadOptions,
     SourceKind,
+    SourceSelector,
     TableFormat,
     _cells_exceed,
 )
@@ -63,14 +72,18 @@ def read_excel(
     options: LoadOptions,
     limits: IngestionLimits,
     sheet: "str | None" = None,
-) -> pd.DataFrame:
-    """The frame held by one worksheet of an .xlsx file, or a structured refusal.
+) -> tuple[pd.DataFrame, SourceSelector]:
+    """The frame held by one worksheet of an .xlsx file, and which worksheet.
 
     Raises:
         InvalidIngestionOptionsError, MissingDependencyError, EmptyInputError,
         MalformedInputError, DuplicateHeadersError, RowLimitError,
-        ColumnLimitError, CellLimitError.
+        ColumnLimitError, CellLimitError, FieldLengthLimitError.
     """
+    if not isinstance(sheet, str) and sheet is not None:
+        raise InvalidIngestionOptionsError(
+            f"sheet must name a worksheet, got {type(sheet).__name__}."
+        )
     if not options.is_default:
         raise InvalidIngestionOptionsError(
             "LoadOptions (encoding, delimiter, header) apply to text files; "
@@ -82,9 +95,10 @@ def read_excel(
         ws = _choose_sheet(path, wb, sheet)
         _check_dimensions(path, ws, limits)
         rows = _rows(ws, path)
+        _reject_long_fields(path, rows, limits)
     finally:
         wb.close()
-    return _frame(path, rows, limits)
+    return _frame(path, rows), _sheet_selector(sheet, ws)
 
 
 def _openpyxl(path: Path):
@@ -127,21 +141,60 @@ def _open(path: Path):
         ) from None
 
 
+def _eligible_worksheets(wb) -> list:
+    """Worksheets only. Hidden and veryHidden stay eligible. Chartsheets do not."""
+    return [ws for ws in wb.worksheets if _worksheet_is_eligible(ws)]
+
+
+def _worksheet_is_eligible(ws) -> bool:
+    state = getattr(ws, "sheet_state", "visible")
+    if state == "hidden":
+        return True
+    if state == "veryHidden":
+        return True
+    return True
+
+
 def _choose_sheet(path: Path, wb, sheet: "str | None"):
     """The one worksheet to read: named, or the only one, else refused as ambiguous."""
-    names = wb.sheetnames
+    eligible = _eligible_worksheets(wb)
+    names = [ws.title for ws in eligible]
     if sheet is not None:
-        if sheet not in names:
-            raise MalformedInputError(
-                f"{path.name} has no sheet named {sheet!r}. Sheets: {', '.join(names)}."
-            )
-        return wb[sheet]
+        return _named_worksheet(path, wb, eligible, names, sheet)
+    if len(names) == 0:
+        raise EmptyInputError(
+            f"{path.name} has no worksheet; there is no table to load."
+        )
     if len(names) == 1:
-        return wb[names[0]]
+        return eligible[0]
     raise MalformedInputError(
         f"{path.name} has {len(names)} sheets ({', '.join(names)}). Choosing one "
         "would be a guess; pass sheet= to name it."
     )
+
+
+def _named_worksheet(path: Path, wb, eligible, names: list[str], sheet: str):
+    """Exact title match. No case folding, trimming, or Unicode normalization."""
+    for ws in eligible:
+        if ws.title == sheet:
+            return ws
+    for chart in wb.chartsheets:
+        if chart.title == sheet:
+            raise MalformedInputError(
+                f"{path.name} has no sheet named {sheet!r}. "
+                f"{sheet!r} is a chartsheet, not a worksheet."
+            )
+    raise MalformedInputError(
+        f"{path.name} has no sheet named {sheet!r}. Sheets: {', '.join(names)}."
+    )
+
+
+def _sheet_selector(requested: "str | None", chosen) -> SourceSelector:
+    """The worksheet that was actually read, for evidence and config identity."""
+    recorded = chosen.title
+    if requested is None:
+        recorded = chosen.title  # automatic selection is recorded too
+    return SourceSelector(kind="sheet", name=recorded)
 
 
 def _check_dimensions(path: Path, ws, limits: IngestionLimits) -> None:
@@ -176,11 +229,39 @@ def _check_dimensions(path: Path, ws, limits: IngestionLimits) -> None:
 
 
 def _rows(ws, path: Path) -> list[tuple[Any, ...]]:
-    """Every row's values, materialized only after the budgets pass."""
-    return list(ws.iter_rows(values_only=True))
+    """Every row's values, materialized only after the dimension budgets pass."""
+    return [tuple(row) for row in ws.iter_rows(values_only=True)]
 
 
-def _frame(path: Path, rows: list[tuple[Any, ...]], limits: IngestionLimits) -> pd.DataFrame:
+def _over_field_length(value: Any, limit: int) -> bool:
+    """True when a textual or binary cell exceeds the limit.
+
+    Numbers, booleans and datetimes are not measured by turning them into text.
+    """
+    if isinstance(value, str) or isinstance(value, (bytes, bytearray)):
+        return len(value) > limit
+    return False
+
+
+def _reject_long_fields(path: Path, rows: list[tuple[Any, ...]], limits: IngestionLimits) -> None:
+    """Refuse an oversized selected cell before a DataFrame is built."""
+    if limits.max_field_length is None:
+        return
+    limit = limits.max_field_length
+    for row in rows:
+        for value in row:
+            if _over_field_length(value, limit):
+                length = len(value)
+                raise FieldLengthLimitError(
+                    f"{path.name} exceeds the field length limit ({length} > {limit}).",
+                    limit_name="max_field_length",
+                    configured_limit=limit,
+                    observed_value=length,
+                    input_kind=SourceKind.FILE.value,
+                )
+
+
+def _frame(path: Path, rows: list[tuple[Any, ...]]) -> pd.DataFrame:
     """Header + data rows -> a frame. First row is the header."""
     if not rows:
         raise EmptyInputError(f"{path.name} has no rows; there is no table to load.")

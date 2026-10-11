@@ -10,7 +10,9 @@ table without a word.
 
 Not here, on purpose: profiling, quality checks, training, network access,
 scraping, and every format other than CSV, TSV, JSON, JSONL, Parquet, Feather,
-Excel ``.xlsx`` and local SQLite. A SQLite file is one ordinary table, opened
+Excel ``.xlsx`` and local SQLite. An ``.xlsx`` file contributes one eligible
+worksheet, and that worksheet's exact name is the ``sheet`` selector. A SQLite
+file is one ordinary table, opened
 read-only; views, virtual tables, ``sqlite_*`` tables and caller SQL are
 refused. Encodings are never guessed; date inference is not
 implemented. Chunked profiling of a CSV or TSV file is a separate opt-in,
