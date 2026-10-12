@@ -354,8 +354,9 @@ class TestMappingRules:
         try:
             load_table(iter([[1, 2], {"a": 1}]))
         except MalformedInputError as exc:
-            assert "list" in str(exc)
-            assert "[1, 2]" not in str(exc)
+            text = str(exc)
+            if "list" not in text or "[1, 2]" in text:
+                raise AssertionError("non-mapping yielded item accepted") from None
         except Exception:
             raise AssertionError("non-mapping yielded item accepted") from None
         else:
@@ -376,14 +377,13 @@ class TestMappingRules:
         assert secret not in str(caught.value)
 
     def test_the_yielded_mapping_is_not_retained(self):
-        row = {"a": 1, "b": 2}
-
         def gen():
+            row = {"a": 1, "b": 2}
             yield row
+            row["a"] = 99
+            row["c"] = 7
 
         loaded = load_table(gen())
-        row["a"] = 99
-        row["c"] = 7
         assert loaded.frame.iloc[0]["a"] == 1, "yielded mapping retained by reference"
         assert list(loaded.frame.columns) == ["a", "b"]
 
@@ -574,7 +574,7 @@ class TestRefusals:
         try:
             load_table(source)
         except UnsupportedFormatError as exc:
-            if "async" not in str(exc):
+            if "not a synchronous source of records" not in str(exc):
                 raise AssertionError("async iterable accepted") from None
         except Exception:
             raise AssertionError("async iterable accepted") from None
@@ -595,7 +595,7 @@ class TestRefusals:
                 raise StopAsyncIteration
 
         source = AIter()
-        with pytest.raises(UnsupportedFormatError, match="async"):
+        with pytest.raises(UnsupportedFormatError, match="not a synchronous source of records"):
             load_table(source)
         assert source.started is False
 
