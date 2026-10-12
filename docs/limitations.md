@@ -102,8 +102,8 @@ while JSONL is checked as it streams.
   values, and numbers are not recognized. Nulls and empty strings are ignored;
   surrounding whitespace is not stripped. The loaded values, dtypes,
   operational detected kind, verdict, and dataset fingerprint stay as they
-  were. Chunked profiling does not run this scan. G1-22 is pending later
-  review and is not promoted.
+  were. Chunked profiling does not run this scan. G1-22 is
+  `SUPPORTED_AND_TESTED` for this recognition. Conversion is not part of it.
 - **Not implemented yet:** generators and arbitrary iterables.
   A refused input is never published as a new audit.
 

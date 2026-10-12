@@ -1,16 +1,16 @@
 # POST-G0 Capability Reality Audit — AIDatasetKit
 
 ```text
-CURRENT_GATE                 = G0 closed; G1-W1 through G1-W7 closed
-CURRENT_ACTIVITY             = G1-W8 implemented; pending review; stop before certification and before G1-W9
+CURRENT_GATE                 = G0 closed; G1-W1 through G1-W8 closed
+CURRENT_ACTIVITY             = G1-W8 PASS; stop before G1-W9
 G0_STATUS                    = PASS (16/16)
 G0_MAIN_INTEGRATION          = PASS
 GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
-OVERALL_CERTIFIED_PROGRESS   = 47.84%   (111 proven / 232 applicable, G0–G12; updated after G1-W7, §0)
+OVERALL_CERTIFIED_PROGRESS   = 48.28%   (112 proven / 232 applicable, G0–G12; updated after G1-W8, §0)
 AUDIT_GATE                   = PASS     (the audit is complete with evidence; G1–G12 are not)
-READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W8 is awaiting review; it is not PASS)
-NEXT_AUTHORIZED_ACTION       = stop for CTO review; do not certify G1-22; do not start G1-W9
+READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W8 is PASS; do not start G1-W9)
+NEXT_AUTHORIZED_ACTION       = stop; do not start G1-W9
 ```
 
 **حدود هذا المستند:**
@@ -218,6 +218,14 @@ AUDIT_DOCUMENTS       = CORRECT
 - Recorded progress stays G1 = 19/26 = **73.08%** and overall = 111/232 = **47.84%**. Status-detail counts for G1 stay 19 / 0 / 3 / 4 because this row is not promoted. Artifact schema `1.4`. Publication schema `1.0`. Package version `0.1.0a1`.
 - Evidence: `docs/evidence/G1_W8_DATE_TEXT_INFERENCE_REPORT.md`.
 
+**تحديث 14 — G1-W8 closure (PASS):**
+
+- **G1-22: `SUPPORTED_AND_TESTED`.** A full default audit recognizes a textual column whose every non-blank value is a strict ISO date (`YYYY-MM-DD`) or datetime (`YYYY-MM-DDTHH:MM:SS`, optional fraction, optional `Z` or `±HH:MM`). At least 8 non-blank values are required, the whole column is scanned, the match ratio is 1.0, and there is no sampling. The result is `date_inference` with method `strict_iso_full_population_v1`. Recognition is not conversion. Loaded values, dtypes, operational `detected_kind`, quality, task detection, the preprocessing plan, lineage, the verdict, the dataset fingerprint, and the config fingerprint stay unchanged. The semantic fingerprint changes only because the typed record is present. Chunked profiling leaves `date_inference` null.
+- **G1-W8 = PASS.** Code branch CI and code main CI are 10/10 on `CERTIFIED_CODE_SHA` `4b0533793081ed85b020a9a692bb723039d9129d`. This update does not name the CI run of the documentation commit that adds it.
+- **G1-13 stays `PARTIAL`.** **G1-17 stays `PARTIAL`.** **G1-14, G1-24, and G1-25 stay `SUPPORTED_AND_TESTED`.** **G1-15, G1-05, G1-10, and G1-11 stay `MISSING`.** **G2-16 stays `MISSING`.**
+- Recorded progress is G1 = 20/26 = **76.92%** and overall = 112/232 = **48.28%**. Status-detail counts for G1 are 20 / 0 / 2 / 4. Artifact schema `1.4`. Publication schema `1.0`. Package version `0.1.0a1`.
+- Evidence: `docs/evidence/G1_W8_DATE_TEXT_INFERENCE_REPORT.md`.
+
 ## 1. Main integration
 
 | البند | القيمة |
@@ -318,7 +326,7 @@ G0_MAIN_INTEGRATION = PASS
 | G1-19 | G1 | Duplicate header detection | `SUPPORTED_AND_TESTED` | delimited._validate (moved from cli in G1-W1); loader._from_dataframe | tests/unit/test_ingestion.py::test_duplicate_headers_before_pandas_renames_them, test_audit_end_to_end.py::test_duplicate_headers_are_refused_rather_than_renamed | — | — |
 | G1-20 | G1 | Empty input | `SUPPORTED_AND_TESTED` | `EmptyInputError` for 0 bytes, whitespace, header-only, empty frame/records (G1-W1) | tests/unit/test_ingestion.py::TestRefusals, TestDataFrames, TestRecords; tests/integration/test_cli_ingestion.py::test_structured_refusals | — | — |
 | G1-21 | G1 | Malformed rows | `SUPPORTED_AND_TESTED` | delimited._validate: every record's width, strict quoting; `MalformedInputError` names the record and line (G1-W1) | tests/unit/test_ingestion.py::TestRefusals (too few/many fields, after the sample, unclosed quote); tests/integration/test_cli_ingestion.py | No tolerant/skip mode, by design: refuse | — |
-| G1-22 | G1 | Type inference incl. dates from text | `PARTIAL_PENDING_CERTIFICATION` | profiling/date_inference.py (G1-W8, not PASS): a full audit records strict ISO date/datetime text in `date_inference`. Recognition is not conversion. `detected_kind`, the verdict, and the dataset fingerprint stay unchanged. Chunked profiling leaves `date_inference` null | tests/unit/test_date_inference.py; scripts/g1_w8_mutations.py; G1-W8 report | Ambiguous, localized, compact, and numeric dates are not recognized. Not promoted | P1 |
+| G1-22 | G1 | Type inference incl. dates from text | `SUPPORTED_AND_TESTED` | profiling/date_inference.py (G1-W8 PASS): full-population strict ISO date/datetime text in `date_inference`, method `strict_iso_full_population_v1`, threshold 8, match ratio 1.0, no sampling. Recognition is not conversion. `detected_kind`, the verdict, and the dataset and config fingerprints stay unchanged. Chunked profiling leaves `date_inference` null | tests/unit/test_date_inference.py; tests/unit/test_current_example_contract.py; scripts/g1_w8_mutations.py (16/16); G1-W8 report | Ambiguous, localized, compact, numeric, and `datetime.date` values stay unrecognized, by decision | — |
 | G1-23 | G1 | Row/column counts and memory estimate | `SUPPORTED_AND_TESTED` | DatasetProfile.row_count/column_count/memory_usage_bytes | tests/unit/test_profiler.py | — | — |
 | G1-24 | G1 | Excel sheets | `SUPPORTED_AND_TESTED` | ingestion/excel.py (G1-W7 PASS): exact worksheet name or the only eligible worksheet; hidden and very-hidden stay eligible; chartsheets excluded; `source_selector` kind `sheet`; selected name in the config fingerprint; selected-sheet logical limits; whole-workbook `max_source_bytes` | tests/unit/test_ingestion_excel.py; scripts/g1_w7_mutations.py (17/17); G1-W7 report | — | — |
 | G1-25 | G1 | Large files: chunking / streaming | `SUPPORTED_AND_TESTED` | opt-in bounded CSV/TSV profile (G1-W5): blocked profile-only artifact at stage `profiled`; config identity from the scan contract only; not the default audit | tests/unit/test_chunked_profiling.py; scripts/g1_w5_mutations.py (19/19); G1-W5 report | Default path still loads one pandas table. JSON, Parquet, Feather, and Excel stay on the full-table path | P1 |
@@ -721,7 +729,7 @@ G0_MAIN_INTEGRATION = PASS
 |---|---|---:|---:|---:|---|---|
 | G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
 | G0.1 | Profiling performance hotfix | — | — | — | PASS | P0-1 مغلق (انظر §0) |
-| G1 | Ingestion | 19 | 26 | 73.08% | IN PROGRESS | W1–W7 مغلقة؛ W8 بانتظار المراجعة |
+| G1 | Ingestion | 20 | 26 | 76.92% | IN PROGRESS | W1–W8 مغلقة |
 | G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | تواريخ ونص وقيم |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | عمليات جدولية |
 | G4 | EDA & Statistics | 9 | 13 | 69.23% | AUDIT | ارتباط فئوي واختبارات |
@@ -733,14 +741,14 @@ G0_MAIN_INTEGRATION = PASS
 | G10 | Provenance/Security/Privacy/Errors | 18 | 28 | 64.29% | AUDIT | أخطاء الموارد والمدخلات |
 | G11 | Performance & Certification | 5 | 21 | 23.81% | AUDIT | 4 بنود MISSING→PARTIAL في G0.1؛ benchmarks في CI |
 | G12 | Masari Consumer Integration | 2 | 14 | 14.29% | AUDIT | بعد G1–G9 |
-| **All** | G0–G12 | **111** | **232** | **47.84%** | — | — |
+| **All** | G0–G12 | **112** | **232** | **48.28%** | — | — |
 
 **تفصيل الحالات لكل بوابة** (حتى لا يختفي العمل الموجود غير المكتمل):
 
 | Gate | SUPPORTED_AND_TESTED | SUPPORTED_NOT_SUFFICIENTLY_TESTED | PARTIAL | MISSING | BLOCKED | NOT_APPLICABLE | OUT_OF_SCOPE |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | G0 | 16 | 0 | 0 | 0 | 0 | 0 | 0 |
-| G1 | 19 | 0 | 3 | 4 | 0 | 0 | 1 |
+| G1 | 20 | 0 | 2 | 4 | 0 | 0 | 1 |
 | G2 | 15 | 0 | 2 | 5 | 0 | 0 | 0 |
 | G3 | 2 | 0 | 5 | 10 | 0 | 1 | 0 |
 | G4 | 9 | 0 | 2 | 2 | 0 | 0 | 0 |

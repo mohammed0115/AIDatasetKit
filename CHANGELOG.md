@@ -11,7 +11,7 @@ as a GitHub release, and no version is tagged. Everything below is new.
 
 ### G1-W8 strict ISO date text
 
-Evidence: `docs/evidence/G1_W8_DATE_TEXT_INFERENCE_REPORT.md`. Status: pending later review.
+Evidence: `docs/evidence/G1_W8_DATE_TEXT_INFERENCE_REPORT.md`. Status: PASS.
 
 - A full audit recognizes textual columns of strict ISO dates
   (`YYYY-MM-DD`) and datetimes (`YYYY-MM-DDTHH:MM:SS`, optional fraction,
@@ -23,8 +23,8 @@ Evidence: `docs/evidence/G1_W8_DATE_TEXT_INFERENCE_REPORT.md`. Status: pending l
   `2a33aff5…` to `60375e40…` because the new record is present with an empty
   column list; rolling the record back restores `1.3`. Publication schema
   stays `1.0`. Package version stays `0.1.0a1`.
-- G1-22 is not promoted. Recorded progress stays G1 19/26 = 73.08% and
-  overall 111/232 = 47.84%.
+- G1-22 is `SUPPORTED_AND_TESTED`. Recorded progress is G1 20/26 = 76.92%
+  and overall 112/232 = 48.28%.
 
 ### G1-W7 worksheet selection evidence
 
