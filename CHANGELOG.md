@@ -9,6 +9,23 @@ Versions before `1.0` may change public interfaces and the artifact schema; see
 First alpha, not yet released: nothing has been published to PyPI, TestPyPI or
 as a GitHub release, and no version is tagged. Everything below is new.
 
+### G1-W8 strict ISO date text
+
+Evidence: `docs/evidence/G1_W8_DATE_TEXT_INFERENCE_REPORT.md`. Status: pending later review.
+
+- A full audit recognizes textual columns of strict ISO dates
+  (`YYYY-MM-DD`) and datetimes (`YYYY-MM-DDTHH:MM:SS`, optional fraction,
+  optional `Z` or numeric `±HH:MM`). The result is `date_inference` on the
+  artifact. Values are not converted. Operational detected kind, the verdict,
+  and the dataset fingerprint stay unchanged. Ambiguous and localized forms
+  are not recognized. Chunked profiling does not run the scan.
+- Artifact schema is now `1.4`. The churn semantic fingerprint moved from
+  `2a33aff5…` to `60375e40…` because the new record is present with an empty
+  column list; rolling the record back restores `1.3`. Publication schema
+  stays `1.0`. Package version stays `0.1.0a1`.
+- G1-22 is not promoted. Recorded progress stays G1 19/26 = 73.08% and
+  overall 111/232 = 47.84%.
+
 ### G1-W7 worksheet selection evidence
 
 Evidence: `docs/evidence/G1_W7_EXCEL_SHEET_EVIDENCE_REPORT.md`. Status: PASS.

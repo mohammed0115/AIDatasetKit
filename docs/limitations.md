@@ -94,7 +94,17 @@ while JSONL is checked as it streams.
   path and keeps the stages `inspected`, `planned` and `prepared`. G1-25 is
   `SUPPORTED_AND_TESTED` for this opt-in CSV/TSV scan. The default audit still
   loads one pandas table.
-- **Not implemented yet:** date inference, generators and arbitrary iterables.
+- **Strict ISO text is recognized and not converted.** A full audit records
+  `date_inference` when every non-blank value in a textual column is
+  `YYYY-MM-DD`, or `YYYY-MM-DDTHH:MM:SS` with an optional fraction and an
+  optional `Z` or numeric `±HH:MM` offset, and at least 8 such values were
+  scanned. Slash dates, month names, locale forms, compact dates, year-month
+  values, and numbers are not recognized. Nulls and empty strings are ignored;
+  surrounding whitespace is not stripped. The loaded values, dtypes,
+  operational detected kind, verdict, and dataset fingerprint stay as they
+  were. Chunked profiling does not run this scan. G1-22 is pending later
+  review and is not promoted.
+- **Not implemented yet:** generators and arbitrary iterables.
   A refused input is never published as a new audit.
 
 ## Detection

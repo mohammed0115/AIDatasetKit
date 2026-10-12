@@ -298,8 +298,13 @@ Also merged, unreleased: model training, evaluation, model comparison, the
 Not supported yet: anomaly detection, dimensionality reduction, time series,
 text, images, hyperparameter tuning, cross-validation, model persistence,
 PostgreSQL, SQLAlchemy, `.db` files, database URLs, cloud storage, automatic encoding detection,
-date inference or generators/other arbitrary iterables. An opt-in CSV/TSV
-chunked scan exists (`--chunked-profile`); it does not replace the default audit.
+or generators/other arbitrary iterables. A full audit can record strict ISO
+date or datetime text (`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SS`, optional
+fraction, optional `Z` or `±HH:MM`) as `date_inference`. That record does not
+convert the column, and slash dates and other localized forms are not
+recognized. An opt-in CSV/TSV
+chunked scan exists (`--chunked-profile`); it does not replace the default audit
+and does not run date recognition.
 
 Every supported input now has finite resource limits before pandas parsing or
 analysis: 64 MiB file bytes, 1,000,000 data rows, 1,000 columns, 10,000,000
@@ -395,7 +400,7 @@ The repository includes a reproducible [comparative research lab](https://github
 ## Status
 
 An unreleased alpha (`0.1.0a1`): not published to PyPI, TestPyPI or as a GitHub release, and no version is tagged. Apache-2.0 licensed. The artifact schema is versioned independently of the
-package (currently `1.3`) so that stored artifacts stay readable as the library changes.
+package (currently `1.4`) so that stored artifacts stay readable as the library changes.
 Interfaces may still move. Feedback on the audit artifact — what is missing, what
 is unclear, what you would want to fail a build on — is the most useful thing you
 can send.

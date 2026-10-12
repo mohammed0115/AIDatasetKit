@@ -58,6 +58,7 @@
 | G1-W5 (PASS؛ CI الفرع وCI على main 10/10، انظر `docs/evidence/G1_W5_CHUNKED_PROFILING_REPORT.md`) | chunked profiling للملفات الكبيرة أو sampling مُعلَن، مسجّل في الـartifact | W2 | L |
 | G1-W6 (PASS؛ CI الفرع وCI على main 10/10، انظر `docs/evidence/G1_W6_SQLITE_READER_REPORT.md`) | SQLite read-only عبر `sqlite3` من stdlib؛ جدول عادي واحد، بلا SQL من المتصل؛ بلا views أو virtual أو shadow | W1 | S |
 | G1-W7 (PASS؛ CI الفرع وCI على main 10/10، انظر `docs/evidence/G1_W7_EXCEL_SHEET_EVIDENCE_REPORT.md`) | إغلاق دليل اختيار ورقة `.xlsx`: اسم مطابق حرفيًا أو الورقة الوحيدة المؤهلة، `source_selector` من النوع `sheet`، والاسم داخل بصمة الإعداد. الأوراق المخفية تبقى مؤهلة. أوراق المخططات لا تُحسب. `max_field_length` على الورقة المختارة فقط. G1-24 = `SUPPORTED_AND_TESTED`. التقدم G1 19/26 = 73.08% والإجمالي 111/232 = 47.84% | W4, W6 | S |
+| G1-W8 (مُنفَّذة؛ بانتظار المراجعة؛ ليست PASS. انظر `docs/evidence/G1_W8_DATE_TEXT_INFERENCE_REPORT.md`) | تعرّف ISO الصارم من النص كدليل فقط: `YYYY-MM-DD` و`YYYY-MM-DDTHH:MM:SS` مع كسور ثانية اختيارية و`Z` أو إزاحة `±HH:MM`. لا تحويل، ولا تغيّر في `detected_kind` أو الحكم أو بصمة البيانات. المخطط `1.4`. الوضع المُقطَّع لا يمسح التواريخ. G1-22 = `PARTIAL_PENDING_CERTIFICATION`. التقدم يبقى G1 19/26 = 73.08% والإجمالي 111/232 = 47.84% | W1 | M |
 
 **Tests:**
 

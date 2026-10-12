@@ -8,14 +8,14 @@ and an audit that disagrees with itself is worthless.
 ## Schema version
 
 ```json
-{ "schema_version": "1.3" }
+{ "schema_version": "1.4" }
 ```
 
 The artifact format is versioned **separately from the package**. Most releases
 will not change the shape of the record; the ones that do must be identifiable
 without consulting a changelog. Adding, removing or redefining a field bumps the
 version: an additive change is a minor bump, anything else a major one. A later
-`0.4.0` may still write `1.3`. `lineage.json` carries the same version.
+`0.4.0` may still write `1.4`. `lineage.json` carries the same version.
 
 | Version | Change |
 |---|---|
@@ -23,6 +23,7 @@ version: an additive change is a minor bump, anything else a major one. A later
 | `1.1` | G1-W1: the top-level `ingestion` record. |
 | `1.2` | G1-W5: the top-level `chunked_profiling` record. `null` unless the caller opted into chunked CSV/TSV profiling. |
 | `1.3` | G1-W6: the top-level `source_selector` record. `null` unless a relation inside the file was chosen. A SQLite table is `{"kind": "table", "name": "<table>"}`. An Excel worksheet is `{"kind": "sheet", "name": "<exact title>"}`. Kind `sheet` uses this same record; it is not a new schema version. |
+| `1.4` | G1-W8: the top-level `date_inference` record. A full audit records the fixed strict-ISO policy and any textual columns that met it. `null` on the chunked profile-only route. The record does not convert values and does not change detected kind, the verdict, or the dataset fingerprint. Removing the key and setting the version back to `1.3` restores the previous semantic artifact. |
 
 An artifact with an `ingestion` key and `schema_version` `1.0` exists: `main` at
 `90ecfae` wrote it, before the version was corrected. Read it as `1.1`; nothing
