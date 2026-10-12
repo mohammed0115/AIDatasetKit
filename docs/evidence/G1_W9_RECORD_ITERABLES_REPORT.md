@@ -1,19 +1,29 @@
 # G1-W9 — Bounded synchronous iterables of mapping records
 
-Status: implemented, pending review. This is not PASS. G1-13 is not promoted.
+G1-W9 is **PASS**. G1-13 is `SUPPORTED_AND_TESTED`.
+
+`CERTIFIED_CODE_SHA` is the tip integrated to `main` before this record.
+`DOCS_SEAL_SHA` is the documentation-only commit that adds this certification.
+This file names `CERTIFIED_CODE_SHA` and does not name `DOCS_SEAL_SHA` or any
+CI run started by that documentation commit.
 
 ```text
 STARTING_HEAD            = 300ce4374fde84dbb93e7e13e5ec5ae703f27e9e
+CERTIFIED_CODE_SHA       = 1f436ad0091318ad552bc722d8d56afe184e0b51
+DOCS_SEAL_SHA            = not recorded in this file
 BRANCH                   = g1-w9-record-iterables
-G1_13_STATUS             = PARTIAL_PENDING_CERTIFICATION
+G1_W9_STATUS             = PASS
+G1_13_STATUS             = SUPPORTED_AND_TESTED
 ARTIFACT_SCHEMA          = 1.4
 PUBLICATION_SCHEMA       = 1.0
 PACKAGE                  = 0.1.0a1
-G1_PROGRESS              = 20/26 = 76.92%
-OVERALL_PROGRESS         = 112/232 = 48.28%
+G1_PROGRESS              = 21/26 = 80.77%
+OVERALL_PROGRESS         = 113/232 = 48.71%
 ```
 
-Branch CI is not named in this file. The review package reports it. `origin/main` stays at the starting SHA until a later review says otherwise.
+Before this seal the recorded progress was G1 20/26 = 76.92% and overall
+112/232 = 48.28%. Iterable support belongs to `load_table`. `AIDataFacade.load`
+remains DataFrame-only.
 
 ## What this wave does
 
@@ -35,12 +45,32 @@ There is no new dependency, CLI flag, schema field, or package version. Schema s
 
 Blocking iterators, network-backed iterators, side effects while pulling, hostile mappings, expensive `__str__` on values, secrets inside the caller's own exceptions, and nested mutable values remain the caller's responsibility. The library does not claim a wall-clock or network cancellation bound.
 
-## Progress
+## CI
 
-Until a later review:
+These runs are for `CERTIFIED_CODE_SHA`. This section does not name a CI run of the commit that adds it.
 
-- G1-13 remains `PARTIAL_PENDING_CERTIFICATION`
-- G1 remains 20/26 = 76.92%
-- overall remains 112/232 = 48.28%
+```text
+CERTIFIED_CODE_SHA = 1f436ad0091318ad552bc722d8d56afe184e0b51
+BRANCH_CI_RUN      = 38264865799
+BRANCH_CI_URL      = https://github.com/mohammed0115/AIDatasetKit/actions/runs/38264865799
+BRANCH_CI_SHA      = 1f436ad0091318ad552bc722d8d56afe184e0b51
+BRANCH_CI_EVENT    = push
+BRANCH_CI_BRANCH   = g1-w9-record-iterables
+BRANCH_CI_RESULT   = success
+BRANCH_CI_JOBS     = 10/10
+BRANCH_CI_STARTED  = 2026-10-12T14:42:25Z
+BRANCH_CI_UPDATED  = 2026-10-12T14:49:42Z
+MAIN_CI_RUN        = 38291797343
+MAIN_CI_URL        = https://github.com/mohammed0115/AIDatasetKit/actions/runs/38291797343
+MAIN_CI_SHA        = 1f436ad0091318ad552bc722d8d56afe184e0b51
+MAIN_CI_EVENT      = push
+MAIN_CI_BRANCH     = main
+MAIN_CI_RESULT     = success
+MAIN_CI_JOBS       = 10/10
+MAIN_CI_STARTED    = 2026-10-12T18:34:12Z
+MAIN_CI_UPDATED    = 2026-10-12T18:43:22Z
+```
 
-A later promotion would be the first time those three figures move, to G1 21/26 = 80.77% and overall 113/232 = 48.71%.
+## Status
+
+G1-W9 = PASS. G1-13 = `SUPPORTED_AND_TESTED` for `load_table` synchronous iterable ingestion. `AIDataFacade.load` remains DataFrame-only. G1-17 stays `PARTIAL`. G1-14, G1-22, G1-24, and G1-25 stay `SUPPORTED_AND_TESTED`. G1-15, G1-05, G1-10, and G1-11 stay `MISSING`. G2-16 stays `MISSING`. Artifact schema `1.4`. Publication schema `1.0`. Package version `0.1.0a1`. Recorded progress is G1 21/26 = 80.77% and overall 113/232 = 48.71%.

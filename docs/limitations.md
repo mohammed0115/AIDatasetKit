@@ -114,7 +114,7 @@ while JSONL is checked as it streams.
   sources, side effects while pulling, hostile mappings, and nested mutable
   values remain the caller's responsibility. `AIDataFacade.load` still
   requires a DataFrame: `facade.load(load_table(source).frame)`. G1-13 is
-  pending later review and is not promoted.
+  `SUPPORTED_AND_TESTED` for this `load_table` ingestion.
 - **Not implemented yet:** generators of anything other than mapping records,
   and arbitrary containers that are not a synchronous iterable of mappings.
   A refused input is never published as a new audit.

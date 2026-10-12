@@ -11,7 +11,7 @@ as a GitHub release, and no version is tagged. Everything below is new.
 
 ### G1-W9 synchronous iterables of records
 
-Evidence: `docs/evidence/G1_W9_RECORD_ITERABLES_REPORT.md`. Status: pending later review.
+Evidence: `docs/evidence/G1_W9_RECORD_ITERABLES_REPORT.md`. Status: PASS.
 
 - `load_table` accepts a synchronous iterable of mappings as well as a list or
   tuple. The iterable is read once, at most one pull past `max_records`,
@@ -22,9 +22,9 @@ Evidence: `docs/evidence/G1_W9_RECORD_ITERABLES_REPORT.md`. Status: pending late
   `frozenset`, and `range` are refused.
 - `AIDataFacade.load` still requires a DataFrame. Compose them as
   `facade.load(load_table(source).frame)`.
-- G1-13 is not promoted. Recorded progress stays G1 20/26 = 76.92% and
-  overall 112/232 = 48.28%. Artifact schema stays `1.4`. Publication schema
-  stays `1.0`. Package version stays `0.1.0a1`.
+- G1-13 is `SUPPORTED_AND_TESTED` for `load_table` ingestion. Recorded
+  progress is G1 21/26 = 80.77% and overall 113/232 = 48.71%. Artifact schema
+  stays `1.4`. Publication schema stays `1.0`. Package version stays `0.1.0a1`.
 
 ### G1-W8 strict ISO date text
 
