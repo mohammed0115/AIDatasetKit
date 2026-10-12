@@ -104,7 +104,19 @@ while JSONL is checked as it streams.
   operational detected kind, verdict, and dataset fingerprint stay as they
   were. Chunked profiling does not run this scan. G1-22 is
   `SUPPORTED_AND_TESTED` for this recognition. Conversion is not part of it.
-- **Not implemented yet:** generators and arbitrary iterables.
+- **Synchronous iterables of mappings load through `load_table`.** A
+  generator, iterator, or re-iterable container is consumed once, at most one
+  pull past `max_records`, shallow-copied, and turned into one DataFrame.
+  `max_keys_per_record`, `max_columns`, `max_cells`, and `max_record_chars`
+  apply. A generator is closed afterwards. A bare mapping, `str`, `bytes`,
+  `bytearray`, `set`, `frozenset`, `range`, and any async iterable are refused.
+  There is no streaming profile of that iterable. Blocking iterators, network
+  sources, side effects while pulling, hostile mappings, and nested mutable
+  values remain the caller's responsibility. `AIDataFacade.load` still
+  requires a DataFrame: `facade.load(load_table(source).frame)`. G1-13 is
+  pending later review and is not promoted.
+- **Not implemented yet:** generators of anything other than mapping records,
+  and arbitrary containers that are not a synchronous iterable of mappings.
   A refused input is never published as a new audit.
 
 ## Detection

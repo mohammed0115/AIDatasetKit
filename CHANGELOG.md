@@ -9,6 +9,23 @@ Versions before `1.0` may change public interfaces and the artifact schema; see
 First alpha, not yet released: nothing has been published to PyPI, TestPyPI or
 as a GitHub release, and no version is tagged. Everything below is new.
 
+### G1-W9 synchronous iterables of records
+
+Evidence: `docs/evidence/G1_W9_RECORD_ITERABLES_REPORT.md`. Status: pending later review.
+
+- `load_table` accepts a synchronous iterable of mappings as well as a list or
+  tuple. The iterable is read once, at most one pull past `max_records`,
+  shallow-copied, and materialized as one DataFrame with source kind
+  `records`. The records limits apply: `max_records`, `max_keys_per_record`,
+  `max_columns`, `max_cells`, and `max_record_chars`. A generator is closed
+  on the way out. Async iterables, a bare mapping, `bytearray`, `set`,
+  `frozenset`, and `range` are refused.
+- `AIDataFacade.load` still requires a DataFrame. Compose them as
+  `facade.load(load_table(source).frame)`.
+- G1-13 is not promoted. Recorded progress stays G1 20/26 = 76.92% and
+  overall 112/232 = 48.28%. Artifact schema stays `1.4`. Publication schema
+  stays `1.0`. Package version stays `0.1.0a1`.
+
 ### G1-W8 strict ISO date text
 
 Evidence: `docs/evidence/G1_W8_DATE_TEXT_INFERENCE_REPORT.md`. Status: PASS.

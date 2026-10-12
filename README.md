@@ -295,10 +295,15 @@ lineage · audit artifacts.
 Also merged, unreleased: model training, evaluation, model comparison, the
 `AIDataFacade` workflow above, and clustering.
 
+`load_table` also accepts a synchronous iterable of mappings. It is read once,
+at most one record past `max_records`, and materialized as one DataFrame.
+Async iterables, a bare dictionary, sets, and ranges are refused.
+`AIDataFacade.load` still requires a DataFrame.
+
 Not supported yet: anomaly detection, dimensionality reduction, time series,
 text, images, hyperparameter tuning, cross-validation, model persistence,
-PostgreSQL, SQLAlchemy, `.db` files, database URLs, cloud storage, automatic encoding detection,
-or generators/other arbitrary iterables. A full audit can record strict ISO
+PostgreSQL, SQLAlchemy, `.db` files, database URLs, cloud storage, automatic encoding detection.
+A full audit can record strict ISO
 date or datetime text (`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SS`, optional
 fraction, optional `Z` or `±HH:MM`) as `date_inference`. That record does not
 convert the column, and slash dates and other localized forms are not

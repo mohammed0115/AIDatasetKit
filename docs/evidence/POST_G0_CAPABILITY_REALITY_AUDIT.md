@@ -2,15 +2,15 @@
 
 ```text
 CURRENT_GATE                 = G0 closed; G1-W1 through G1-W8 closed
-CURRENT_ACTIVITY             = G1-W8 PASS; stop before G1-W9
+CURRENT_ACTIVITY             = G1-W9 implemented; pending review; stop before certification
 G0_STATUS                    = PASS (16/16)
 G0_MAIN_INTEGRATION          = PASS
 GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
 OVERALL_CERTIFIED_PROGRESS   = 48.28%   (112 proven / 232 applicable, G0–G12; updated after G1-W8, §0)
 AUDIT_GATE                   = PASS     (the audit is complete with evidence; G1–G12 are not)
-READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W8 is PASS; do not start G1-W9)
-NEXT_AUTHORIZED_ACTION       = stop; do not start G1-W9
+READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W9 is awaiting review; it is not PASS)
+NEXT_AUTHORIZED_ACTION       = stop for CTO review; do not certify G1-13; do not start another capability
 ```
 
 **حدود هذا المستند:**
@@ -226,6 +226,15 @@ AUDIT_DOCUMENTS       = CORRECT
 - Recorded progress is G1 = 20/26 = **76.92%** and overall = 112/232 = **48.28%**. Status-detail counts for G1 are 20 / 0 / 2 / 4. Artifact schema `1.4`. Publication schema `1.0`. Package version `0.1.0a1`.
 - Evidence: `docs/evidence/G1_W8_DATE_TEXT_INFERENCE_REPORT.md`.
 
+**تحديث 15 — G1-W9 bounded synchronous record iterables (pending review, not PASS):**
+
+- **G1-13: `PARTIAL_PENDING_CERTIFICATION`.** `load_table` accepts a list or tuple of mappings, and also a synchronous iterable of mappings: a generator, an iterator, or a custom re-iterable container. The iterable is consumed once, at most `max_records + 1` pulls, shallow-copied, and materialized as one DataFrame with `source_kind` `records`. Limits are `max_records`, `max_keys_per_record`, `max_columns`, `max_cells`, and `max_record_chars`. A real generator is closed afterwards. A bare mapping, `str`, `bytes`, `bytearray`, `set`, `frozenset`, `range`, and any async iterable are refused. This is not streaming profiling.
+- **`AIDataFacade.load` stays DataFrame-only.** Closure of G1-13 is the `load_table` contract. The safe composition is `facade.load(load_table(source).frame)`. Facade support is not required to close this row.
+- **G1-W9 is not PASS.** This update does not promote G1-13 and does not name a CI run.
+- **G1-17 stays `PARTIAL`.** **G1-14, G1-22, G1-24, and G1-25 stay `SUPPORTED_AND_TESTED`.** **G1-15, G1-05, G1-10, and G1-11 stay `MISSING`.** **G2-16 stays `MISSING`.**
+- Recorded progress stays G1 = 20/26 = **76.92%** and overall = 112/232 = **48.28%**. Status-detail counts for G1 stay 20 / 0 / 2 / 4 because this row is not promoted. Artifact schema `1.4`. Publication schema `1.0`. Package version `0.1.0a1`.
+- Evidence: `docs/evidence/G1_W9_RECORD_ITERABLES_REPORT.md`.
+
 ## 1. Main integration
 
 | البند | القيمة |
@@ -317,7 +326,7 @@ G0_MAIN_INTEGRATION = PASS
 | G1-10 | G1 | XML | `MISSING` | no reader | probe_ingestion.py (exploratory): refused | No reader | P3 |
 | G1-11 | G1 | YAML | `MISSING` | no reader; PyYAML not a dependency | probe_ingestion.py (exploratory): refused | No reader | P3 |
 | G1-12 | G1 | pandas DataFrame in memory (Python API) | `SUPPORTED_AND_TESTED` | DataProfiler.profile, DataQualityInspector.inspect, AIDataFacade.load | tests/unit/test_profiler.py, test_quality.py, integration/test_facade.py | — | — |
-| G1-13 | G1 | list of dicts / records / iterables | `PARTIAL` | ingestion/loader.py::_from_records (G1-W1): list or tuple of mappings | tests/unit/test_ingestion.py::TestRecords | Generators and other iterables refused (`UnsupportedFormatError`); not reachable from AIDataFacade.load | P2 |
+| G1-13 | G1 | list of dicts / records / iterables | `PARTIAL_PENDING_CERTIFICATION` | ingestion/loader.py::_from_record_iterable (G1-W9, not PASS): one-pass synchronous iterable of mappings into one DataFrame, `source_kind=records`, records limits, generator `close()`. Lists and tuples stay on `_from_records`. `AIDataFacade.load` stays DataFrame-only by decision; that is not part of closing this row | tests/unit/test_record_iterables.py; scripts/g1_w9_mutations.py; G1-W9 report | Not promoted. Async iterables, bare mappings, sets, and streaming profiling stay out | P2 |
 | G1-14 | G1 | SQLite | `SUPPORTED_AND_TESTED` | ingestion/sqlite.py (G1-W6 PASS): one ordinary local `.sqlite`/`.sqlite3` table, read-only; views, virtual tables, shadow tables, sqlite_* and caller SQL refused; `PRAGMA table_list` with a safe fallback | tests/unit/test_ingestion_sqlite.py; scripts/g1_w6_mutations.py (20/20); G1-W6 report | PostgreSQL and SQLAlchemy remain absent (G1-15) | P2 |
 | G1-15 | G1 | PostgreSQL / SQLAlchemy / query results | `MISSING` | no reader; no DB dependency | — | No reader; connection handling undecided | P2 |
 | G1-16 | G1 | Document extraction (TXT, Markdown, HTML, PDF, DOCX) | `OUT_OF_SCOPE` | no reader, by design of a tabular library | probe_ingestion.py (exploratory): all refused | Belongs upstream (MWIE/connectors): extract to a table first | — |
@@ -729,7 +738,7 @@ G0_MAIN_INTEGRATION = PASS
 |---|---|---:|---:|---:|---|---|
 | G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
 | G0.1 | Profiling performance hotfix | — | — | — | PASS | P0-1 مغلق (انظر §0) |
-| G1 | Ingestion | 20 | 26 | 76.92% | IN PROGRESS | W1–W8 مغلقة |
+| G1 | Ingestion | 20 | 26 | 76.92% | IN PROGRESS | W1–W8 مغلقة؛ W9 بانتظار المراجعة |
 | G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | تواريخ ونص وقيم |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | عمليات جدولية |
 | G4 | EDA & Statistics | 9 | 13 | 69.23% | AUDIT | ارتباط فئوي واختبارات |
