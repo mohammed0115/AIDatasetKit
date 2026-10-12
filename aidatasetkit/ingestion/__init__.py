@@ -2,7 +2,8 @@
 
 :func:`load_table` accepts a ``.csv``, ``.tsv``, ``.json``, ``.jsonl``,
 ``.ndjson``, ``.parquet``, ``.feather``, ``.arrow``, ``.xlsx``, ``.sqlite`` or
-``.sqlite3`` path, a pandas DataFrame, or a list of records, and returns a
+``.sqlite3`` path, a pandas DataFrame, a list or tuple of records, or another
+synchronous iterable of mappings, and returns a
 :class:`LoadedTable` -- the frame and typed :class:`LoadMetadata` about how it
 was read -- or raises an :class:`~aidatasetkit.core.exceptions.IngestionError`.
 Every input is either read correctly or refused; nothing is read into a wrong
@@ -18,7 +19,11 @@ refused. Encodings are never guessed, and load does not convert date
 text. Chunked profiling of a CSV or TSV file is a separate opt-in,
 :func:`aidatasetkit.profiling.profile_delimited_chunks`, and is not what
 :func:`load_table` does. Finite resource limits are enforced by
-:func:`load_table` before analysis.
+:func:`load_table` before analysis. A synchronous iterable of mappings is
+consumed once, at most one pull past ``max_records``, and materialized as
+records. Generators are closed afterwards. Async iterables, a bare mapping,
+``bytearray``, ``set``, ``frozenset`` and ``range`` are refused. The facade
+still accepts a DataFrame only.
 
 ``load_table`` is resolved lazily (PEP 562), so importing the contracts does not
 import the parsing modules. It does not avoid pandas: ``aidatasetkit.core`` already

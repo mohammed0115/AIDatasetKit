@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncIterable, AsyncIterator, Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
+from types import GeneratorType
 from typing import Any
 
 import pandas as pd
@@ -57,9 +58,13 @@ def load_table(
         source: A path (:class:`pathlib.Path` or any :class:`os.PathLike`) to a
             ``.csv``, ``.tsv``, ``.json``, ``.jsonl``, ``.ndjson``, ``.parquet``,
             ``.feather``, ``.arrow``, ``.xlsx``, ``.sqlite`` or ``.sqlite3`` file;
-            a :class:`pandas.DataFrame`;
-            or a list or tuple of mappings, one per row. A plain ``str`` is
-            refused rather than guessed at -- pass ``Path("data.csv")``.
+            a :class:`pandas.DataFrame`; a list or tuple of mappings, one per row;
+            or another synchronous iterable of mappings, consumed once.
+            A plain ``str`` is refused rather than guessed at -- pass
+            ``Path("data.csv")``. A bare mapping, ``bytearray``, ``set``,
+            ``frozenset``, ``range``, and any async iterable are refused.
+            ``AIDataFacade.load`` still requires a DataFrame; pass
+            ``load_table(source).frame`` into it.
         options: How a file is read. In-memory sources accept only the defaults.
         sheet: The worksheet to read from an ``.xlsx`` file. Required when the
             workbook has more than one sheet; meaningless for any other source.
@@ -100,10 +105,26 @@ def load_table(
         if table is not None:
             raise InvalidIngestionOptionsError("table= applies to SQLite files only.")
         return _from_records(source, limits)
+    if isinstance(source, (Mapping, bytearray, range, set, frozenset)):
+        raise UnsupportedFormatError(
+            f"Cannot load a {type(source).__name__}. A mapping, bytearray, range, "
+            "set, or frozenset is not a sequence of records."
+        )
+    if isinstance(source, (AsyncIterable, AsyncIterator)):
+        raise UnsupportedFormatError(
+            "An async iterable is not a synchronous source of records."
+        )
+    if isinstance(source, Iterable):
+        _require_default(options, "records")
+        if sheet is not None:
+            raise InvalidIngestionOptionsError("sheet= applies to .xlsx files only.")
+        if table is not None:
+            raise InvalidIngestionOptionsError("table= applies to SQLite files only.")
+        return _from_record_iterable(source, limits)
     raise UnsupportedFormatError(
         f"Cannot load a {type(source).__name__}. Supported: a path to a .csv, "
         ".tsv, .json, .jsonl, .parquet, .feather, .xlsx, .sqlite or .sqlite3 "
-        "file, a pandas DataFrame, or a list of mappings."
+        "file, a pandas DataFrame, or a synchronous iterable of mappings."
     )
 
 
@@ -354,6 +375,109 @@ def _from_records(records: Sequence[Any], limits: IngestionLimits) -> LoadedTabl
                 )
     frame, notes = _records_frame(records, list(columns), limits, SourceKind.RECORDS.value)
     return LoadedTable(frame=frame, metadata=_in_memory(SourceKind.RECORDS, frame, notes))
+
+
+def _from_record_iterable(source: Any, limits: IngestionLimits) -> LoadedTable:
+    """One pass over a synchronous iterable of mappings.
+
+    ``iter(source)`` is called once. The source object is not retained, measured
+    with ``len``, or rendered with ``repr``. A real generator is closed on every
+    exit. Other iterators have no close protocol and are left alone.
+    """
+    iterator: Iterator[Any] = iter(source)
+    try:
+        copied, names = _take_record_iterable(iterator, limits)
+        frame, notes = _records_frame(copied, names, limits, SourceKind.RECORDS.value)
+        return LoadedTable(frame=frame, metadata=_in_memory(SourceKind.RECORDS, frame, notes))  # iterable materialization
+    finally:
+        if isinstance(iterator, GeneratorType):
+            iterator.close()
+
+
+def _take_record_iterable(
+    iterator: Iterator[Any], limits: IngestionLimits
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Copy at most ``max_records`` mappings. One extra pull detects overflow.
+
+    The extra item is not validated, copied, or retained. Nothing past it is pulled.
+    """
+    copied: list[dict[str, Any]] = []
+    names: dict[str, None] = {}
+    total_chars = 0
+    accepted = 0
+    while True:
+        if limits.max_records is not None and accepted >= limits.max_records:
+            try:
+                next(iterator)
+            except StopIteration:
+                break
+            raise RecordLimitError(
+                f"Records exceed the record limit ({limits.max_records + 1} > {limits.max_records}).",
+                limit_name="max_records",
+                configured_limit=limits.max_records,
+                observed_value=limits.max_records + 1,
+                input_kind=SourceKind.RECORDS.value,
+            )
+        try:
+            record = next(iterator)
+        except StopIteration:
+            break
+        if not isinstance(record, Mapping):
+            raise MalformedInputError(
+                f"Record {accepted} is a {type(record).__name__}, not a mapping. Every "
+                "record must map column names to values."
+            )
+        if limits.max_keys_per_record is not None and len(record) > limits.max_keys_per_record:
+            raise KeyLimitError(
+                f"Record exceeds the key limit ({len(record)} > {limits.max_keys_per_record}).",
+                limit_name="max_keys_per_record",
+                configured_limit=limits.max_keys_per_record,
+                observed_value=len(record),
+                input_kind=SourceKind.RECORDS.value,
+            )
+        for key in record:
+            if not isinstance(key, str):
+                raise MalformedInputError(
+                    f"Record {accepted} has a {type(key).__name__} key; column names "
+                    "given as records must be strings."
+                )
+        shallow = dict(record)
+        if limits.max_record_chars is not None:
+            total_chars += sum(len(str(value)) for value in shallow.values())
+            if total_chars > limits.max_record_chars:
+                raise CellLimitError(
+                    "Records exceed the accumulated value-character limit.",
+                    limit_name="max_record_chars",
+                    configured_limit=limits.max_record_chars,
+                    observed_value=total_chars,
+                    input_kind=SourceKind.RECORDS.value,
+                )
+        for key in shallow:
+            names.setdefault(key, None)
+        if limits.max_columns is not None and len(names) > limits.max_columns:  # running union of this iterable
+            raise ColumnLimitError(
+                f"Records exceed the column limit ({len(names)} > {limits.max_columns}).",
+                limit_name="max_columns",
+                configured_limit=limits.max_columns,
+                observed_value=len(names),
+                input_kind=SourceKind.RECORDS.value,
+            )
+        if names and limits.max_cells is not None and _cells_exceed(accepted + 1, len(names), limits.max_cells):
+            cells = (accepted + 1) * len(names)
+            raise CellLimitError(
+                f"Records exceed the cell limit ({cells} > {limits.max_cells}).",
+                limit_name="max_cells",
+                configured_limit=limits.max_cells,
+                observed_value=cells,
+                input_kind=SourceKind.RECORDS.value,
+            )
+        copied.append(shallow)
+        accepted += 1
+    if accepted == 0:
+        raise EmptyInputError(
+            "The records iterable is empty; there is no table to load."
+        )
+    return copied, list(names)
 
 
 def _records_frame(
