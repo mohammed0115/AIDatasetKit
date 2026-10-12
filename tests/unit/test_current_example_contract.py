@@ -21,6 +21,7 @@ from aidatasetkit.evidence import (
     render_report,
 )
 from aidatasetkit.evidence.fingerprint import config_fingerprint
+from tests.golden import pandas_major, semantic_fixture_path
 
 EXAMPLE = Path(__file__).resolve().parents[2] / "examples" / "audit_churn"
 CURRENT_OUTPUTS = ("audit.json", "lineage.json", "report.html")
@@ -65,14 +66,22 @@ class TestCommittedCurrentExamples:
         from examples.audit_churn.generate_artifacts import build_artifact
 
         audit = _load("audit.json")
-        rebuilt = build_artifact(pd.read_csv(EXAMPLE / "train.csv"))
-        semantic = rebuilt.semantic_dict()
-        assert _semantic_view(audit) == semantic
-        assert canonical_json(semantic) == (EXAMPLE / "expected_audit_semantic.json").read_text(
-            encoding="utf-8"
-        )
-        assert audit["provenance"]["semantic_fingerprint"] == rebuilt.semantic_fingerprint
-        assert audit["provenance"]["semantic_fingerprint"] == config_fingerprint(semantic)
+        reference = _load("expected_audit_semantic.json")
+        rebuilt = build_artifact(pd.read_csv(EXAMPLE / "train.csv")).semantic_dict()
+        fixture = json.loads(semantic_fixture_path().read_text(encoding="utf-8"))
+        # The committed illustration is the pandas 3 reference. Pandas 2 rebuilds
+        # against its own fixture; dtype names are the only allowed gap.
+        assert _semantic_view(audit) == reference
+        assert rebuilt == fixture
+        assert rebuilt["schema_version"] == reference["schema_version"] == ARTIFACT_SCHEMA_VERSION
+        assert rebuilt["date_inference"] == reference["date_inference"] == audit["date_inference"]
+        if pandas_major() == 3:
+            assert canonical_json(rebuilt) == (EXAMPLE / "expected_audit_semantic.json").read_text(
+                encoding="utf-8"
+            )
+            assert audit["provenance"]["semantic_fingerprint"] == config_fingerprint(rebuilt)
+        else:
+            assert audit["provenance"]["semantic_fingerprint"] == config_fingerprint(reference)
         assert audit["provenance"]["created_at"] == "2025-02-01T00:00:00Z"
         assert lineage_fingerprint(audit, _load("lineage.json"))
 
