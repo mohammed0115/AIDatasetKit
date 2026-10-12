@@ -4,6 +4,8 @@ Status: implemented, pending review. This is not PASS. G1-22 is not promoted.
 
 ```text
 STARTING_HEAD            = 270570ffbe5712c118365753bb58d7bf8a1523a0
+REVIEWED_HEAD            = b47b0c3229ff2e98ca0afe33d639dfe60e1b5442
+REPAIR_COMMIT            = d671b1db5eaa3476c2c0a9bf8194edd6785f5741
 BRANCH                   = g1-w8-date-text-inference
 G1_22_STATUS             = PARTIAL_PENDING_CERTIFICATION
 ARTIFACT_SCHEMA          = 1.4
@@ -43,7 +45,17 @@ Chunked profiling does not run this scan. Its artifact has `date_inference: null
 
 Artifact schema moves from `1.3` to `1.4` because `date_inference` is a new top-level key. A full audit always carries the policy object. `columns` is empty when nothing qualified. Publication schema stays `1.0`. Package version stays `0.1.0a1`.
 
-The churn example has no strict ISO column. Its semantic fingerprint moved from `2a33aff562bf32116d2f48587eda19af85e9a2db956a7e6c00b8a89c1bcf7c75` to `60375e40773cb0849085a4867c31e609b90c34a60a2cb8842c9e34f37b3a237e` only because the schema version and the empty `date_inference` record were added. Deleting that key and setting the version back to `1.3` reproduces the previous identity. The dataset fingerprint did not move. The illustrative `audit.json` environment block was not regenerated.
+The churn example has no strict ISO column. Its semantic fingerprint moved from `2a33aff562bf32116d2f48587eda19af85e9a2db956a7e6c00b8a89c1bcf7c75` to `60375e40773cb0849085a4867c31e609b90c34a60a2cb8842c9e34f37b3a237e` only because the schema version and the empty `date_inference` record were added. Deleting that key and setting the version back to `1.3` reproduces the previous identity. The dataset fingerprint did not move.
+
+## Stale illustrative output
+
+Review of `b47b0c3229ff2e98ca0afe33d639dfe60e1b5442` found that `examples/audit_churn/audit.json`, `lineage.json`, and `report.html` were still schema `1.3` and omitted `date_inference`. The semantic fixtures were already `1.4`. Current illustrations must not contradict the artifact the package writes.
+
+Repair commit `d671b1db5eaa3476c2c0a9bf8194edd6785f5741` regenerates those three files through `examples/audit_churn/generate_artifacts.py`. The generated audit is schema `1.4`, carries `date_inference` with `method` `strict_iso_full_population_v1`, `conversion_performed` false, `affects_detected_kind` false, `affects_verdict` false, and an empty `columns` list. The HTML renders that section, states that conversion was not performed, and leaves each column's detected kind as profiled. `tests/unit/test_current_example_contract.py` fails if `ARTIFACT_SCHEMA_VERSION` moves and these files are not regenerated.
+
+`expected_audit_semantic.json` and `expected_audit_semantic.pandas2.json` were not rewritten by this repair. Their semantic fingerprint stays `60375e40773cb0849085a4867c31e609b90c34a60a2cb8842c9e34f37b3a237e` on the pandas 3 fixture. The only environment field that changed in the illustration is `python`, from `3.12.3` to `3.12.14`, because the generator records the interpreter that produced the file. Created-at stays `2025-02-01T00:00:00Z`. No workspace path was written.
+
+G1-22 is still not certified. This repair does not mark G1-W8 PASS.
 
 ## Evidence shape
 
