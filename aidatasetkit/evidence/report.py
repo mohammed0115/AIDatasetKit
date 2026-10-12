@@ -93,6 +93,7 @@ def render_report(artifact: Mapping[str, Any]) -> str:
         _summary(artifact, dataset, verdict, name),
         _identity(artifact, dataset),
         _ingestion(artifact),
+        _date_inference(artifact),
         _columns(artifact),
         _findings(artifact),
         _decisions(artifact),
@@ -114,6 +115,47 @@ def render_report(artifact: Mapping[str, Any]) -> str:
 # ---------------------------------------------------------------------- #
 # Sections
 # ---------------------------------------------------------------------- #
+
+
+def _date_inference(artifact) -> str:
+    """Recognition recorded beside detected kind. Absent on artifacts from before 1.4."""
+    if "date_inference" not in artifact:
+        return ""
+    record = artifact.get("date_inference")
+    if not record:
+        return (
+            "<h2>Date inference</h2>\n"
+            "<p>Not run. Chunked profiling does not claim a full-population "
+            "date or datetime scan. Conversion performed: no.</p>\n"
+        )
+    intro = (
+        "<h2>Date inference</h2>\n"
+        "<p>Textual recognition only. "
+        f"Method: {_e(record.get('method'))}. "
+        f"Population: {_e(record.get('population'))}. "
+        f"Full population scanned: {_e(record.get('full_population_scanned'))}. "
+        "Conversion performed: no. "
+        "Operational detected kind unchanged. "
+        "This column was not converted and was not datetime-profiled.</p>\n"
+    )
+    columns = record.get("columns") or ()
+    if not columns:
+        return intro + "<p>No textual column met the strict ISO rule.</p>\n"
+    body = "".join(
+        "<tr>"
+        f"<td>{_e(column.get('column'))}</td>"
+        f"<td>{_e(column.get('inferred_semantic_type'))}</td>"
+        f"<td>{_e(column.get('matched_count'))}/{_e(column.get('non_blank_count'))}</td>"
+        f"<td>{_e(column.get('timezone_policy'))}</td>"
+        "</tr>"
+        for column in columns
+    )
+    return (
+        intro
+        + "<table><tr><th>column</th><th>inferred semantic type</th>"
+        "<th>matched/non-blank</th><th>timezone policy</th></tr>"
+        f"{body}</table>\n"
+    )
 
 
 def _summary(artifact, dataset, verdict, name) -> str:

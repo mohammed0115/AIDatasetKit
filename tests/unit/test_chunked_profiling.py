@@ -283,8 +283,10 @@ def test_the_default_audit_does_not_chunk(tmp_path: Path):
         (output / "runs" / current["run_id"] / "audit.json").read_text(encoding="utf-8")
     )
     assert artifact["chunked_profiling"] is None, "default audit used chunked profiling"
-    assert artifact["schema_version"] == "1.3"
+    assert artifact["schema_version"] == "1.4"
     assert artifact["source_selector"] is None
+    assert artifact["date_inference"]["full_population_scanned"] is True
+    assert artifact["date_inference"]["columns"] == []
 
 
 def test_the_opt_in_records_the_population_and_keeps_the_verdict(tmp_path: Path):
@@ -310,6 +312,8 @@ def test_the_opt_in_records_the_population_and_keeps_the_verdict(tmp_path: Path)
     assert opted_artifact["stage"] == "profiled"
     assert opted_artifact["verdict"] == "blocked"
     assert opted_artifact["verdict_reasons"] == [CHUNKED_AUDIT_UNAVAILABLE]
+    assert opted_artifact["date_inference"] is None
+    assert plain_artifact["date_inference"]["conversion_performed"] is False
     assert opted_artifact["findings"] == []
     assert opted_artifact["decisions"] == []
     assert opted_artifact["columns"] == []
@@ -493,6 +497,7 @@ def test_chunked_evidence_is_recorded(tmp_path: Path):
     artifact = AuditBuilder().build_chunked(profile)
     assert artifact.chunked_profiling is not None, "chunked evidence omitted"
     assert artifact.chunked_profiling.full_population_scanned is True
+    assert artifact.date_inference is None, "chunked mode claims full date inference"
     assert artifact.verdict_reasons == (CHUNKED_AUDIT_UNAVAILABLE,)
 
 
@@ -501,7 +506,7 @@ def test_the_default_builder_still_writes_null_chunked_evidence(tmp_path: Path):
     artifact = AuditBuilder().build(frame, profile=DataProfiler().profile(frame))
     assert artifact.chunked_profiling is None
     assert artifact.semantic_dict()["chunked_profiling"] is None
-    assert artifact.schema_version == "1.3"
+    assert artifact.schema_version == "1.4"
     assert artifact.source_selector is None
     assert artifact.stage is AuditStage.INSPECTED
 
@@ -512,7 +517,7 @@ def test_the_chunked_artifact_is_profiled(tmp_path: Path):
     )
     assert artifact.stage is AuditStage.PROFILED, "chunked artifact claimed inspected"
     assert artifact.stage is not AuditStage.INSPECTED
-    assert artifact.schema_version == "1.3"
+    assert artifact.schema_version == "1.4"
     assert artifact.source_selector is None
 
 

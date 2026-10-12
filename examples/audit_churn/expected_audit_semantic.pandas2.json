@@ -363,6 +363,17 @@
     "schema_fingerprint": "6c0f17c687a4c064faeac7e2f8c78c51bccede76eb344b90335673a16361d749",
     "total_missing_count": 55
   },
+  "date_inference": {
+    "affects_detected_kind": false,
+    "affects_verdict": false,
+    "columns": [],
+    "conversion_performed": false,
+    "full_population_scanned": true,
+    "method": "strict_iso_full_population_v1",
+    "minimum_non_blank": 8,
+    "population": "full",
+    "required_match_ratio": 1.0
+  },
   "decisions": [
     {
       "action": "review",
@@ -877,7 +888,7 @@
     "task_type": "classification"
   },
   "plan_fingerprint": "90b978c9c9dc745a9a9d0d0f8f0143ca",
-  "schema_version": "1.3",
+  "schema_version": "1.4",
   "source_selector": null,
   "stage": "prepared",
   "target": {

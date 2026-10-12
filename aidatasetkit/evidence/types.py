@@ -63,7 +63,12 @@ __all__ = [
 #:       ``{"kind": "table", "name": ...}``. An Excel worksheet is
 #:       ``{"kind": "sheet", "name": ...}``. The kind is an open string; ``sheet``
 #:       does not require a new schema version.
-ARTIFACT_SCHEMA_VERSION = "1.3"
+#: 1.4 -- G1-W8: the top-level ``date_inference`` record. A full audit records
+#:       the fixed strict-ISO policy and any textual columns that met it.
+#:       ``null`` on the chunked profile-only route, which does not scan dates.
+#:       The record is evidence. It does not convert values and does not change
+#:       detected kind, verdict, or the dataset fingerprint.
+ARTIFACT_SCHEMA_VERSION = "1.4"
 
 
 class EvidenceSource(StrEnum):
@@ -641,6 +646,63 @@ class ConfigIdentity:
 
 
 @dataclass(frozen=True, slots=True)
+class DateColumnInference:
+    """One textual column recognized as strict ISO date or datetime text.
+
+    Counts only. The column's values are not stored.
+    """
+
+    column: str
+    inferred_semantic_type: str
+    format_family: str
+    non_blank_count: int
+    blank_count: int
+    matched_count: int
+    invalid_count: int
+    timezone_policy: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "column": self.column,
+            "inferred_semantic_type": self.inferred_semantic_type,
+            "format_family": self.format_family,
+            "non_blank_count": self.non_blank_count,
+            "blank_count": self.blank_count,
+            "matched_count": self.matched_count,
+            "invalid_count": self.invalid_count,
+            "timezone_policy": self.timezone_policy,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class DateInferenceEvidence:
+    """Strict ISO recognition for one full audit, or absent when it did not run."""
+
+    method: str
+    population: str
+    full_population_scanned: bool
+    minimum_non_blank: int
+    required_match_ratio: float
+    conversion_performed: bool
+    affects_detected_kind: bool
+    affects_verdict: bool
+    columns: tuple[DateColumnInference, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "method": self.method,
+            "population": self.population,
+            "full_population_scanned": self.full_population_scanned,
+            "minimum_non_blank": self.minimum_non_blank,
+            "required_match_ratio": self.required_match_ratio,
+            "conversion_performed": self.conversion_performed,
+            "affects_detected_kind": self.affects_detected_kind,
+            "affects_verdict": self.affects_verdict,
+            "columns": [column.to_dict() for column in self.columns],
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class AuditArtifact:
     """One run's evidence, in one object.
 
@@ -674,6 +736,7 @@ class AuditArtifact:
     ingestion: IngestionEvidence | None = None
     chunked_profiling: ChunkedProfilingEvidence | None = None
     source_selector: SourceSelectorEvidence | None = None
+    date_inference: DateInferenceEvidence | None = None
 
     # ---------------------------------------------------------------- #
     # Serialisation
@@ -714,6 +777,9 @@ class AuditArtifact:
             ),
             "source_selector": (
                 self.source_selector.to_dict() if self.source_selector is not None else None
+            ),
+            "date_inference": (
+                self.date_inference.to_dict() if self.date_inference is not None else None
             ),
             "config": self.config.to_dict(),
             "target": self.target.to_dict() if self.target else None,

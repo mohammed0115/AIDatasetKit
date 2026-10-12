@@ -70,6 +70,13 @@ the package version are not part of this fingerprint.
 and that alone reproduces the previous identity. The selected SQLite table is
 recorded on SQLite artifacts and in their config fingerprint; this fixture has
 no table to select.
+
+**G1-W8 -- artifact schema 1.3 to 1.4.** The artifact gained a top-level
+``date_inference`` record. The example has no strict ISO date column, so
+``columns`` is empty and the fixed policy is still recorded. Undoing the step
+deletes the key and sets the version back to 1.3, and that alone reproduces
+the previous identity. Dataset values, detected kinds, the verdict and the
+dataset fingerprint are not part of the move.
 """
 
 from __future__ import annotations
@@ -134,6 +141,11 @@ def _rollback_schema_1_2(semantic: dict) -> None:
 def _rollback_schema_1_3(semantic: dict) -> None:
     semantic["schema_version"] = "1.2"
     del semantic["source_selector"]
+
+
+def _rollback_schema_1_4(semantic: dict) -> None:
+    semantic["schema_version"] = "1.3"
+    del semantic["date_inference"]
 
 
 def _rollback_threshold(name: str) -> Callable[[dict], None]:
@@ -208,6 +220,12 @@ CHAIN: tuple[Step, ...] = (
         before="39f4c43867f1b30f47a42986187c3cce4b8dbad1540e5e7a369e0e142d5d5d47",
         after="2a33aff562bf32116d2f48587eda19af85e9a2db956a7e6c00b8a89c1bcf7c75",
         rollback=_rollback_schema_1_3,
+    ),
+    Step(
+        "G1-W8 artifact schema 1.3 -> 1.4 and date_inference record",
+        before="2a33aff562bf32116d2f48587eda19af85e9a2db956a7e6c00b8a89c1bcf7c75",
+        after="60375e40773cb0849085a4867c31e609b90c34a60a2cb8842c9e34f37b3a237e",
+        rollback=_rollback_schema_1_4,
     ),
 )
 
@@ -336,6 +354,7 @@ class TestTheIngestionStep:
 
     def test_nothing_but_the_key_moved(self):
         stored = _stored()
+        _rollback_schema_1_4(stored)
         _rollback_schema_1_3(stored)
         _rollback_schema_1_2(stored)
         _rollback_schema_1_1(stored)
@@ -351,17 +370,18 @@ def _step(prefix: str) -> Step:
 class TestTheSchemaStep:
     """The version says what the record is, without comparing fingerprints."""
 
-    def test_the_current_code_writes_1_3(self, semantic):
+    def test_the_current_code_writes_1_4(self, semantic):
         from aidatasetkit.evidence import ARTIFACT_SCHEMA_VERSION
 
-        assert semantic["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.3"
+        assert semantic["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.4"
 
-    def test_the_fixture_declares_1_3(self):
-        assert _stored()["schema_version"] == "1.3"
+    def test_the_fixture_declares_1_4(self):
+        assert _stored()["schema_version"] == "1.4"
 
     def test_setting_the_version_back_reproduces_the_intermediate_artifact(self):
         """The 1.0-with-ingestion artifact that 90ecfae published."""
         stored = _stored()
+        _rollback_schema_1_4(stored)
         _rollback_schema_1_3(stored)
         _rollback_schema_1_2(stored)
         _rollback_schema_1_1(stored)
@@ -370,6 +390,7 @@ class TestTheSchemaStep:
 
     def test_then_removing_the_key_reproduces_the_pre_g1_artifact(self):
         stored = _stored()
+        _rollback_schema_1_4(stored)
         _rollback_schema_1_3(stored)
         _rollback_schema_1_2(stored)
         _rollback_schema_1_1(stored)
@@ -379,6 +400,8 @@ class TestTheSchemaStep:
     def test_only_the_version_moved(self):
         """Data, findings, decisions and lineage are what they were in 1.0."""
         current, previous = _stored(), _stored()
+        _rollback_schema_1_4(current)
+        _rollback_schema_1_4(previous)
         _rollback_schema_1_3(current)
         _rollback_schema_1_3(previous)
         _rollback_schema_1_2(current)
@@ -389,6 +412,7 @@ class TestTheSchemaStep:
 
     def test_a_1_0_artifact_is_recognisable_as_the_older_contract(self):
         older = _stored()
+        _rollback_schema_1_4(older)
         _rollback_schema_1_3(older)
         _rollback_schema_1_2(older)
         _rollback_schema_1_1(older)
@@ -403,6 +427,7 @@ class TestTheChunkedSchemaStep:
 
     def test_deleting_the_key_and_the_version_reproduces_1_1(self):
         stored = _stored()
+        _rollback_schema_1_4(stored)
         _rollback_schema_1_3(stored)
         _rollback_schema_1_2(stored)
         assert stored["schema_version"] == "1.1"
@@ -411,6 +436,8 @@ class TestTheChunkedSchemaStep:
 
     def test_only_the_record_and_the_version_moved(self):
         current, previous = _stored(), _stored()
+        _rollback_schema_1_4(current)
+        _rollback_schema_1_4(previous)
         _rollback_schema_1_3(current)
         _rollback_schema_1_3(previous)
         _rollback_schema_1_2(previous)
@@ -428,6 +455,7 @@ class TestTheSourceSelectorSchemaStep:
 
     def test_deleting_the_key_and_the_version_reproduces_1_2(self):
         stored = _stored()
+        _rollback_schema_1_4(stored)
         _rollback_schema_1_3(stored)
         assert stored["schema_version"] == "1.2"
         assert "source_selector" not in stored
@@ -435,12 +463,37 @@ class TestTheSourceSelectorSchemaStep:
 
     def test_only_the_record_and_the_version_moved(self):
         current, previous = _stored(), _stored()
+        _rollback_schema_1_4(current)
+        _rollback_schema_1_4(previous)
         _rollback_schema_1_3(previous)
         changed = set(current) ^ set(previous)
         changed.update(
             key for key in current.keys() & previous.keys() if current[key] != previous[key]
         )
         assert changed == {"schema_version", "source_selector"}
+
+
+class TestTheDateInferenceSchemaStep:
+    def test_the_key_is_present_for_a_full_audit(self, semantic):
+        assert semantic["date_inference"]["method"] == "strict_iso_full_population_v1"
+        assert semantic["date_inference"]["columns"] == []
+        assert semantic["date_inference"]["conversion_performed"] is False
+
+    def test_deleting_the_key_and_the_version_reproduces_1_3(self):
+        stored = _stored()
+        _rollback_schema_1_4(stored)
+        assert stored["schema_version"] == "1.3"
+        assert "date_inference" not in stored
+        assert config_fingerprint(stored) == _step("G1-W6 artifact schema").after
+
+    def test_only_the_record_and_the_version_moved(self):
+        current, previous = _stored(), _stored()
+        _rollback_schema_1_4(previous)
+        changed = set(current) ^ set(previous)
+        changed.update(
+            key for key in current.keys() & previous.keys() if current[key] != previous[key]
+        )
+        assert changed == {"schema_version", "date_inference"}
 
 
 class TestTheCvFoldsStep:

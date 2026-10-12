@@ -1,6 +1,7 @@
 """Assembling an audit artifact from facts other layers already established.
 
-This module measures nothing. It receives a
+This module does not recompute a profile, a quality report, or a verdict. It
+receives a
 :class:`~aidatasetkit.core.types.DatasetProfile`, a
 :class:`~aidatasetkit.core.types.QualityReport`, a
 :class:`~aidatasetkit.preprocessing.PreprocessingPlan`, and whatever else the
@@ -58,6 +59,8 @@ from aidatasetkit.evidence.types import (
     ColumnEvidence,
     ConfigIdentity,
     DatasetIdentity,
+    DateColumnInference,
+    DateInferenceEvidence,
     DecisionEvidence,
     EvidenceSource,
     FeatureLineage,
@@ -73,6 +76,11 @@ from aidatasetkit.evidence.types import (
     ModelEvidence,
     TargetEvidence,
     Verdict,
+)
+from aidatasetkit.profiling.date_inference import (
+    FORMAT_FAMILY,
+    StrictIsoInference,
+    infer_strict_iso,
 )
 
 __all__ = ["AuditBuilder", "CHUNKED_AUDIT_UNAVAILABLE", "KNOWN_LIMITATIONS"]
@@ -265,6 +273,8 @@ class AuditBuilder:
         """
         stage = self._stage(plan, lineage)
         columns = tuple(self._column_evidence(column) for column in profile.column_profiles)
+        facts = infer_strict_iso(frame)
+        columns = _keep_detected_kinds(columns, facts)
         issues = quality.issues if quality is not None else ()
         findings = tuple(self._finding_evidence(issue) for issue in issues)
         decisions = tuple(self._decision_evidence(plan, model)) if plan is not None else ()
@@ -274,7 +284,7 @@ class AuditBuilder:
         )
 
         identity = DatasetIdentity(
-            fingerprint=dataset_fingerprint(frame),
+            fingerprint=dataset_fingerprint(_frame_for_fingerprint(frame)),
             schema_fingerprint=schema_fingerprint(frame),
             algorithm=ALGORITHM,
             row_count=profile.row_count,
@@ -311,6 +321,7 @@ class AuditBuilder:
             ingestion=self._ingestion_evidence(ingestion, frame),
             chunked_profiling=None,
             source_selector=_selector_evidence(source_selector),
+            date_inference=_date_evidence(facts),
         )
 
     def build_chunked(
@@ -372,6 +383,7 @@ class AuditBuilder:
             ingestion=_chunked_ingestion(profile),
             chunked_profiling=evidence,
             source_selector=None,
+            date_inference=None,
         )
 
     @staticmethod
@@ -769,6 +781,61 @@ def _chunked_settings(profile: Any) -> dict[str, Any]:
         "limits": dict(profile.effective_limits),
         "fingerprint_algorithm": profile.fingerprint_algorithm,
     }
+
+
+def _frame_for_fingerprint(frame: pd.DataFrame) -> pd.DataFrame:
+    """The fingerprint is of the accepted table, not a converted copy."""
+    return frame
+
+
+def _keep_detected_kinds(
+    columns: tuple[ColumnEvidence, ...], facts: StrictIsoInference
+) -> tuple[ColumnEvidence, ...]:
+    """Inference must not rewrite operational detected_kind."""
+    return columns
+
+
+def _date_evidence(facts: StrictIsoInference) -> DateInferenceEvidence:
+    """Copy recognizer facts into the artifact. Columns are the positive ones."""
+    return DateInferenceEvidence(
+        method=facts.method,
+        population=facts.population,
+        full_population_scanned=facts.full_population_scanned,
+        minimum_non_blank=facts.minimum_non_blank,
+        required_match_ratio=facts.required_match_ratio,
+        conversion_performed=facts.conversion_performed,
+        affects_detected_kind=facts.affects_detected_kind,
+        affects_verdict=facts.affects_verdict,
+        columns=tuple(_column_date_evidence(column) for column in facts.columns),
+    )
+
+
+def _column_date_evidence(column) -> DateColumnInference:
+    return DateColumnInference(
+        column=column.column,
+        inferred_semantic_type=column.inferred_semantic_type,
+        format_family=FORMAT_FAMILY,
+        non_blank_count=column.non_blank_count,
+        blank_count=column.blank_count,
+        matched_count=column.matched_count,
+        invalid_count=column.invalid_count,
+        timezone_policy=column.timezone_policy,
+    )
+
+
+def _unavailable_date_inference() -> StrictIsoInference:
+    """A scan that did not run. The full-audit path does not call this."""
+    return StrictIsoInference(
+        method="",
+        population="unavailable",
+        full_population_scanned=False,
+        minimum_non_blank=0,
+        required_match_ratio=1.0,
+        conversion_performed=False,
+        affects_detected_kind=False,
+        affects_verdict=False,
+        columns=(),
+    )
 
 
 def _with_source_selector(
