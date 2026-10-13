@@ -70,7 +70,7 @@ Formulas are not evaluated. An `.xls` cell keeps only the cached result; a
 missing cache is a missing cell, and an Excel error result is refused without
 the code or the formula text. Row, column and cell limits, and the
 field-length limit, apply to the selected worksheet; the file-size limit still
-covers the whole workbook and is applied before the workbook is opened. A
+covers the whole workbook and is applied before the workbook is opened. xlrd may parse inside that accepted byte budget. This is not a streaming reader. A
 header with no data rows is
 empty input, and a blank data row is kept as missing cells. JSON is read whole (bounded by the source-byte limit),
 while JSONL is checked as it streams.

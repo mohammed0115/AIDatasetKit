@@ -1,16 +1,16 @@
 # POST-G0 Capability Reality Audit — AIDatasetKit
 
 ```text
-CURRENT_GATE                 = G0 closed; G1-W1 through G1-W9 closed; G1-W10 implemented, pending review
-CURRENT_ACTIVITY             = G1-W10 implemented, pending review; stop before certification
+CURRENT_GATE                 = G0 closed; G1-W1 through G1-W10 closed
+CURRENT_ACTIVITY             = G1-W10 PASS; stop; do not start another capability
 G0_STATUS                    = PASS (16/16)
 G0_MAIN_INTEGRATION          = PASS
 GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
-OVERALL_CERTIFIED_PROGRESS   = 48.71%   (113 proven / 232 applicable, G0–G12; unchanged by G1-W10, §0)
+OVERALL_CERTIFIED_PROGRESS   = 49.14%   (114 proven / 232 applicable, G0–G12; updated after G1-W10, §0)
 AUDIT_GATE                   = PASS     (the audit is complete with evidence; G1–G12 are not)
-READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W10 awaits review; do not certify G1-05)
-NEXT_AUTHORIZED_ACTION       = stop for CTO review; do not certify G1-05; do not start another capability
+READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W10 is PASS; do not start another capability)
+NEXT_AUTHORIZED_ACTION       = stop; do not start another capability
 ```
 
 **حدود هذا المستند:**
@@ -252,6 +252,14 @@ AUDIT_DOCUMENTS       = CORRECT
 - Recorded progress stays G1 = 21/26 = **80.77%** and overall = 113/232 = **48.71%**. Status-detail counts for G1 stay 21 / 0 / 1 / 4 because this row is not promoted. Artifact schema `1.4`. Publication schema `1.0`. Package version `0.1.0a1`.
 - Evidence: `docs/evidence/G1_W10_XLS_READER_REPORT.md`.
 
+**تحديث 18 — G1-W10 closure (PASS):**
+
+- **G1-05: `SUPPORTED_AND_TESTED`.** A local regular `.xls` file is one worksheet via xlrd on the existing `excel` extra (`xlrd>=2.0.2,<3`). xlrd is optional and is not a core dependency. `.xlsx` stays on openpyxl. Sheet selection, hidden-sheet eligibility, evidence, the config fingerprint, and selected-sheet limits follow the `.xlsx` contract. The reader is bounded by `max_source_bytes` and is not a streaming reader. Formulas are not evaluated; only a cached result is kept. An Excel error cell is refused without the code. Macros and VBA are ignored by the reader. That ignore is not a security scan and not a safety verdict.
+- **G1-W10 = PASS.** Code branch CI and code main CI are 10/10 on `CERTIFIED_CODE_SHA` `0c816d5c778b3367c71f17b458e4aef230a0d629`. This update does not name the CI run of the documentation commit that adds it.
+- **G1-17 stays `PARTIAL`.** **G1-10, G1-11, and G1-15 stay `MISSING`.** **G1-13, G1-14, G1-22, and G1-24 stay `SUPPORTED_AND_TESTED`.**
+- Recorded progress is G1 = 22/26 = **84.62%** and overall = 114/232 = **49.14%**. Status-detail counts for G1 are 22 / 0 / 1 / 3. Artifact schema `1.4`. Publication schema `1.0`. Package version `0.1.0a1`.
+- Evidence: `docs/evidence/G1_W10_XLS_READER_REPORT.md`.
+
 ## 1. Main integration
 
 | البند | القيمة |
@@ -335,7 +343,7 @@ G0_MAIN_INTEGRATION = PASS
 | G1-02 | G1 | CSV delimiter detection (`,` `;` tab `\|`) | `SUPPORTED_AND_TESTED` | ingestion/delimited.py::_choose (G1-W1): csv strict on a 64 KiB sample, ambiguity refused, explicit delimiter validated | tests/unit/test_ingestion.py::TestDelimiterDetection, tests/integration/test_cli_ingestion.py; scripts/ingestion_mutations.py (1–3) | Closed P0-2 | — |
 | G1-03 | G1 | TSV | `SUPPORTED_AND_TESTED` | ingestion/formats.py + delimited.py (G1-W1) | tests/unit/test_ingestion.py::TestTsv, tests/integration/test_cli_ingestion.py::test_every_supported_layout | — | — |
 | G1-04 | G1 | XLSX | `SUPPORTED_AND_TESTED` | ingestion/excel.py (G1-W4): worksheet dims preflight before cells; multi-sheet refused unless sheet=; macro archive refused | tests/unit/test_ingestion_excel.py, tests/integration/test_ingestion_without_openpyxl.py, test_cli_ingestion.py; scripts/g1_w4_mutations.py (6/6) | — | — |
-| G1-05 | G1 | XLS | `MISSING_PENDING_CERTIFICATION` | ingestion/xls.py (G1-W10, pending review): one local BIFF worksheet via xlrd on the excel extra; `.xlsx` stays on openpyxl | tests/unit/test_ingestion_xls.py; scripts/g1_w10_mutations.py | Pending review; not promoted | P2 |
+| G1-05 | G1 | XLS | `SUPPORTED_AND_TESTED` | ingestion/xls.py (G1-W10 PASS): one local BIFF worksheet via xlrd on the excel extra; `.xlsx` stays on openpyxl; cached formula results only; not a streaming reader | tests/unit/test_ingestion_xls.py; scripts/g1_w10_mutations.py (16/16); G1-W10 report | — | — |
 | G1-06 | G1 | Parquet | `SUPPORTED_AND_TESTED` | ingestion/columnar.py::_parquet_frame (G1-W3): footer row/column/cell preflight before materialization; footer/data agreement checked | tests/unit/test_ingestion_columnar.py, tests/integration/test_ingestion_without_pyarrow.py, test_cli_ingestion.py; scripts/g1_w3_mutations.py (M-W3-07/08) | — | — |
 | G1-07 | G1 | Feather / Arrow tables | `SUPPORTED_AND_TESTED` | ingestion/columnar.py::_feather_frame (G1-W3): column budget from the IPC schema before data, rows/cells on the Arrow table before pandas | tests/unit/test_ingestion_columnar.py, tests/integration/test_ingestion_without_pyarrow.py; scripts/g1_w3_mutations.py (M-W3-09) | — | — |
 | G1-08 | G1 | JSON | `SUPPORTED_AND_TESTED` | ingestion/json_text.py (G1-W3): array of flat objects; duplicate keys, nested values, NaN/Infinity refused | tests/unit/test_ingestion_json.py, tests/integration/test_cli_ingestion.py; scripts/g1_w3_mutations.py (M-W3-01..06) | — | — |
@@ -755,7 +763,7 @@ G0_MAIN_INTEGRATION = PASS
 |---|---|---:|---:|---:|---|---|
 | G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
 | G0.1 | Profiling performance hotfix | — | — | — | PASS | P0-1 مغلق (انظر §0) |
-| G1 | Ingestion | 21 | 26 | 80.77% | IN PROGRESS | W1–W9 مغلقة؛ W10 بانتظار المراجعة |
+| G1 | Ingestion | 22 | 26 | 84.62% | IN PROGRESS | W1–W10 مغلقة |
 | G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | تواريخ ونص وقيم |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | عمليات جدولية |
 | G4 | EDA & Statistics | 9 | 13 | 69.23% | AUDIT | ارتباط فئوي واختبارات |
@@ -767,14 +775,14 @@ G0_MAIN_INTEGRATION = PASS
 | G10 | Provenance/Security/Privacy/Errors | 18 | 28 | 64.29% | AUDIT | أخطاء الموارد والمدخلات |
 | G11 | Performance & Certification | 5 | 21 | 23.81% | AUDIT | 4 بنود MISSING→PARTIAL في G0.1؛ benchmarks في CI |
 | G12 | Masari Consumer Integration | 2 | 14 | 14.29% | AUDIT | بعد G1–G9 |
-| **All** | G0–G12 | **113** | **232** | **48.71%** | — | — |
+| **All** | G0–G12 | **114** | **232** | **49.14%** | — | — |
 
 **تفصيل الحالات لكل بوابة** (حتى لا يختفي العمل الموجود غير المكتمل):
 
 | Gate | SUPPORTED_AND_TESTED | SUPPORTED_NOT_SUFFICIENTLY_TESTED | PARTIAL | MISSING | BLOCKED | NOT_APPLICABLE | OUT_OF_SCOPE |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | G0 | 16 | 0 | 0 | 0 | 0 | 0 | 0 |
-| G1 | 21 | 0 | 1 | 4 | 0 | 0 | 1 |
+| G1 | 22 | 0 | 1 | 3 | 0 | 0 | 1 |
 | G2 | 15 | 0 | 2 | 5 | 0 | 0 | 0 |
 | G3 | 2 | 0 | 5 | 10 | 0 | 1 | 0 |
 | G4 | 9 | 0 | 2 | 2 | 0 | 0 | 0 |

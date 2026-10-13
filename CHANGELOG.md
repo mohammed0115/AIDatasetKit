@@ -11,13 +11,13 @@ as a GitHub release, and no version is tagged. Everything below is new.
 
 ### G1-W10 legacy .xls worksheets
 
-Evidence: `docs/evidence/G1_W10_XLS_READER_REPORT.md`. Status: pending later review. Not PASS. G1-05 is not promoted.
+Evidence: `docs/evidence/G1_W10_XLS_READER_REPORT.md`. Status: PASS.
 
 - A local `.xls` workbook loads through `load_table(..., sheet=)` and the CLI `--sheet` flag. xlrd is on the existing `excel` extra (`xlrd>=2.0.2,<3`). openpyxl still reads `.xlsx`. xlrd is not a core dependency. A core install refuses `.xls` with `MissingDependencyError` naming that extra.
 - One eligible worksheet is one table. The name match is exact. One worksheet may omit `sheet=`; more than one requires it. Hidden and very-hidden worksheets stay eligible. A renamed HTML, XML, or ZIP payload is refused before it is treated as BIFF.
 - Formulas are not evaluated. Only the cached result is kept. A missing cache is a missing cell. An Excel error cell is refused without the code or the formula text.
 - Macros and VBA are not executed, extracted, or described. The reader ignores them. That is not a safety verdict.
-- Recorded progress stays G1 21/26 = 80.77% and overall 113/232 = 48.71%. Artifact schema stays `1.4`. Publication schema stays `1.0`. Package version stays `0.1.0a1`.
+- G1-05 is `SUPPORTED_AND_TESTED`. Recorded progress is G1 22/26 = 84.62% and overall 114/232 = 49.14%. Artifact schema stays `1.4`. Publication schema stays `1.0`. Package version stays `0.1.0a1`. The reader is bounded by the file-size limit and is not a streaming reader.
 
 ### G1-W9 synchronous iterables of records
 

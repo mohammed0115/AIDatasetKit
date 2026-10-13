@@ -1,22 +1,28 @@
 # G1-W10 — Bounded legacy .xls worksheet ingestion
 
-G1-W10 is **implemented and pending review**. It is **not PASS**.
+G1-W10 is **PASS**. G1-05 is `SUPPORTED_AND_TESTED`.
 
-G1-05 stays `MISSING_PENDING_CERTIFICATION`. This file does not promote it, does not seal the wave, and does not name a CI run.
+`CERTIFIED_CODE_SHA` is the tip integrated to `main` before this record.
+`DOCS_SEAL_SHA` is the documentation-only commit that adds this certification.
+This file names `CERTIFIED_CODE_SHA` and does not name `DOCS_SEAL_SHA` or any
+CI run started by that documentation commit.
 
 ```text
 STARTING_HEAD            = bf79e2c726ade2ed6f5ec2a62ccaeed90d082397
+CERTIFIED_CODE_SHA       = 0c816d5c778b3367c71f17b458e4aef230a0d629
+DOCS_SEAL_SHA            = not recorded in this file
 BRANCH                   = g1-w10-xls-reader
-G1_W10_STATUS            = implemented, pending review, not PASS
-G1_05_STATUS             = MISSING_PENDING_CERTIFICATION
+G1_W10_STATUS            = PASS
+G1_05_STATUS             = SUPPORTED_AND_TESTED
 ARTIFACT_SCHEMA          = 1.4
 PUBLICATION_SCHEMA       = 1.0
 PACKAGE                  = 0.1.0a1
-G1_PROGRESS              = 21/26 = 80.77%
-OVERALL_PROGRESS         = 113/232 = 48.71%
+G1_PROGRESS              = 22/26 = 84.62%
+OVERALL_PROGRESS         = 114/232 = 49.14%
 ```
 
-Recorded progress is unchanged from the G1-W9 seal. Promoting G1-05, after a later review, would be G1 22/26 = 84.62% and overall 114/232 = 49.14%.
+Before this seal the recorded progress was G1 21/26 = 80.77% and overall
+113/232 = 48.71%.
 
 ## What this wave does
 
@@ -44,6 +50,32 @@ Evidence records `format=xls`, `source_kind=file`, and `source_selector={"kind":
 
 It does not read `.xlsm`, `.xlsb`, XML, YAML, PostgreSQL, SQLAlchemy, or query results. It does not detect encodings. It does not change G1-17, G1-10, G1-11, or G1-15. It does not change the artifact schema, the publication schema, or the package version. Existing golden artifacts are not regenerated. `AIDataFacade.load` stays DataFrame-only.
 
+## CI
+
+These runs are for `CERTIFIED_CODE_SHA`. This section does not name a CI run of the commit that adds it.
+
+```text
+CERTIFIED_CODE_SHA = 0c816d5c778b3367c71f17b458e4aef230a0d629
+BRANCH_CI_RUN      = 38387353796
+BRANCH_CI_URL      = https://github.com/mohammed0115/AIDatasetKit/actions/runs/38387353796
+BRANCH_CI_SHA      = 0c816d5c778b3367c71f17b458e4aef230a0d629
+BRANCH_CI_EVENT    = push
+BRANCH_CI_BRANCH   = g1-w10-xls-reader
+BRANCH_CI_RESULT   = success
+BRANCH_CI_JOBS     = 10/10
+BRANCH_CI_STARTED  = 2026-10-13T11:01:24Z
+BRANCH_CI_UPDATED  = 2026-10-13T11:07:31Z
+MAIN_CI_RUN        = 38421556058
+MAIN_CI_URL        = https://github.com/mohammed0115/AIDatasetKit/actions/runs/38421556058
+MAIN_CI_SHA        = 0c816d5c778b3367c71f17b458e4aef230a0d629
+MAIN_CI_EVENT      = push
+MAIN_CI_BRANCH     = main
+MAIN_CI_RESULT     = success
+MAIN_CI_JOBS       = 10/10
+MAIN_CI_STARTED    = 2026-10-13T15:22:51Z
+MAIN_CI_UPDATED    = 2026-10-13T15:29:57Z
+```
+
 ## Status
 
-G1-W10 = implemented, pending review, not PASS. G1-05 = `MISSING_PENDING_CERTIFICATION`. G1-17 stays `PARTIAL`. G1-10, G1-11, and G1-15 stay `MISSING`. G1-13 stays `SUPPORTED_AND_TESTED`. Artifact schema `1.4`. Publication schema `1.0`. Package version `0.1.0a1`. Recorded progress stays G1 21/26 = 80.77% and overall 113/232 = 48.71%.
+G1-W10 = PASS. G1-05 = `SUPPORTED_AND_TESTED`. xlrd stays on the optional `excel` extra. `.xlsx` still uses openpyxl. The reader is bounded by `max_source_bytes` and is not a streaming reader. Formulas are not evaluated. VBA is ignored by the reader and is not a security scan or a safety verdict. G1-17 stays `PARTIAL`. G1-10, G1-11, and G1-15 stay `MISSING`. G1-13 stays `SUPPORTED_AND_TESTED`. Artifact schema `1.4`. Publication schema `1.0`. Package version `0.1.0a1`. Recorded progress is G1 22/26 = 84.62% and overall 114/232 = 49.14%.
