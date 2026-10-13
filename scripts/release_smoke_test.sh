@@ -125,7 +125,13 @@ EXCEL="$WORK/excel"
 python -m venv "$EXCEL"
 EBIN="$EXCEL/bin"
 [ -d "$EXCEL/Scripts" ] && EBIN="$EXCEL/Scripts"
-"$EBIN/pip" install -q "${WHEEL}[excel]"
+# Git Bash does not convert a path once an extras marker is appended, and pip
+# then looks for /d/a/... under D:\d\a\...
+WHEEL_EXCEL="${WHEEL}[excel]"
+if command -v cygpath >/dev/null 2>&1; then
+  WHEEL_EXCEL="$(cygpath -w "$WHEEL")[excel]"
+fi
+MSYS_NO_PATHCONV=1 "$EBIN/pip" install -q "$WHEEL_EXCEL"
 "$EBIN/python" - "$ROOT/tests/fixtures/g1_w10_two_sheet.xls.b64" "$WORK/book.xls" <<'PY'
 import base64, sys
 from pathlib import Path
