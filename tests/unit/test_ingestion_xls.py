@@ -379,19 +379,23 @@ class TestRefusals:
             "zip.xls": b"PK\x03\x04" + b"not-a-workbook",
         }
 
-        def opened(*args, **kwargs):
-            raise AssertionError("disguised non-BIFF file accepted")
+        opened = {"count": 0}
 
-        monkeypatch.setattr(xlrd, "open_workbook", opened)
+        def opened_book(*args, **kwargs):
+            opened["count"] += 1
+            raise RuntimeError("opened")
+
+        monkeypatch.setattr(xlrd, "open_workbook", opened_book)
         for name, payload in samples.items():
             path = tmp_path / name
             path.write_bytes(payload)
+            opened["count"] = 0
             try:
                 load_table(path)
-            except MalformedInputError:
+            except MalformedInputError as exc:
+                if opened["count"] or "BIFF" not in str(exc):
+                    raise AssertionError("disguised non-BIFF file accepted") from None
                 continue
-            except AssertionError:
-                raise
             raise AssertionError("disguised non-BIFF file accepted")
 
     def test_xlsm_and_xlsb_suffixes_stay_unsupported(self, tmp_path):
