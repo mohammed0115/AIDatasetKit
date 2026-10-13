@@ -14,6 +14,7 @@ Two environments are supported, and both are pinned exactly in `constraints/`:
 | xgboost / lightgbm / catboost (`boosting`) | 2.0.0 / 4.0.0 / 1.2 | 3.4.1 / 4.7.0 / 1.2.10 |
 | pyarrow (`parquet`) | 14.0.1 | 25.0.1 |
 | openpyxl (`excel`) | 3.1.0 | 3.1.5 |
+| xlrd (`excel`) | 2.0.2 | 2.0.2 |
 
 ```bash
 pip install -c constraints/minimum.txt   -e ".[dev]"      # or reference.txt
@@ -22,9 +23,10 @@ pip install -c constraints/reference.txt -e ".[dev,viz,boosting]"
 
 The floors in `pyproject.toml` are the minimum column exactly. They record what
 the full suite has passed on, not what might work, and
-`tests/unit/test_dependency_contract.py` fails if the two drift apart. There are
-no upper bounds: nothing newer than the reference column is known to break, and
-nothing newer has been run either.
+`tests/unit/test_dependency_contract.py` fails if the two drift apart. Floors
+are open, except `xlrd`, which is `>=2.0.2,<3` so the `.xls` reader stays on
+the BIFF-only 2.x line. Nothing newer than the reference column is known to
+break, and nothing newer has been run either.
 
 ## Why each floor is where it is
 
@@ -57,6 +59,10 @@ untrusted tables, so the floor is the fix, not the oldest version that imports.
 **openpyxl 3.1.0.** The floor for the `.xlsx` reader: the 3.1 line reads the
 worksheet's declared dimensions in `read_only` mode without materializing the
 cells, which is what the row/column/cell preflight relies on.
+
+**xlrd 2.0.2.** The floor for the legacy `.xls` reader, on the same `excel`
+extra. The 2.x line reads BIFF workbooks and does not read `.xlsx`. 1.x is
+outside the pin because it also opens `.xlsx`. The requirement stops before 3.
 
 ## What differs between the two, by design
 

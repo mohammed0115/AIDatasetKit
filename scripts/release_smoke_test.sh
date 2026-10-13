@@ -98,8 +98,54 @@ assert a["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.4", a["schema_versio
 assert a["verdict"] == "blocked", a["verdict"]
 assert a["columns"] and a["findings"], "artifact is empty"
 PY
+  say "A core install refuses .xls and publishes nothing"
+  "$BIN/python" - "$WORK/core-$KIND.xls" <<'PY'
+import sys
+from pathlib import Path
+Path(sys.argv[1]).write_bytes(bytes.fromhex("D0CF11E0A1B11AE1") + b"\x00" * 512)
+PY
+  set +e
+  "$BIN/aidatasetkit" audit "$WORK/core-$KIND.xls" \
+      --output "$WORK/xls-refused-$KIND" >"$WORK/xls-refused-$KIND.out" 2>"$WORK/xls-refused-$KIND.err"
+  CODE=$?
+  set -e
+  [ "$CODE" -eq 1 ] || fail "$KIND: core .xls expected exit 1, got $CODE"
+  grep -q "MissingDependencyError" "$WORK/xls-refused-$KIND.err" \
+      || fail "$KIND: core .xls did not name MissingDependencyError"
+  grep -q "excel" "$WORK/xls-refused-$KIND.err" \
+      || fail "$KIND: core .xls did not name the excel extra"
+  [ ! -e "$WORK/xls-refused-$KIND/CURRENT" ] \
+      || fail "$KIND: a refused .xls published CURRENT"
+
   printf '  %s: install, CLI, audit, artifacts, exit code -- all good\n' "$KIND"
 done
+
+say "Installing the wheel with the excel extra"
+EXCEL="$WORK/excel"
+python -m venv "$EXCEL"
+EBIN="$EXCEL/bin"
+[ -d "$EXCEL/Scripts" ] && EBIN="$EXCEL/Scripts"
+"$EBIN/pip" install -q "${WHEEL}[excel]"
+"$EBIN/python" - "$ROOT/tests/fixtures/g1_w10_two_sheet.xls.b64" "$WORK/book.xls" <<'PY'
+import base64, sys
+from pathlib import Path
+Path(sys.argv[2]).write_bytes(base64.b64decode(Path(sys.argv[1]).read_text()))
+PY
+"$EBIN/aidatasetkit" audit "$WORK/book.xls" --sheet Data --target churn \
+    --fail-on never --output "$WORK/xls-ok" >/dev/null
+"$EBIN/python" - "$WORK/xls-ok" <<'PY' || exit 1
+import sys
+from aidatasetkit.evidence import ARTIFACT_SCHEMA_VERSION, read_current
+run = read_current(sys.argv[1])
+audit = run.json("audit.json")
+assert audit["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.4", audit["schema_version"]
+assert audit["ingestion"]["format"] == "xls", audit["ingestion"]
+assert audit["ingestion"]["source_kind"] == "file"
+assert audit["source_selector"] == {"kind": "sheet", "name": "Data"}, audit["source_selector"]
+assert audit["ingestion"]["encoding"] is None
+assert audit["ingestion"]["delimiter"] is None
+PY
+printf '  excel extra: .xls --sheet Data, format xls, schema 1.4 -- all good\n'
 
 say "Release smoke test passed"
 echo "Nothing was published. dist/ holds the artifacts."

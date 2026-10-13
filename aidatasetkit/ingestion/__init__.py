@@ -1,7 +1,7 @@
 """Ingestion: the one authority that turns a source into a table.
 
 :func:`load_table` accepts a ``.csv``, ``.tsv``, ``.json``, ``.jsonl``,
-``.ndjson``, ``.parquet``, ``.feather``, ``.arrow``, ``.xlsx``, ``.sqlite`` or
+``.ndjson``, ``.parquet``, ``.feather``, ``.arrow``, ``.xlsx``, ``.xls``, ``.sqlite`` or
 ``.sqlite3`` path, a pandas DataFrame, a list or tuple of records, or another
 synchronous iterable of mappings, and returns a
 :class:`LoadedTable` -- the frame and typed :class:`LoadMetadata` about how it
@@ -11,7 +11,7 @@ table without a word.
 
 Not here, on purpose: profiling, quality checks, training, network access,
 scraping, and every format other than CSV, TSV, JSON, JSONL, Parquet, Feather,
-Excel ``.xlsx`` and local SQLite. An ``.xlsx`` file contributes one eligible
+Excel ``.xlsx`` and ``.xls`` and local SQLite. An Excel file contributes one eligible
 worksheet, and that worksheet's exact name is the ``sheet`` selector. A SQLite
 file is one ordinary table, opened
 read-only; views, virtual tables, ``sqlite_*`` tables and caller SQL are

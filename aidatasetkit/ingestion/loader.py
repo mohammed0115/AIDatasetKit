@@ -28,6 +28,7 @@ from aidatasetkit.core.exceptions import (
 from aidatasetkit.ingestion.columnar import read_columnar
 from aidatasetkit.ingestion.delimited import plan_delimited
 from aidatasetkit.ingestion.excel import read_excel
+from aidatasetkit.ingestion.xls import read_xls
 from aidatasetkit.ingestion.formats import resolve_format
 from aidatasetkit.ingestion.json_text import read_json_text
 from aidatasetkit.ingestion.types import (
@@ -57,7 +58,7 @@ def load_table(
     Args:
         source: A path (:class:`pathlib.Path` or any :class:`os.PathLike`) to a
             ``.csv``, ``.tsv``, ``.json``, ``.jsonl``, ``.ndjson``, ``.parquet``,
-            ``.feather``, ``.arrow``, ``.xlsx``, ``.sqlite`` or ``.sqlite3`` file;
+            ``.feather``, ``.arrow``, ``.xlsx``, ``.xls``, ``.sqlite`` or ``.sqlite3`` file;
             a :class:`pandas.DataFrame`; a list or tuple of mappings, one per row;
             or another synchronous iterable of mappings, consumed once.
             A plain ``str`` is refused rather than guessed at -- pass
@@ -66,7 +67,7 @@ def load_table(
             ``AIDataFacade.load`` still requires a DataFrame; pass
             ``load_table(source).frame`` into it.
         options: How a file is read. In-memory sources accept only the defaults.
-        sheet: The worksheet to read from an ``.xlsx`` file. Required when the
+        sheet: The worksheet to read from an ``.xlsx`` or ``.xls`` file. Required when the
             workbook has more than one sheet; meaningless for any other source.
         table: The ordinary table to read from a ``.sqlite`` or ``.sqlite3``
             file. Required when the database has more than one; meaningless for
@@ -87,7 +88,7 @@ def load_table(
     if isinstance(source, pd.DataFrame):
         _require_default(options, "a DataFrame")
         if sheet is not None:
-            raise InvalidIngestionOptionsError("sheet= applies to .xlsx files only.")
+            raise InvalidIngestionOptionsError("sheet= applies to .xlsx and .xls files only.")
         if table is not None:
             raise InvalidIngestionOptionsError("table= applies to SQLite files only.")
         return _from_dataframe(source, limits)
@@ -101,7 +102,7 @@ def load_table(
     if isinstance(source, (list, tuple)):
         _require_default(options, "records")
         if sheet is not None:
-            raise InvalidIngestionOptionsError("sheet= applies to .xlsx files only.")
+            raise InvalidIngestionOptionsError("sheet= applies to .xlsx and .xls files only.")
         if table is not None:
             raise InvalidIngestionOptionsError("table= applies to SQLite files only.")
         return _from_records(source, limits)
@@ -117,13 +118,13 @@ def load_table(
     if isinstance(source, Iterable):
         _require_default(options, "records")
         if sheet is not None:
-            raise InvalidIngestionOptionsError("sheet= applies to .xlsx files only.")
+            raise InvalidIngestionOptionsError("sheet= applies to .xlsx and .xls files only.")
         if table is not None:
             raise InvalidIngestionOptionsError("table= applies to SQLite files only.")
         return _from_record_iterable(source, limits)
     raise UnsupportedFormatError(
         f"Cannot load a {type(source).__name__}. Supported: a path to a .csv, "
-        ".tsv, .json, .jsonl, .parquet, .feather, .xlsx, .sqlite or .sqlite3 "
+        ".tsv, .json, .jsonl, .parquet, .feather, .xlsx, .xls, .sqlite or .sqlite3 "
         "file, a pandas DataFrame, or a synchronous iterable of mappings."
     )
 
@@ -166,9 +167,9 @@ def _from_file(
                 observed_value=size, input_kind=SourceKind.FILE.value,
             )
 
-    if fmt is not TableFormat.XLSX and sheet is not None:
+    if fmt not in (TableFormat.XLSX, TableFormat.XLS) and sheet is not None:
         raise InvalidIngestionOptionsError(
-            f"sheet= applies to .xlsx files only; {path.name} is {fmt.value}."
+            f"sheet= applies to .xlsx and .xls files only; {path.name} is {fmt.value}."
         )
     if fmt is not TableFormat.SQLITE and table is not None:
         raise InvalidIngestionOptionsError(
@@ -230,6 +231,24 @@ def _from_file(
         )
     if fmt is TableFormat.XLSX:
         frame, selector = read_excel(path, fmt, options, limits, sheet=sheet)
+        return LoadedTable(
+            frame=frame,
+            metadata=LoadMetadata(
+                source_kind=SourceKind.FILE,
+                format=fmt,
+                encoding=None,
+                delimiter=None,
+                delimiter_source=None,
+                header=None,
+                row_count=int(len(frame)),
+                column_count=int(frame.shape[1]),
+                memory_bytes=_memory(frame),
+                warnings=(),
+            ),
+            selector=selector,
+        )
+    if fmt is TableFormat.XLS:
+        frame, selector = read_xls(path, fmt, options, limits, sheet=sheet)
         return LoadedTable(
             frame=frame,
             metadata=LoadMetadata(

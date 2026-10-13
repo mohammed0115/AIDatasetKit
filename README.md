@@ -282,9 +282,10 @@ Supported: `.csv` and `.tsv` files (comma, semicolon, tab or pipe, detected or
 named; utf-8, utf-8-sig, latin-1 or cp1256, never guessed), `.json` files
 holding an array of flat objects, `.jsonl`/`.ndjson` files holding one object
 per line, `.parquet` and `.feather`/`.arrow` files (via the optional `parquet`
-extra), `.xlsx` workbooks (one eligible worksheet, via the optional `excel`
-extra; the exact name is `sheet=` or `--sheet` when more than one worksheet
-exists, and that name is recorded on the audit), local `.sqlite` and
+extra), `.xlsx` and `.xls` workbooks (one eligible worksheet, via the optional
+`excel` extra; `.xlsx` uses openpyxl and `.xls` uses xlrd; the exact name is
+`sheet=` or `--sheet` when more than one worksheet exists, and that name is
+recorded on the audit), local `.sqlite` and
 `.sqlite3` databases (one ordinary table, read-only; more than one table needs
 `table=` or `--table`), pandas DataFrames and lists
 of records · tabular data · binary and multiclass classification readiness ·

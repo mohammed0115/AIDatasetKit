@@ -45,6 +45,7 @@ class TableFormat(StrEnum):
     PARQUET = "parquet"
     FEATHER = "feather"
     XLSX = "xlsx"
+    XLS = "xls"
     SQLITE = "sqlite"
 
 

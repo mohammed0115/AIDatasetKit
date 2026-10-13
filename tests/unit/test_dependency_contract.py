@@ -45,6 +45,17 @@ def _declared() -> dict[str, str]:
     return floors
 
 
+def _floor_text(package: str, pin: str) -> str:
+    """The pyproject spec that corresponds to one constraints pin.
+
+    xlrd is the exception: 1.x also reads ``.xlsx``, so the extra pins the 2.x
+    line and stops before 3. Every other floor is an open ``>=``.
+    """
+    if package == "xlrd":
+        return f">={pin},<3"
+    return f">={pin}"
+
+
 def _version(text: str) -> tuple[int, ...]:
     return tuple(int(part) for part in text.split("."))
 
@@ -52,7 +63,7 @@ def _version(text: str) -> tuple[int, ...]:
 class TestTheFloorsAreTheTestedMinimum:
     @pytest.mark.parametrize("package", sorted(_pins("minimum.txt")))
     def test_each_pinned_package_is_declared_with_exactly_that_floor(self, package):
-        assert _declared()[package] == f">={_pins('minimum.txt')[package]}"
+        assert _declared()[package] == _floor_text(package, _pins("minimum.txt")[package])
 
     def test_every_library_dependency_is_pinned_in_the_minimum(self):
         """build and twine are release tools, exercised by the smoke test."""
@@ -61,6 +72,9 @@ class TestTheFloorsAreTheTestedMinimum:
 
     def test_there_are_no_upper_bounds(self):
         for package, spec in _declared().items():
+            if package == "xlrd":
+                assert spec == ">=2.0.2,<3", spec
+                continue
             assert "<" not in spec and "!=" not in spec and "~=" not in spec, package
 
 

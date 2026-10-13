@@ -46,23 +46,32 @@ frame has none.
 
 **Delimited text, JSON, columnar, Excel and local SQLite files.** `aidatasetkit.ingestion.load_table`
 — which the CLI uses — reads `.csv`, `.tsv`, `.json` (an array of flat
-objects), `.jsonl`/`.ndjson`, `.parquet`, `.feather`/`.arrow`, `.xlsx`,
+objects), `.jsonl`/`.ndjson`, `.parquet`, `.feather`/`.arrow`, `.xlsx`, `.xls`,
 `.sqlite` and `.sqlite3` files, a pandas DataFrame, or a list of records, and
-nothing else: no old-format `.xls`, no `.db`, no PostgreSQL, no SQLAlchemy, no
+nothing else: no `.db`, no PostgreSQL, no SQLAlchemy, no
 database URLs, and no cloud storage. A `.txt` file is refused even when it
 holds CSV. A SQLite file is one ordinary table, opened read-only. The only
 table is selected automatically; more than one needs `table=` or `--table`.
 Views, virtual tables, shadow tables that belong to virtual tables, `sqlite_*` tables and caller-supplied SQL are refused. Eligibility uses `PRAGMA table_list` when that catalog classification exists. When it does not, a file that defines a virtual table is refused rather than guessed.
 There is no chunked SQLite scan. Parquet and Feather need the optional `parquet` extra (pyarrow);
 `.xlsx` needs the `excel` extra (openpyxl) and reads one eligible worksheet.
-The name match is exact: case, spaces and Unicode are kept as written. One
-eligible worksheet is selected when `sheet=` is omitted; more than one needs
-`sheet=` or the CLI `--sheet` flag. Hidden and very-hidden worksheets stay
-eligible. Chartsheets are not worksheets. The selected title is recorded as
-`source_selector` with kind `sheet` and is part of the config fingerprint.
-The first row is the header. Macro-enabled workbooks are refused. Row, column
-and cell limits, and the field-length limit, apply to the selected worksheet;
-the file-size limit still covers the whole workbook. A header with no data rows is
+`.xls` needs the same extra (xlrd 2.x, not a core dependency) and reads one
+eligible BIFF worksheet. A core install refuses `.xls`. A file that is HTML,
+XML, or a ZIP archive under an `.xls` name is refused. `.xlsm` and `.xlsb`
+stay unsupported. The name match is exact: case, spaces and Unicode are kept
+as written. One eligible worksheet is selected when `sheet=` is omitted; more
+than one needs `sheet=` or the CLI `--sheet` flag. Hidden and very-hidden
+worksheets stay eligible. Chartsheets are not worksheets. The selected title
+is recorded as `source_selector` with kind `sheet` and is part of the config
+fingerprint. The first row is the header. A macro-enabled `.xlsx` is refused.
+An `.xls` workbook's macros and VBA are ignored by the reader: they are not
+executed, extracted, or described, and that ignore is not a safety verdict.
+Formulas are not evaluated. An `.xls` cell keeps only the cached result; a
+missing cache is a missing cell, and an Excel error result is refused without
+the code or the formula text. Row, column and cell limits, and the
+field-length limit, apply to the selected worksheet; the file-size limit still
+covers the whole workbook and is applied before the workbook is opened. A
+header with no data rows is
 empty input, and a blank data row is kept as missing cells. JSON is read whole (bounded by the source-byte limit),
 while JSONL is checked as it streams.
 

@@ -157,7 +157,7 @@ def build_parser() -> argparse.ArgumentParser:
     audit.add_argument(
         "path",
         type=Path,
-        help="Path to a .csv, .tsv, .json, .jsonl, .parquet, .feather, .xlsx, .sqlite or .sqlite3 file.",
+        help="Path to a .csv, .tsv, .json, .jsonl, .parquet, .feather, .xlsx, .xls, .sqlite or .sqlite3 file.",
     )
     audit.add_argument(
         "--target", default=None, help="Column holding the label, if there is one."
@@ -237,7 +237,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--sheet",
         default=None,
         help=(
-            "Worksheet to read from an .xlsx workbook. Required when the "
+            "Worksheet to read from an .xlsx or .xls workbook. Required when the "
             "workbook has more than one sheet; refused for every other format."
         ),
     )
