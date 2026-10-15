@@ -377,6 +377,94 @@ MUTATIONS += (
 )
 
 
+RANGE_TESTS = "tests/unit/test_datetime_endpoint_range.py"
+MUTATIONS += (
+    Mutation(
+        "M-G2W1-39", "Python datetime parser limits expanded endpoints",
+        ((TYPES, "    match = _DATETIME_ENDPOINT.fullmatch(value)",
+          '    __import__("datetime").datetime.fromisoformat(value)\n'
+          "    match = _DATETIME_ENDPOINT.fullmatch(value)"),),
+        f"{RANGE_TESTS}::test_year_10000_six_combinations",
+        "test_year_10000_six_combinations",
+        "Python datetime range restriction restored",
+    ),
+    Mutation(
+        "M-G2W1-40", "arbitrary endpoint strings bypass strict parsing",
+        ((TYPES, "    match = _DATETIME_ENDPOINT.fullmatch(value)",
+          "    return 0, False\n"
+          "    match = _DATETIME_ENDPOINT.fullmatch(value)"),),
+        f"{RANGE_TESTS}::test_noncanonical_endpoint_is_rejected[arbitrary]",
+        "test_noncanonical_endpoint_is_rejected[arbitrary]",
+        "arbitrary endpoint text accepted",
+    ),
+    Mutation(
+        "M-G2W1-41", "impossible calendar dates bypass validation",
+        ((TYPES,
+          '        if not (1 <= month <= 12 and 1 <= day <= month_lengths[month - 1]):',
+          '        if False and not (1 <= month <= 12 and 1 <= day <= month_lengths[month - 1]):'),),
+        f"{RANGE_TESTS}::test_impossible_endpoint_is_rejected[10000-02-30T00:00:00]",
+        "test_impossible_endpoint_is_rejected[10000-02-30T00:00:00]",
+        "impossible calendar or time accepted",
+    ),
+    Mutation(
+        "M-G2W1-42", "expanded endpoint is clipped to Python year ceiling",
+        (("aidatasetkit/core/types.py",
+          '            "duplicate_timestamp_count": self.duplicate_timestamp_count,\n'
+          '            "minimum": self.minimum,',
+          '            "duplicate_timestamp_count": self.duplicate_timestamp_count,\n'
+          '            "minimum": "9999-01-01T00:00:00" if self.minimum and self.minimum.startswith("10000-") else self.minimum,'),),
+        f"{RANGE_TESTS}::test_expanded_endpoint_is_not_clipped",
+        "test_expanded_endpoint_is_not_clipped",
+        "expanded endpoint clipped",
+    ),
+    Mutation(
+        "M-G2W1-43", "expanded endpoint loses timezone context",
+        (("aidatasetkit/core/types.py",
+          '            "timezone": self.timezone,', '            "timezone": None,'),),
+        f"{RANGE_TESTS}::test_expanded_endpoint_keeps_timezone",
+        "test_expanded_endpoint_keeps_timezone",
+        "expanded endpoint timezone lost",
+    ),
+    Mutation(
+        "M-G2W1-44", "expanded endpoint loses resolution context",
+        (("aidatasetkit/core/types.py",
+          '            "resolution": self.resolution,', '            "resolution": None,'),),
+        f"{RANGE_TESTS}::test_expanded_endpoint_keeps_resolution",
+        "test_expanded_endpoint_keeps_resolution",
+        "expanded endpoint resolution lost",
+    ),
+    Mutation(
+        "M-G2W1-45", "serialized evidence loses expanded endpoint",
+        ((TYPES, 'canonical(dict(self.datetime), path="column.datetime")',
+          'canonical({**dict(self.datetime), "minimum": None}, path="column.datetime")'),),
+        f"{RANGE_TESTS}::test_expanded_endpoint_serializes_losslessly",
+        "test_expanded_endpoint_serializes_losslessly",
+        "expanded endpoint serialization lost",
+    ),
+    Mutation(
+        "M-G2W1-46", "public JSON reader discards expanded endpoint",
+        (("aidatasetkit/evidence/publication.py",
+          "        return json.loads(self.text(name))",
+          "        decoded = json.loads(self.text(name))\n"
+          '        if name == "audit.json":\n'
+          '            decoded["columns"][0]["datetime"]["minimum"] = None\n'
+          "        return decoded"),),
+        f"{RANGE_TESTS}::test_expanded_endpoint_deserializes_losslessly",
+        "test_expanded_endpoint_deserializes_losslessly",
+        "expanded endpoint deserialization lost",
+    ),
+    Mutation(
+        "M-G2W1-47", "HTML omits expanded minimum endpoint",
+        (("aidatasetkit/evidence/report.py",
+          'f"<td>{_e(summary.get(field))}</td>"',
+          'f"<td>{_e(summary.get(field) if field != \'minimum\' else None)}</td>"'),),
+        f"{RANGE_TESTS}::test_expanded_endpoint_renders_losslessly",
+        "test_expanded_endpoint_renders_losslessly",
+        "expanded endpoint HTML lost",
+    ),
+)
+
+
 def export(revision: str, tree: Path) -> str:
     sha = subprocess.run(
         ["git", "rev-parse", revision],

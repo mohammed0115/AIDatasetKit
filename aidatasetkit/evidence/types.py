@@ -14,7 +14,8 @@ and the ones that do must be identifiable without consulting a changelog.
 
 from __future__ import annotations
 
-import datetime as _datetime
+import calendar
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -336,8 +337,8 @@ def _validate_datetime_evidence(value: Mapping[str, Any]) -> None:
     if timezone is not None and (not isinstance(timezone, str) or not timezone):
         raise EvidenceError("Datetime evidence timezone must be a non-empty string or null.")
     if minimum is not None:
-        endpoints_aware = minimum.utcoffset() is not None
-        if (maximum.utcoffset() is not None) != endpoints_aware:
+        endpoints_aware = minimum[1]
+        if maximum[1] != endpoints_aware:
             raise EvidenceError("Datetime evidence endpoints disagree on timezone awareness.")
         if (timezone is not None) != endpoints_aware:
             raise EvidenceError("Datetime evidence timezone does not match its endpoints.")
@@ -403,15 +404,78 @@ def _validate_datetime_evidence(value: Mapping[str, Any]) -> None:
             raise EvidenceError("Datetime evidence off-grid count exceeds distinct timestamps.")
 
 
-def _parse_datetime_endpoint(value: Any, field_name: str) -> _datetime.datetime | None:
+_DATETIME_ENDPOINT = re.compile(
+    r"(?P<year>-?[0-9]{3,12})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})"
+    r"T(?P<hour>[0-9]{2}):(?P<minute>[0-9]{2}):(?P<second>[0-9]{2})"
+    r"(?:\.(?P<fraction>[0-9]{6}|[0-9]{9}))?"
+    r"(?P<offset>(?P<sign>[+-])(?P<offset_hour>[0-9]{2}):"
+    r"(?P<offset_minute>[0-9]{2})(?::(?P<offset_second>[0-9]{2})"
+    r"(?:\.(?P<offset_fraction>[0-9]{6}))?)?)?"
+)
+
+
+def _parse_datetime_endpoint(value: Any, field_name: str) -> tuple[int, bool] | None:
+    """Validate pandas' canonical ISO form; compare instants with unbounded integers."""
     if value is None:
         return None
     if not isinstance(value, str):
         raise EvidenceError(f"Datetime evidence {field_name} must be ISO text or null.")
+    match = _DATETIME_ENDPOINT.fullmatch(value)
+    if match is None:
+        raise EvidenceError(f"Datetime evidence {field_name} is not canonical endpoint text.")
+    parts = match.groupdict()
     try:
-        return _datetime.datetime.fromisoformat(value)
+        year, month, day, hour, minute, second = (
+            int(parts[key]) for key in ("year", "month", "day", "hour", "minute", "second")
+        )
+        if parts["year"] != f"{year:04d}":
+            raise ValueError("noncanonical year")
+        month_lengths = (31, 29 if calendar.isleap(year) else 28, 31, 30, 31, 30,
+                         31, 31, 30, 31, 30, 31)
+        if not (1 <= month <= 12 and 1 <= day <= month_lengths[month - 1]):
+            raise ValueError("impossible calendar date")
+        if not (hour < 24 and minute < 60 and second < 60):
+            raise ValueError("impossible time")
+        fraction = parts["fraction"]
+        nanoseconds = int(fraction.ljust(9, "0")) if fraction else 0
+        if fraction and (nanoseconds == 0 or (len(fraction) == 9 and nanoseconds % 1000 == 0)):
+            raise ValueError("noncanonical fraction")
+
+        offset = 0
+        if parts["offset"]:
+            offset_hour = int(parts["offset_hour"])
+            offset_minute = int(parts["offset_minute"])
+            offset_second = int(parts["offset_second"] or 0)
+            offset_fraction = int(parts["offset_fraction"] or 0)
+            if not (offset_hour < 24 and offset_minute < 60 and offset_second < 60):
+                raise ValueError("impossible offset")
+            if parts["offset_fraction"] and offset_fraction == 0:
+                raise ValueError("noncanonical offset fraction")
+            if parts["offset_second"] and offset_second == offset_fraction == 0:
+                raise ValueError("noncanonical offset seconds")
+            offset = ((offset_hour * 60 + offset_minute) * 60 + offset_second) * 10**9
+            offset += offset_fraction * 1000
+            if parts["sign"] == "-":
+                if offset == 0:
+                    raise ValueError("noncanonical negative zero offset")
+                offset = -offset
+
+        # Gregorian ordinal arithmetic works for year zero and negative/expanded
+        # years too. 719163 is the ordinal of 1970-01-01.
+        previous_year = year - 1
+        days = (
+            365 * previous_year + previous_year // 4 - previous_year // 100
+            + previous_year // 400
+            + sum(month_lengths[:month - 1])
+            + day - 719163
+        )
+        instant = ((days * 24 + hour) * 3600 + minute * 60 + second) * 10**9
+        instant += nanoseconds - offset
+        if not ((-(2**63) + 1) * 10**9 <= instant <= (2**63 - 1) * 10**9):
+            raise ValueError("outside native datetime range")
+        return instant, parts["offset"] is not None
     except ValueError as error:
-        raise EvidenceError(f"Datetime evidence {field_name} is not valid ISO text.") from error
+        raise EvidenceError(f"Datetime evidence {field_name} is not a valid canonical endpoint.") from error
 
 
 def _parse_positive_duration(value: Any, field_name: str) -> pd.Timedelta | None:
