@@ -3,7 +3,7 @@
 ```text
 WAVE                         = G2-W1
 TARGET_CAPABILITY            = G2-16
-IMPLEMENTATION_STATUS        = CONTRACT_RECORDED_BEFORE_IMPLEMENTATION
+IMPLEMENTATION_STATUS        = IMPLEMENTED_PENDING_CTO_REVIEW
 CERTIFIED_STATUS             = UNCHANGED
 STARTING_HEAD                = 92da30368775489ecf5e0d059148d69b0bd49e13
 BRANCH                       = g2-w1-datetime-profiling
@@ -183,6 +183,29 @@ Local implementation and validation can mark G2-W1 only as
 `IMPLEMENTED_PENDING_CTO_REVIEW`. G2-16 retains its current certified status and
 certified progress remains G1 `22/26 = 84.62%`, overall
 `114/232 = 49.14%`.
+
+### Local validation evidence
+
+- Focused datetime contract tests: pandas 3, 56 passed and one optional
+  PyArrow-extension test skipped because PyArrow is not installed; pandas 2,
+  57 passed.
+- Focused evidence, fingerprint, date-inference, chunked, and golden regressions:
+  pandas 3, 352 passed; pandas 2, 349 passed and three optional-dependency tests
+  skipped.
+- Full reference suite: 4,864 passed, 47 skipped.
+- Full minimum suite: 4,738 passed, 61 skipped.
+- Datetime mutation gate: all 20 semantic mutations were killed by their
+  selected tests; no mutant survived and every scratch tree was restored.
+- Release smoke test: wheel and source distribution built, passed metadata
+  validation, installed into clean environments, and passed CLI/audit checks.
+- Pylance diagnostics on changed Python sources and tests: no errors.
+- Example verdict remained `blocked` before and after the schema migration.
+  Dataset fingerprints and verdict logic are unchanged; the semantic
+  fingerprint moved as expected for schema `1.5` and its added config/evidence
+  fields.
+
+These are local results, not certification. Platform CI and CTO approval remain
+outstanding.
 
 Remaining certification requirements:
 
