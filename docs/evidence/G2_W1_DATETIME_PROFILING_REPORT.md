@@ -3,14 +3,16 @@
 ```text
 WAVE                         = G2-W1
 TARGET_CAPABILITY            = G2-16
-IMPLEMENTATION_STATUS        = IMPLEMENTED_PENDING_CTO_REVIEW
-CERTIFIED_STATUS             = MISSING_PENDING_CERTIFICATION
+IMPLEMENTATION_STATUS        = PASS
+CERTIFIED_STATUS             = SUPPORTED_AND_TESTED
 STARTING_HEAD                = 92da30368775489ecf5e0d059148d69b0bd49e13
+CERTIFIED_CODE_SHA           = 706a99fc2cb167018a5d7d33c08bd2409ee9403b
 BRANCH                       = g2-w1-datetime-profiling
 ARTIFACT_SCHEMA_BEFORE       = 1.4
+ARTIFACT_SCHEMA_AFTER        = 1.5
 PUBLICATION_SCHEMA           = 1.0 (unchanged)
 PACKAGE_VERSION              = 0.1.0a1 (unchanged)
-REMOTE_ACTIONS               = BRANCH_PUSH_AND_BRANCH_CI_ONLY
+REMOTE_ACTIONS               = CODE_AND_DOCUMENTATION_INTEGRATION_COMPLETE
 ```
 
 ## Authorized scope
@@ -181,15 +183,15 @@ success-shaped values.
 
 ## Closure boundary
 
-Local implementation and validation can mark G2-W1 only as
-`IMPLEMENTED_PENDING_CTO_REVIEW`. G2-16 retains its current certified status and
-certified progress remains G1 `22/26 = 84.62%`, overall
-`114/232 = 49.14%`, and G2 `15/22 = 68.18%`.
+G2-W1 is **PASS** on certified code SHA
+`706a99fc2cb167018a5d7d33c08bd2409ee9403b`. G2-16 is
+`SUPPORTED_AND_TESTED`. Certified progress is G1 `22/26 = 84.62%`, G2
+`16/22 = 72.73%`, and overall `115/232 = 49.57%`.
 
-### Certification-blocker endpoint repair (pending CTO review)
+### Certification-blocker endpoint repair (closed)
 
-G2-W1 is **not certified**. G2-16 remains `MISSING_PENDING_CERTIFICATION`.
-The attempted certification of `5d3457d64353164aee71c7c4c1dd123feda0c9c5`
+The initial certification attempt at
+`5d3457d64353164aee71c7c4c1dd123feda0c9c5`
 found an end-to-end range defect: native `s`, `ms`, and `us` arrays with year
 10000 profiled correctly, but evidence validation called Python
 `datetime.fromisoformat`, which cannot represent expanded years. Six naive/UTC
@@ -366,16 +368,42 @@ Initial expanded-matrix evidence on committed test/harness revision
   Artifact schema 1.5, publication schema 1.0, package 0.1.0a1, fingerprints,
   approved semantics, and the Golden verdict are unchanged by this repair.
 
-The complete matrix must also run against the final committed branch tip,
-using `scripts/g2_w1_mutations.py <new-scratch-dir> --rev <exact-tip>`.
-Only exported committed revisions may be mutated; the live worktree is never
-a mutation target. Final exact-tip branch CI (10/10) and CTO review remain
-separate gates, not implied by these local results.
+## Certification seal
 
-Remaining certification requirements:
+CTO review approved the two endpoint-range repair commits and the exact
+candidate `706a99fc2cb167018a5d7d33c08bd2409ee9403b`. The final gates on that
+unchanged code SHA were:
 
-1. Branch CI on the exact candidate code SHA.
-2. Windows and Linux matrix success, expected 10/10.
-3. CTO review.
-4. Main integration and main CI on the certified code SHA.
-5. Separate documentation seal.
+- Code branch CI: run [38740498935](https://github.com/mohammed0115/AIDatasetKit/actions/runs/38740498935), push on `g2-w1-datetime-profiling`, completed successfully, 10/10 jobs.
+- Code main CI: run [38758230448](https://github.com/mohammed0115/AIDatasetKit/actions/runs/38758230448), push on `main`, completed successfully, 10/10 jobs.
+- Focused endpoint, profiling, evidence, migration, fingerprint, Golden,
+  strict-ISO, and chunked-isolation tests: 526 passed under Python 3.11.17 /
+  pandas 2.1.4 and 526 passed under Python 3.12.14 / pandas 3.0.5; no failures,
+  errors, or skips. Both runs produced JUnit reports.
+- Full minimum suite: 4,997 passed, 45 skipped, no failures or errors; JUnit
+  recorded 5,042 tests. The one warning was a third-party matplotlib/pyparsing
+  deprecation warning.
+- Full reference suite: 4,974 passed, 47 skipped, no failures or errors; JUnit
+  recorded 5,021 tests.
+- Mutation matrices: 46/46 killed in each pandas environment, with baseline
+  exit 0, zero baseline skips, survivors, harness errors, or test-environment
+  errors. Every mutant and each complete exported tree were restored byte for
+  byte.
+- Wheel and sdist built successfully and passed `twine check`; clean wheel and
+  sdist installs passed import, CLI, audit, verified-artifact, refusal, and
+  optional Excel checks. The installed wheel, imported from `site-packages`
+  outside the source tree, passed all 92 endpoint-range tests.
+- The endpoint suite proves year 10000 for naive/UTC x s/ms/us; lower and upper
+  native bounds for naive/UTC x s/ms/us/ns; strict malformed, impossible, and
+  noncanonical rejection; exact evidence, JSON, typed-reader, publication, and
+  HTML preservation; timezone/resolution preservation; source immutability;
+  and verdict, fingerprint, chunked-mode, and ISO-text isolation.
+- The Golden verdict remains `blocked`; no existing verdict changed. Dataset
+  and schema fingerprint algorithms are unchanged. The expected semantic and
+  config fingerprint changes are versioned through artifact schema 1.5.
+
+The endpoint repair is commits `41e47886db94ff66d02290f3f25e8e7cb536398e`
+and `706a99fc2cb167018a5d7d33c08bd2409ee9403b`; it preserves the full native
+range rather than clipping to Python's datetime range. Publication schema 1.0
+and package version 0.1.0a1 remain unchanged. No package was published and no
+tag was created.

@@ -1,16 +1,16 @@
 # POST-G0 Capability Reality Audit — AIDatasetKit
 
 ```text
-CURRENT_GATE                 = G0 closed; G1-W1 through G1-W10 closed
-CURRENT_ACTIVITY             = G1-W10 PASS; stop; do not start another capability
+CURRENT_GATE                 = G0 closed; G1-W1 through G1-W10 and G2-W1 closed
+CURRENT_ACTIVITY             = G2-W1 PASS; stop; do not start another capability
 G0_STATUS                    = PASS (16/16)
 G0_MAIN_INTEGRATION          = PASS
 GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
-OVERALL_CERTIFIED_PROGRESS   = 49.14%   (114 proven / 232 applicable, G0–G12; updated after G1-W10, §0)
-AUDIT_GATE                   = PASS     (the audit is complete with evidence; G1–G12 are not)
-READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W10 is PASS; do not start another capability)
-NEXT_AUTHORIZED_ACTION       = stop; do not start another capability
+OVERALL_CERTIFIED_PROGRESS   = 49.57%   (115 proven / 232 applicable, G0–G12; updated after G2-W1, §0)
+AUDIT_GATE                   = PASS     (the audit is complete with evidence; G1–G12 are not fully closed)
+READY_FOR_G1_IMPLEMENTATION  = YES      (G1-W10 is PASS; G1 remains in progress)
+NEXT_AUTHORIZED_ACTION       = stop; await separate authorization
 ```
 
 **حدود هذا المستند:**
@@ -260,6 +260,35 @@ AUDIT_DOCUMENTS       = CORRECT
 - Recorded progress is G1 = 22/26 = **84.62%** and overall = 114/232 = **49.14%**. Status-detail counts for G1 are 22 / 0 / 1 / 3. Artifact schema `1.4`. Publication schema `1.0`. Package version `0.1.0a1`.
 - Evidence: `docs/evidence/G1_W10_XLS_READER_REPORT.md`.
 
+**تحديث 19 — G2-W1 datetime profiling closure (PASS):**
+
+- **G2-16: `SUPPORTED_AND_TESTED`.** Native pandas datetime columns, including
+  timezone-aware dtypes, receive bounded range and exact observed-spacing
+  evidence. Fixed-duration gap analysis runs only with a validated explicit
+  cadence; duplicates, off-grid observations, and missing expected observations
+  remain separate. Object/string values are not parsed, source frames are not
+  modified, and chunked profiling remains unchanged.
+- **G2-W1 = PASS.** Certified code SHA
+  `706a99fc2cb167018a5d7d33c08bd2409ee9403b` passed code branch CI run
+  [38740498935](https://github.com/mohammed0115/AIDatasetKit/actions/runs/38740498935)
+  and code main CI run
+  [38758230448](https://github.com/mohammed0115/AIDatasetKit/actions/runs/38758230448),
+  each 10/10 on Windows and Linux. The approved endpoint repair is commits
+  `41e47886db94ff66d02290f3f25e8e7cb536398e` and
+  `706a99fc2cb167018a5d7d33c08bd2409ee9403b`.
+- Final local validation passed 526 focused tests on each of pandas 2.1.4 and
+  pandas 3.0.5; full minimum 4,997 passed / 45 skipped and full reference 4,974
+  passed / 47 skipped, both with JUnit; 46/46 mutations were killed in each
+  environment with exact tree restoration. Wheel/sdist build, `twine check`,
+  clean-install smoke, and 92 installed-wheel endpoint tests passed.
+- The Golden verdict remains `blocked`. Artifact schema is `1.5`; publication
+  schema remains `1.0`; package version remains `0.1.0a1`. Dataset/schema
+  fingerprint algorithms are unchanged; semantic/config identity changes are
+  versioned and tested.
+- Recorded progress is G1 = 22/26 = **84.62%**, G2 = 16/22 = **72.73%**, and
+  overall = 115/232 = **49.57%**. G2 status-detail counts are 16 / 0 / 2 / 4.
+- Evidence: `docs/evidence/G2_W1_DATETIME_PROFILING_REPORT.md`.
+
 ## 1. Main integration
 
 | البند | القيمة |
@@ -381,7 +410,7 @@ G0_MAIN_INTEGRATION = PASS
 | G2-13 | G2 | Outliers (IQR, z-score) | `SUPPORTED_AND_TESTED` | check_outliers | test_quality.py | — | — |
 | G2-14 | G2 | Text lengths | `MISSING` | — | probe: no field | Not measured | P2 |
 | G2-15 | G2 | Empty strings | `MISSING` | '' counted as a present value | probe: `txt` ['', 'abc', ''] -> missing 0, no finding | Blank text invisible to quality | P2 |
-| G2-16 | G2 | Datetime range / frequency / gaps | `MISSING` | DATETIME kind only; `numeric` is None | probe: datetime column -> no range | Not measured | P1 |
+| G2-16 | G2 | Datetime range / frequency / gaps | `SUPPORTED_AND_TESTED` | `profiling/datetime.py`; native naive/aware datetime range, exact observed spacing, and explicit fixed-cadence gaps; artifact schema 1.5 | datetime profiling, endpoint-range, evidence, migration, fingerprint, Golden/isolation tests; 46/46 mutations on pandas 2 and 3; branch/main CI 10/10 | Object/string parsing, calendar cadence inference, resampling, and chunked datetime profiling are intentionally excluded | — |
 | G2-17 | G2 | Multicollinearity (VIF) | `SUPPORTED_AND_TESTED` | check_multicollinearity | test_quality.py (Multicollinearity + IsRobust) | — | — |
 | G2-18 | G2 | Structured findings with severity and review flag | `SUPPORTED_AND_TESTED` | core/types.QualityIssue; evidence FindingEvidence | test_quality.py, test_evidence_artifact.py | — | — |
 | G2-19 | G2 | Affected rows and ratios in every finding | `PARTIAL` | counts/ratios in some details (missing, outliers, duplicates) | test_quality.py | No uniform affected-row contract | P2 |
@@ -764,7 +793,7 @@ G0_MAIN_INTEGRATION = PASS
 | G0 | Baseline stability | 16 | 16 | 100.00% | PASS | مغلق |
 | G0.1 | Profiling performance hotfix | — | — | — | PASS | P0-1 مغلق (انظر §0) |
 | G1 | Ingestion | 22 | 26 | 84.62% | IN PROGRESS | W1–W10 مغلقة |
-| G2 | Profiling & Quality | 15 | 22 | 68.18% | AUDIT | تواريخ ونص وقيم |
+| G2 | Profiling & Quality | 16 | 22 | 72.73% | IN PROGRESS | G2-W1 مغلقة؛ نص وقيم |
 | G3 | Cleaning & Transformation | 2 | 17 | 11.76% | AUDIT | عمليات جدولية |
 | G4 | EDA & Statistics | 9 | 13 | 69.23% | AUDIT | ارتباط فئوي واختبارات |
 | G5 | Trends & Comparisons | 0 | 15 | 0.00% | AUDIT | بعد G3 |
@@ -775,7 +804,7 @@ G0_MAIN_INTEGRATION = PASS
 | G10 | Provenance/Security/Privacy/Errors | 18 | 28 | 64.29% | AUDIT | أخطاء الموارد والمدخلات |
 | G11 | Performance & Certification | 5 | 21 | 23.81% | AUDIT | 4 بنود MISSING→PARTIAL في G0.1؛ benchmarks في CI |
 | G12 | Masari Consumer Integration | 2 | 14 | 14.29% | AUDIT | بعد G1–G9 |
-| **All** | G0–G12 | **114** | **232** | **49.14%** | — | — |
+| **All** | G0–G12 | **115** | **232** | **49.57%** | — | — |
 
 **تفصيل الحالات لكل بوابة** (حتى لا يختفي العمل الموجود غير المكتمل):
 
@@ -783,7 +812,7 @@ G0_MAIN_INTEGRATION = PASS
 |---|---:|---:|---:|---:|---:|---:|---:|
 | G0 | 16 | 0 | 0 | 0 | 0 | 0 | 0 |
 | G1 | 22 | 0 | 1 | 3 | 0 | 0 | 1 |
-| G2 | 15 | 0 | 2 | 5 | 0 | 0 | 0 |
+| G2 | 16 | 0 | 2 | 4 | 0 | 0 | 0 |
 | G3 | 2 | 0 | 5 | 10 | 0 | 1 | 0 |
 | G4 | 9 | 0 | 2 | 2 | 0 | 0 | 0 |
 | G5 | 0 | 0 | 1 | 14 | 0 | 0 | 0 |
@@ -796,15 +825,15 @@ G0_MAIN_INTEGRATION = PASS
 | G12 | 2 | 0 | 7 | 5 | 0 | 1 | 0 |
 
 ```text
-CURRENT_GATE                 = G0 closed; G1 audit complete
-CURRENT_ACTIVITY             = audit report
+CURRENT_GATE                 = G0 closed; G1-W1 through G1-W10 and G2-W1 closed
+CURRENT_ACTIVITY             = G2-W1 PASS
 G0_STATUS                    = PASS
 G0_MAIN_INTEGRATION          = PASS
 GATES_FULLY_PASSED           = 1
 TOTAL_GATES                  = 13
-OVERALL_CERTIFIED_PROGRESS   = 40.95%
-READY_FOR_G1_IMPLEMENTATION  = YES after G0.1 (P0-1 closed; P0-2 is a G1 item)
-NEXT_AUTHORIZED_ACTION       = owner authorisation of G0.1, then G1 wave 1
+OVERALL_CERTIFIED_PROGRESS   = 49.57%
+READY_FOR_G1_IMPLEMENTATION  = YES (G1 remains in progress)
+NEXT_AUTHORIZED_ACTION       = stop; await separate authorization
 ```
 
 **التمييز المطلوب:**
