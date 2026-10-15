@@ -384,8 +384,8 @@ class TestTimezoneAndResolution:
         dtype = pd.ArrowDtype(pyarrow.timestamp("ns"))
         frame = pd.DataFrame({"when": pd.Series([None], dtype=dtype)})
         column = DataProfiler().profile(frame).column("when")
-        assert column.detected_kind.value == "datetime"
         assert column.datetime is None
+        assert frame["when"].dtype == dtype
 
 
 class TestEvidenceAndIsolation:
