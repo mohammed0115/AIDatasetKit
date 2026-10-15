@@ -529,7 +529,7 @@ class TestValues:
 class TestEvidence:
     def test_the_artifact_records_the_table(self, tmp_path: Path):
         artifact = _artifact(_people(tmp_path / "ev.sqlite"))
-        assert artifact.schema_version == "1.4", "schema incorrectly remains 1.2"
+        assert artifact.schema_version == "1.5", "schema migration is incomplete"
         assert artifact.ingestion is not None
         assert artifact.ingestion.source_kind == "file"
         assert artifact.ingestion.format == "sqlite"
@@ -576,7 +576,7 @@ class TestEvidence:
         assert artifact.source_selector is None
         assert artifact.semantic_dict()["source_selector"] is None
         assert "source_selector" not in artifact.config.settings
-        assert artifact.schema_version == "1.4"
+        assert artifact.schema_version == "1.5"
 
 
 class TestTheCommand:
@@ -597,7 +597,7 @@ class TestTheCommand:
         artifact = json.loads(read_current(output).text("audit.json"))
         assert artifact["source_selector"] == {"kind": "table", "name": "b"}
         assert artifact["ingestion"]["format"] == "sqlite"
-        assert artifact["schema_version"] == "1.4"
+        assert artifact["schema_version"] == "1.5"
 
     def test_chunked_profiling_refuses_sqlite(self, tmp_path: Path):
         from aidatasetkit.cli.main import main

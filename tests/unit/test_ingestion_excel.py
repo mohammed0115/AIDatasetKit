@@ -687,11 +687,11 @@ class TestSheetSchema:
     def test_schema_13_accepts_table_sheet_and_null_selectors(self, tmp_path):
         import sqlite3
 
-        assert ARTIFACT_SCHEMA_VERSION == "1.4"
+        assert ARTIFACT_SCHEMA_VERSION == "1.5"
         assert PUBLICATION_SCHEMA_VERSION == "1.0"
         assert __version__ == "0.1.0a1"
         sheet = _artifact(_book(tmp_path / "one.xlsx", [("Data", [["a"], [1]], "visible")]))
-        assert sheet.schema_version == "1.4"
+        assert sheet.schema_version == "1.5"
         assert sheet.source_selector.to_dict() == {"kind": "sheet", "name": "Data"}
         csv_path = tmp_path / "rows.csv"
         csv_path.write_text("a\n1\n", encoding="utf-8")

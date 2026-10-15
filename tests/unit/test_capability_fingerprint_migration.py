@@ -144,8 +144,22 @@ def _rollback_schema_1_3(semantic: dict) -> None:
 
 
 def _rollback_schema_1_4(semantic: dict) -> None:
+    if semantic["schema_version"] == "1.5":
+        _rollback_schema_1_5(semantic)
     semantic["schema_version"] = "1.3"
     del semantic["date_inference"]
+
+
+def _rollback_schema_1_5(semantic: dict) -> None:
+    semantic["schema_version"] = "1.4"
+    for column in semantic["columns"]:
+        del column["datetime"]
+    semantic["config"]["settings"]["thresholds"].pop(
+        "expected_datetime_cadence", None
+    )
+    semantic["config"]["fingerprint"] = config_fingerprint(
+        semantic["config"]["settings"]
+    )
 
 
 def _rollback_threshold(name: str) -> Callable[[dict], None]:
@@ -226,6 +240,12 @@ CHAIN: tuple[Step, ...] = (
         before="2a33aff562bf32116d2f48587eda19af85e9a2db956a7e6c00b8a89c1bcf7c75",
         after="60375e40773cb0849085a4867c31e609b90c34a60a2cb8842c9e34f37b3a237e",
         rollback=_rollback_schema_1_4,
+    ),
+    Step(
+        "G2-W1 artifact schema 1.4 -> 1.5 and datetime evidence",
+        before="60375e40773cb0849085a4867c31e609b90c34a60a2cb8842c9e34f37b3a237e",
+        after="d889bc29c93faa0133d4bee392d9cff9e07c781bf54c2b720bc31fb57f6c7daf",
+        rollback=_rollback_schema_1_5,
     ),
 )
 
@@ -370,13 +390,13 @@ def _step(prefix: str) -> Step:
 class TestTheSchemaStep:
     """The version says what the record is, without comparing fingerprints."""
 
-    def test_the_current_code_writes_1_4(self, semantic):
+    def test_the_current_code_writes_1_5(self, semantic):
         from aidatasetkit.evidence import ARTIFACT_SCHEMA_VERSION
 
-        assert semantic["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.4"
+        assert semantic["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.5"
 
-    def test_the_fixture_declares_1_4(self):
-        assert _stored()["schema_version"] == "1.4"
+    def test_the_fixture_declares_1_5(self):
+        assert _stored()["schema_version"] == "1.5"
 
     def test_setting_the_version_back_reproduces_the_intermediate_artifact(self):
         """The 1.0-with-ingestion artifact that 90ecfae published."""
@@ -488,12 +508,38 @@ class TestTheDateInferenceSchemaStep:
 
     def test_only_the_record_and_the_version_moved(self):
         current, previous = _stored(), _stored()
+        _rollback_schema_1_5(current)
         _rollback_schema_1_4(previous)
         changed = set(current) ^ set(previous)
         changed.update(
             key for key in current.keys() & previous.keys() if current[key] != previous[key]
         )
         assert changed == {"schema_version", "date_inference"}
+
+
+class TestTheDatetimeSchemaStep:
+    def test_the_key_is_present_and_null_for_non_datetime_columns(self, semantic):
+        columns = semantic["columns"]
+        assert columns
+        assert all("datetime" in column for column in columns)
+        assert all(column["datetime"] is None for column in columns)
+
+    def test_rollback_reproduces_the_schema_1_4_identity(self):
+        stored = _stored()
+        _rollback_schema_1_5(stored)
+        assert stored["schema_version"] == "1.4"
+        assert all("datetime" not in column for column in stored["columns"])
+        assert "expected_datetime_cadence" not in stored["config"]["settings"]["thresholds"]
+        assert config_fingerprint(stored) == _step("G1-W8 artifact schema").after
+
+    def test_only_the_datetime_contract_moved(self):
+        current, previous = _stored(), _stored()
+        _rollback_schema_1_5(previous)
+        changed = set(current) ^ set(previous)
+        changed.update(
+            key for key in current.keys() & previous.keys() if current[key] != previous[key]
+        )
+        assert changed == {"schema_version", "columns", "config"}
 
 
 class TestTheCvFoldsStep:

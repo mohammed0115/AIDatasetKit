@@ -11,6 +11,8 @@ import dataclasses
 from dataclasses import dataclass
 from typing import Any
 
+import pandas as pd
+
 from aidatasetkit.core.exceptions import ConfigurationError
 
 __all__ = ["KitConfig"]
@@ -58,6 +60,9 @@ class KitConfig:
             probabilities.
         predicted_class_column: Output column name for multiclass predictions.
         prediction_column: Output column name for regression predictions.
+        expected_datetime_cadence: Optional positive fixed duration applied to
+            native datetime columns for gap and off-grid analysis. ``None``
+            leaves cadence unknown and disables gap classification.
     """
 
     random_state: int = 42
@@ -82,6 +87,7 @@ class KitConfig:
     probability_column: str = "predicted_probability"
     predicted_class_column: str = "predicted_class"
     prediction_column: str = "prediction"
+    expected_datetime_cadence: str | None = None
 
     def __post_init__(self) -> None:
         self._require_seed("random_state", self.random_state)
@@ -147,6 +153,30 @@ class KitConfig:
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise ConfigurationError(f"{name} must be a non-empty string, got {value!r}.")
+        self._validate_datetime_cadence()
+
+    def _validate_datetime_cadence(self) -> None:
+        value = self.expected_datetime_cadence
+        if value is None:
+            return
+        if not isinstance(value, str) or not value.strip():
+            raise ConfigurationError(
+                "expected_datetime_cadence must be a positive fixed-duration "
+                f"string or None, got {value!r}."
+            )
+        try:
+            cadence = pd.Timedelta(value)
+            if pd.isna(cadence) or cadence <= pd.Timedelta(0):
+                raise ValueError
+            normalized = cadence.isoformat()
+            if pd.isna(pd.Timedelta(normalized)):
+                raise ValueError
+        except (TypeError, ValueError, OverflowError) as error:
+            raise ConfigurationError(
+                "expected_datetime_cadence must be a positive, finite, fixed "
+                "duration representable by pandas."
+            ) from error
+        object.__setattr__(self, "expected_datetime_cadence", normalized)
 
     @staticmethod
     def _require_seed(name: str, value: Any) -> None:

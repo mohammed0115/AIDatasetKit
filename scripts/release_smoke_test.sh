@@ -94,7 +94,7 @@ run = read_current(sys.argv[1])
 assert sorted(run.contents) == ["audit.json", "lineage.json", "report.html"], sorted(run.contents)
 assert all(run.contents.values()), "an artifact is empty"
 a = run.json("audit.json")
-assert a["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.4", a["schema_version"]
+assert a["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.5", a["schema_version"]
 assert a["verdict"] == "blocked", a["verdict"]
 assert a["columns"] and a["findings"], "artifact is empty"
 PY
@@ -144,14 +144,14 @@ import sys
 from aidatasetkit.evidence import ARTIFACT_SCHEMA_VERSION, read_current
 run = read_current(sys.argv[1])
 audit = run.json("audit.json")
-assert audit["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.4", audit["schema_version"]
+assert audit["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.5", audit["schema_version"]
 assert audit["ingestion"]["format"] == "xls", audit["ingestion"]
 assert audit["ingestion"]["source_kind"] == "file"
 assert audit["source_selector"] == {"kind": "sheet", "name": "Data"}, audit["source_selector"]
 assert audit["ingestion"]["encoding"] is None
 assert audit["ingestion"]["delimiter"] is None
 PY
-printf '  excel extra: .xls --sheet Data, format xls, schema 1.4 -- all good\n'
+printf '  excel extra: .xls --sheet Data, format xls, schema 1.5 -- all good\n'
 
 say "Release smoke test passed"
 echo "Nothing was published. dist/ holds the artifacts."

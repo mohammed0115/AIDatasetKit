@@ -37,6 +37,7 @@ __all__ = [
     "ProbabilisticEstimator",
     "PreprocessingProfile",
     "NumericSummary",
+    "DatetimeSummary",
     "ColumnProfile",
     "DatasetProfile",
     "QualityIssue",
@@ -359,6 +360,57 @@ class NumericSummary:
 
 
 @dataclass(frozen=True, slots=True)
+class DatetimeSummary:
+    """Bounded measurements for one native pandas datetime column."""
+
+    total_count: int
+    valid_count: int
+    missing_count: int
+    distinct_valid_count: int
+    duplicate_timestamp_count: int
+    minimum: str | None
+    maximum: str | None
+    timezone: str | None
+    resolution: str
+    interval_count: int
+    distinct_spacing_count: int
+    minimum_spacing: str | None
+    maximum_spacing: str | None
+    is_regular: bool | None
+    observed_cadence: str | None
+    expected_cadence: str | None
+    missing_expected_observation_count: int | None
+    gap_count: int | None
+    off_grid_observation_count: int | None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return the bounded, JSON-serialisable datetime summary."""
+        return {
+            "total_count": self.total_count,
+            "valid_count": self.valid_count,
+            "missing_count": self.missing_count,
+            "distinct_valid_count": self.distinct_valid_count,
+            "duplicate_timestamp_count": self.duplicate_timestamp_count,
+            "minimum": self.minimum,
+            "maximum": self.maximum,
+            "timezone": self.timezone,
+            "resolution": self.resolution,
+            "interval_count": self.interval_count,
+            "distinct_spacing_count": self.distinct_spacing_count,
+            "minimum_spacing": self.minimum_spacing,
+            "maximum_spacing": self.maximum_spacing,
+            "is_regular": self.is_regular,
+            "observed_cadence": self.observed_cadence,
+            "expected_cadence": self.expected_cadence,
+            "missing_expected_observation_count": (
+                self.missing_expected_observation_count
+            ),
+            "gap_count": self.gap_count,
+            "off_grid_observation_count": self.off_grid_observation_count,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ColumnProfile:
     """What one column looks like.
 
@@ -387,6 +439,7 @@ class ColumnProfile:
     infinite_count: int = 0
     memory_usage_bytes: int = 0
     numeric: NumericSummary | None = None
+    datetime: DatetimeSummary | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serialisable mapping of the column profile."""
@@ -408,6 +461,7 @@ class ColumnProfile:
             "infinite_count": self.infinite_count,
             "memory_usage_bytes": self.memory_usage_bytes,
             "numeric": None if self.numeric is None else self.numeric.to_dict(),
+            "datetime": None if self.datetime is None else self.datetime.to_dict(),
         }
 
 

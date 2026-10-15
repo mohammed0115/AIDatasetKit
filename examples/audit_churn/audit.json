@@ -3,6 +3,7 @@
   "columns": [
     {
       "count": 600,
+      "datetime": null,
       "detected_kind": "categorical",
       "dominant_ratio": 0.0016666666666666668,
       "dominant_value_digest": "sha256:33da28196a2df143222e8b26571ce4d3",
@@ -25,6 +26,7 @@
     },
     {
       "count": 545,
+      "datetime": null,
       "detected_kind": "numeric",
       "dominant_ratio": 0.022018348623853212,
       "dominant_value_digest": "sha256:4c37b87aa9a45cf0398162e8b18c3d00",
@@ -56,6 +58,7 @@
     },
     {
       "count": 600,
+      "datetime": null,
       "detected_kind": "numeric",
       "dominant_ratio": 0.013333333333333334,
       "dominant_value_digest": "sha256:e773f0d9270c2cf882f6bafafec2de95",
@@ -87,6 +90,7 @@
     },
     {
       "count": 600,
+      "datetime": null,
       "detected_kind": "categorical",
       "dominant_ratio": 0.3333333333333333,
       "dominant_value_digest": "sha256:afa18044c5d5faf705b6f60ecebb1c77",
@@ -109,6 +113,7 @@
     },
     {
       "count": 600,
+      "datetime": null,
       "detected_kind": "categorical",
       "dominant_ratio": 0.3333333333333333,
       "dominant_value_digest": "sha256:5fa62369700f37add4e2fa20b5a5dfbf",
@@ -131,6 +136,7 @@
     },
     {
       "count": 600,
+      "datetime": null,
       "detected_kind": "categorical",
       "dominant_ratio": 0.3333333333333333,
       "dominant_value_digest": "sha256:2bfdab50237964577c75eea969cc67d0",
@@ -153,6 +159,7 @@
     },
     {
       "count": 600,
+      "datetime": null,
       "detected_kind": "boolean",
       "dominant_ratio": 0.5,
       "dominant_value_digest": "sha256:cbc78c2f695cf0a5b3b61d178907a93e",
@@ -175,6 +182,7 @@
     },
     {
       "count": 600,
+      "datetime": null,
       "detected_kind": "categorical",
       "dominant_ratio": 0.005,
       "dominant_value_digest": "sha256:789e4f9983d481afcdf43b3383b9e9c2",
@@ -197,6 +205,7 @@
     },
     {
       "count": 600,
+      "datetime": null,
       "detected_kind": "numeric",
       "dominant_ratio": 0.8,
       "dominant_value_digest": "sha256:669b4c24c93570eb1df6701e382789cb",
@@ -228,6 +237,7 @@
     },
     {
       "count": 600,
+      "datetime": null,
       "detected_kind": "numeric",
       "dominant_ratio": 0.8,
       "dominant_value_digest": "sha256:669b4c24c93570eb1df6701e382789cb",
@@ -259,7 +269,7 @@
     }
   ],
   "config": {
-    "fingerprint": "03a79ae16ffa080b15e8f75ff8a0082ce968e4822d956c5d5658ced267d38dc6",
+    "fingerprint": "f8a131e7b5b843345461e7c478fe5161bba2090b74250c2e8c5708f363ae005d",
     "settings": {
       "categorical_sentinel": "__missing__",
       "model": "logistic_regression",
@@ -291,6 +301,7 @@
       "task_hint": null,
       "thresholds": {
         "dense_encoding_warning_categories": 1000,
+        "expected_datetime_cadence": null,
         "high_cardinality_threshold": 50,
         "id_uniqueness_threshold": 0.95,
         "imbalance_threshold": 0.2,
@@ -899,9 +910,9 @@
       "scikit_learn": "1.9.0",
       "scipy": "1.18.0"
     },
-    "semantic_fingerprint": "60375e40773cb0849085a4867c31e609b90c34a60a2cb8842c9e34f37b3a237e"
+    "semantic_fingerprint": "d889bc29c93faa0133d4bee392d9cff9e07c781bf54c2b720bc31fb57f6c7daf"
   },
-  "schema_version": "1.4",
+  "schema_version": "1.5",
   "source_selector": null,
   "stage": "prepared",
   "target": {

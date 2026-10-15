@@ -14,11 +14,15 @@ and the ones that do must be identifiable without consulting a changelog.
 
 from __future__ import annotations
 
+import datetime as _datetime
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
+import pandas as pd
+
+from aidatasetkit.core.exceptions import EvidenceError
 from aidatasetkit.core.provenance import EnvironmentVersions
 from aidatasetkit.core.types import Severity, TaskType
 from aidatasetkit.evidence.serialization import canonical, type_name
@@ -68,7 +72,10 @@ __all__ = [
 #:       ``null`` on the chunked profile-only route, which does not scan dates.
 #:       The record is evidence. It does not convert values and does not change
 #:       detected kind, verdict, or the dataset fingerprint.
-ARTIFACT_SCHEMA_VERSION = "1.4"
+#: 1.5 -- G2-W1: each column evidence record gains a nullable ``datetime``
+#:       summary. Native datetime columns carry bounded range, observed spacing,
+#:       and optional explicit fixed-cadence gap measurements.
+ARTIFACT_SCHEMA_VERSION = "1.5"
 
 
 class EvidenceSource(StrEnum):
@@ -228,6 +235,11 @@ class ColumnEvidence:
     dominant_value_digest: str | None = None
     numeric: Mapping[str, Any] | None = None
     source: EvidenceSource = EvidenceSource.PROFILING
+    datetime: Mapping[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        if self.datetime is not None:
+            _validate_datetime_evidence(self.datetime)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -249,8 +261,173 @@ class ColumnEvidence:
             "numeric": canonical(dict(self.numeric), path="column.numeric")
             if self.numeric
             else None,
+            "datetime": canonical(dict(self.datetime), path="column.datetime")
+            if self.datetime
+            else None,
             "source": self.source.value,
         }
+
+
+_DATETIME_FIELDS = frozenset(
+    {
+        "total_count",
+        "valid_count",
+        "missing_count",
+        "distinct_valid_count",
+        "duplicate_timestamp_count",
+        "minimum",
+        "maximum",
+        "timezone",
+        "resolution",
+        "interval_count",
+        "distinct_spacing_count",
+        "minimum_spacing",
+        "maximum_spacing",
+        "is_regular",
+        "observed_cadence",
+        "expected_cadence",
+        "missing_expected_observation_count",
+        "gap_count",
+        "off_grid_observation_count",
+    }
+)
+_DATETIME_COUNT_FIELDS = (
+    "total_count",
+    "valid_count",
+    "missing_count",
+    "distinct_valid_count",
+    "duplicate_timestamp_count",
+    "interval_count",
+    "distinct_spacing_count",
+)
+
+
+def _validate_datetime_evidence(value: Mapping[str, Any]) -> None:
+    """Refuse internally inconsistent temporal facts before serialization."""
+    if not isinstance(value, Mapping) or set(value) != _DATETIME_FIELDS:
+        raise EvidenceError("Datetime evidence must contain exactly the schema 1.5 fields.")
+
+    for key in _DATETIME_COUNT_FIELDS:
+        count = value[key]
+        if type(count) is not int or count < 0:
+            raise EvidenceError(f"Datetime evidence {key} must be a nonnegative integer.")
+    if value["total_count"] != value["valid_count"] + value["missing_count"]:
+        raise EvidenceError("Datetime evidence total_count must equal valid_count + missing_count.")
+    if value["distinct_valid_count"] > value["valid_count"]:
+        raise EvidenceError("Datetime evidence distinct_valid_count exceeds valid_count.")
+    if value["duplicate_timestamp_count"] != (
+        value["valid_count"] - value["distinct_valid_count"]
+    ):
+        raise EvidenceError("Datetime evidence duplicate count is inconsistent.")
+    expected_intervals = max(value["distinct_valid_count"] - 1, 0)
+    if value["interval_count"] != expected_intervals:
+        raise EvidenceError("Datetime evidence interval_count is inconsistent.")
+    if value["distinct_spacing_count"] > value["interval_count"]:
+        raise EvidenceError("Datetime evidence distinct spacing count exceeds interval_count.")
+
+    minimum = _parse_datetime_endpoint(value["minimum"], "minimum")
+    maximum = _parse_datetime_endpoint(value["maximum"], "maximum")
+    if (minimum is None) != (maximum is None):
+        raise EvidenceError("Datetime evidence minimum and maximum must both be null or present.")
+    if (minimum is None) != (value["valid_count"] == 0):
+        raise EvidenceError("Datetime evidence endpoints are inconsistent with valid_count.")
+
+    timezone = value["timezone"]
+    if timezone is not None and (not isinstance(timezone, str) or not timezone):
+        raise EvidenceError("Datetime evidence timezone must be a non-empty string or null.")
+    if minimum is not None:
+        endpoints_aware = minimum.utcoffset() is not None
+        if (maximum.utcoffset() is not None) != endpoints_aware:
+            raise EvidenceError("Datetime evidence endpoints disagree on timezone awareness.")
+        if (timezone is not None) != endpoints_aware:
+            raise EvidenceError("Datetime evidence timezone does not match its endpoints.")
+        if minimum > maximum:
+            raise EvidenceError("Datetime evidence minimum is later than maximum.")
+
+    if not isinstance(value["resolution"], str) or value["resolution"] not in {
+        "s",
+        "ms",
+        "us",
+        "ns",
+    }:
+        raise EvidenceError("Datetime evidence resolution is unsupported.")
+
+    minimum_spacing = _parse_positive_duration(value["minimum_spacing"], "minimum_spacing")
+    maximum_spacing = _parse_positive_duration(value["maximum_spacing"], "maximum_spacing")
+    if (value["interval_count"] == 0) != (minimum_spacing is None):
+        raise EvidenceError("Datetime evidence spacing is inconsistent with interval_count.")
+    if (minimum_spacing is None) != (maximum_spacing is None):
+        raise EvidenceError("Datetime evidence spacing bounds must both be null or present.")
+    if minimum_spacing is not None and minimum_spacing > maximum_spacing:
+        raise EvidenceError("Datetime evidence minimum_spacing exceeds maximum_spacing.")
+
+    regular = value["is_regular"]
+    if value["interval_count"] == 0:
+        if regular is not None or value["distinct_spacing_count"] != 0:
+            raise EvidenceError("Datetime evidence with no intervals must have unknown regularity.")
+        if value["observed_cadence"] is not None:
+            raise EvidenceError("Datetime evidence without intervals cannot have observed cadence.")
+    elif regular is True:
+        if value["distinct_spacing_count"] != 1:
+            raise EvidenceError("Regular datetime evidence must have one distinct spacing.")
+        if value["observed_cadence"] != value["minimum_spacing"] or (
+            value["observed_cadence"] != value["maximum_spacing"]
+        ):
+            raise EvidenceError("Regular datetime evidence cadence and spacing bounds disagree.")
+    elif regular is False:
+        if value["distinct_spacing_count"] < 2 or value["observed_cadence"] is not None:
+            raise EvidenceError("Irregular datetime evidence has inconsistent cadence.")
+    else:
+        raise EvidenceError("Datetime evidence with intervals must state regularity.")
+
+    expected_cadence = value["expected_cadence"]
+    gap_fields = (
+        "missing_expected_observation_count",
+        "gap_count",
+        "off_grid_observation_count",
+    )
+    if expected_cadence is None:
+        if any(value[key] is not None for key in gap_fields):
+            raise EvidenceError("Datetime gap counts require an expected cadence.")
+    else:
+        _parse_positive_duration(expected_cadence, "expected_cadence")
+        for key in gap_fields:
+            count = value[key]
+            if type(count) is not int or count < 0:
+                raise EvidenceError(
+                    f"Datetime evidence {key} must be a nonnegative integer with a cadence."
+                )
+        if value["gap_count"] > value["missing_expected_observation_count"]:
+            raise EvidenceError("Datetime evidence gap_count exceeds missing positions.")
+        if value["off_grid_observation_count"] > value["distinct_valid_count"]:
+            raise EvidenceError("Datetime evidence off-grid count exceeds distinct timestamps.")
+
+
+def _parse_datetime_endpoint(value: Any, field_name: str) -> _datetime.datetime | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise EvidenceError(f"Datetime evidence {field_name} must be ISO text or null.")
+    try:
+        return _datetime.datetime.fromisoformat(value)
+    except ValueError as error:
+        raise EvidenceError(f"Datetime evidence {field_name} is not valid ISO text.") from error
+
+
+def _parse_positive_duration(value: Any, field_name: str) -> pd.Timedelta | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise EvidenceError(f"Datetime evidence {field_name} must be duration text.")
+    try:
+        duration = pd.Timedelta(value)
+    except (OverflowError, TypeError, ValueError) as error:
+        raise EvidenceError(f"Datetime evidence {field_name} is not a fixed duration.") from error
+    if pd.isna(duration) or duration <= pd.Timedelta(0):
+        raise EvidenceError(f"Datetime evidence {field_name} must be positive and finite.")
+    if duration.isoformat() != value:
+        raise EvidenceError(f"Datetime evidence {field_name} must use canonical ISO duration text.")
+    return duration
 
 
 @dataclass(frozen=True, slots=True)

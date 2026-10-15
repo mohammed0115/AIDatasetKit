@@ -53,7 +53,7 @@ class TestCommittedCurrentExamples:
     def test_the_current_outputs_use_the_live_schema(self):
         audit = _load("audit.json")
         lineage = _load("lineage.json")
-        assert ARTIFACT_SCHEMA_VERSION == "1.4"
+        assert ARTIFACT_SCHEMA_VERSION == "1.5"
         assert audit["schema_version"] == ARTIFACT_SCHEMA_VERSION
         assert lineage["schema_version"] == ARTIFACT_SCHEMA_VERSION
         assert PUBLICATION_SCHEMA_VERSION == "1.0"

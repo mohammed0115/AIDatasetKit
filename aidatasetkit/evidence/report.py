@@ -95,6 +95,7 @@ def render_report(artifact: Mapping[str, Any]) -> str:
         _ingestion(artifact),
         _date_inference(artifact),
         _columns(artifact),
+        _datetimes(artifact),
         _findings(artifact),
         _decisions(artifact),
         _lineage(artifact),
@@ -286,6 +287,63 @@ def _columns(artifact) -> str:
         f"{rows}</table>\n"
         "<p class=\"muted\">Counts and ratios only. The most frequent value of each "
         "column is recorded as a digest, never in plain text.</p>\n"
+    )
+
+
+def _datetimes(artifact) -> str:
+    """Render bounded native-datetime measurements without raw observations."""
+    columns = [
+        column
+        for column in artifact.get("columns") or ()
+        if column.get("datetime") is not None
+    ]
+    if not columns:
+        return ""
+    rows = "".join(
+        "<tr>"
+        + f"<th scope=\"row\"><code>{_e((column.get('name') or {}).get('name'))}</code></th>"
+        + "".join(
+            f"<td>{_e(summary.get(field))}</td>"
+            for field in (
+                "minimum",
+                "maximum",
+                "timezone",
+                "resolution",
+                "valid_count",
+                "missing_count",
+                "distinct_valid_count",
+                "duplicate_timestamp_count",
+                "is_regular",
+                "observed_cadence",
+                "interval_count",
+                "distinct_spacing_count",
+                "minimum_spacing",
+                "maximum_spacing",
+                "expected_cadence",
+                "missing_expected_observation_count",
+                "gap_count",
+                "off_grid_observation_count",
+            )
+        )
+        + "</tr>"
+        for column in columns
+        for summary in (column["datetime"],)
+    )
+    return (
+        "<h2>Datetime profiling</h2>\n"
+        "<p>Observed cadence is exact elapsed spacing between sorted distinct "
+        "instants, not calendar-frequency inference or proof of a schedule. "
+        "Expected-cadence gap measurements are descriptive and do not affect "
+        "findings or the verdict. The grid is anchored at the minimum valid "
+        "timestamp and covers the closed observed window; missing positions "
+        "are counted arithmetically and gap count means contiguous runs.</p>\n"
+        "<table><tr><th>column</th><th>minimum</th><th>maximum</th>"
+        "<th>timezone</th><th>resolution</th><th>valid</th><th>missing</th>"
+        "<th>distinct</th><th>duplicates</th><th>regular</th>"
+        "<th>observed cadence</th><th>intervals</th><th>distinct spacings</th>"
+        "<th>minimum spacing</th><th>maximum spacing</th><th>expected cadence</th>"
+        "<th>missing expected</th><th>gap runs</th><th>off-grid distinct</th></tr>"
+        f"{rows}</table>\n"
     )
 
 

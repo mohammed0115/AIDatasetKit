@@ -8,14 +8,14 @@ and an audit that disagrees with itself is worthless.
 ## Schema version
 
 ```json
-{ "schema_version": "1.4" }
+{ "schema_version": "1.5" }
 ```
 
 The artifact format is versioned **separately from the package**. Most releases
 will not change the shape of the record; the ones that do must be identifiable
 without consulting a changelog. Adding, removing or redefining a field bumps the
 version: an additive change is a minor bump, anything else a major one. A later
-`0.4.0` may still write `1.4`. `lineage.json` carries the same version.
+`0.4.0` may still write `1.5`. `lineage.json` carries the same version.
 
 | Version | Change |
 |---|---|
@@ -24,10 +24,32 @@ version: an additive change is a minor bump, anything else a major one. A later
 | `1.2` | G1-W5: the top-level `chunked_profiling` record. `null` unless the caller opted into chunked CSV/TSV profiling. |
 | `1.3` | G1-W6: the top-level `source_selector` record. `null` unless a relation inside the file was chosen. A SQLite table is `{"kind": "table", "name": "<table>"}`. An Excel worksheet is `{"kind": "sheet", "name": "<exact title>"}`. Kind `sheet` uses this same record; it is not a new schema version. |
 | `1.4` | G1-W8: the top-level `date_inference` record. A full audit records the fixed strict-ISO policy and any textual columns that met it. `null` on the chunked profile-only route. The record does not convert values and does not change detected kind, the verdict, or the dataset fingerprint. Removing the key and setting the version back to `1.3` restores the previous semantic artifact. |
+| `1.5` | G2-W1: each column record gains nullable `datetime` evidence. Eligible native datetime columns record counts, minimum and maximum, timezone, resolution, exact observed spacing, and optional fixed-cadence gap counts. This is measurement-only evidence: it does not add findings or affect the verdict. Minimum and maximum endpoint aggregates may still be sensitive. |
 
 An artifact with an `ingestion` key and `schema_version` `1.0` exists: `main` at
 `90ecfae` wrote it, before the version was corrected. Read it as `1.1`; nothing
 else differs.
+
+## Datetime evidence
+
+Every column record in schema `1.5` has a nullable `datetime` field. It is
+populated only for native pandas datetime arrays, including timezone-aware
+arrays; text and object columns are not parsed or converted. Counts distinguish
+valid rows, `NaT` rows, distinct timestamps, and duplicate rows (every valid
+occurrence after the first). Minimum and maximum are the only source timestamps
+published, formatted in the source timezone with its applicable UTC offset.
+
+Observation spacing is calculated over sorted distinct instants. Equal
+consecutive elapsed durations establish exact regular spacing; irregular
+spacing does not infer a cadence or establish that observations are defective.
+The optional `KitConfig.expected_datetime_cadence` is a positive fixed duration.
+When set, the grid is anchored at the minimum and covers the closed observed
+window. Missing expected positions, contiguous missing runs, off-grid distinct
+timestamps, and duplicate rows are separate measurements. Off-grid timestamps
+do not occupy expected grid positions. With no explicit cadence, the gap
+measurements are `null`. The evidence is bounded and does not materialize
+missing timestamps or publish timestamp lists. Chunked profiling does not
+include datetime summaries.
 
 ## Where a run is published
 

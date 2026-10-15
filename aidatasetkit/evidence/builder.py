@@ -424,6 +424,7 @@ class AuditBuilder:
     def _column_evidence(self, column: Any) -> ColumnEvidence:
         """Record one column's measurements, with its most frequent value hidden."""
         numeric = column.numeric.to_dict() if column.numeric is not None else None
+        datetime = column.datetime.to_dict() if column.datetime is not None else None
         return ColumnEvidence(
             name=LabelRef.of(column.name),
             detected_kind=column.detected_kind.value,
@@ -441,6 +442,7 @@ class AuditBuilder:
             dominant_ratio=column.dominant_ratio,
             dominant_value_digest=self._dominant(column.dominant_value),
             numeric=numeric,
+            datetime=datetime,
         )
 
     def _dominant(self, value: Any) -> str | None:

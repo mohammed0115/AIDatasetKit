@@ -157,7 +157,7 @@ class TestEquivalence:
         ]
         _, listed = _audit(rows)
         _, streamed = _audit(iter([dict(row) for row in rows]))
-        assert listed.schema_version == streamed.schema_version == ARTIFACT_SCHEMA_VERSION == "1.4"
+        assert listed.schema_version == streamed.schema_version == ARTIFACT_SCHEMA_VERSION == "1.5"
         assert listed.semantic_fingerprint == streamed.semantic_fingerprint, "source type salts a fingerprint"
         assert listed.config.fingerprint == streamed.config.fingerprint
         assert listed.verdict == streamed.verdict
@@ -629,5 +629,5 @@ class TestRegressions:
         frame = pd.DataFrame({"a": [1]})
         assert load_table(frame).frame is frame
 
-    def test_the_artifact_schema_stays_1_4(self):
-        assert ARTIFACT_SCHEMA_VERSION == "1.4"
+    def test_the_artifact_schema_stays_1_5(self):
+        assert ARTIFACT_SCHEMA_VERSION == "1.5"

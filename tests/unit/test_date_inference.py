@@ -283,13 +283,13 @@ class TestEvidenceAndSchema:
         assert column.invalid_count == 0
 
     def test_the_artifact_schema_is_1_4(self):
-        assert ARTIFACT_SCHEMA_VERSION == "1.4", "schema remains 1.3 or migration is omitted"
+        assert ARTIFACT_SCHEMA_VERSION == "1.5", "G2-W1 schema migration is omitted"
         assert PUBLICATION_SCHEMA_VERSION == "1.0"
         assert __version__ == "0.1.0a1"
         artifact = _audit(_frame("created_at", _repeat("2024-01-31")))
-        assert artifact.schema_version == "1.4"
+        assert artifact.schema_version == "1.5"
         payload = artifact.to_dict()
-        assert payload["schema_version"] == "1.4"
+        assert payload["schema_version"] == "1.5"
         assert payload["date_inference"]["conversion_performed"] is False
 
     def test_rollback_restores_the_1_3_shape_without_moving_the_dataset(self):
@@ -536,7 +536,7 @@ class TestRegressions:
             source_selector=loaded.selector,
         )
         assert artifact.source_selector.to_dict() == {"kind": "sheet", "name": "Data"}
-        assert artifact.schema_version == "1.4"
+        assert artifact.schema_version == "1.5"
 
     def test_a_sqlite_selector_is_still_recorded(self, tmp_path: Path):
         path = tmp_path / "one.sqlite"
@@ -553,4 +553,4 @@ class TestRegressions:
             source_selector=loaded.selector,
         )
         assert artifact.source_selector.to_dict() == {"kind": "table", "name": "people"}
-        assert artifact.schema_version == "1.4"
+        assert artifact.schema_version == "1.5"

@@ -9,9 +9,11 @@ which is the only dtype classifier in the library. Numeric statistics come from
 :class:`~aidatasetkit.statistics.engine.StatisticsEngine`, so no formula is
 written twice.
 
-Complexity is linear in cells: each column is scanned a bounded number of times
-and the duplicate-row scan is a single hash pass. Nothing here compares rows
-pairwise.
+Most column measurements are linear in cells. Native datetime profiling
+additionally builds a distinct-coordinate array and sorts it, requiring up to
+O(n) auxiliary memory and O(n log n) time for a datetime column. This runs only
+on the full-table path, which inherits the ingestion row and cell limits; it is
+not a streaming datetime profiler. Nothing here compares rows pairwise.
 """
 
 from __future__ import annotations
@@ -32,6 +34,7 @@ from aidatasetkit.core.types import (
     DatasetProfile,
     NumericSummary,
 )
+from aidatasetkit.profiling.datetime import summarize_datetime
 from aidatasetkit.statistics.engine import StatisticsEngine
 
 __all__ = ["DataProfiler", "ID_NAME_PATTERN"]
@@ -149,6 +152,14 @@ class DataProfiler:
             and dominant_ratio >= self._config.near_constant_threshold
         )
         unique_ratio = _ratio(unique_count, count)
+        datetime = (
+            summarize_datetime(
+                series,
+                expected_cadence=self._config.expected_datetime_cadence,
+            )
+            if kind is ColumnKind.DATETIME
+            else None
+        )
 
         return ColumnProfile(
             name=name,
@@ -168,6 +179,7 @@ class DataProfiler:
             infinite_count=self._count_infinite(present, kind),
             memory_usage_bytes=memory_bytes,
             numeric=self._numeric_summary(present, kind),
+            datetime=datetime,
         )
 
     @staticmethod
