@@ -4,13 +4,13 @@
 WAVE                         = G2-W1
 TARGET_CAPABILITY            = G2-16
 IMPLEMENTATION_STATUS        = IMPLEMENTED_PENDING_CTO_REVIEW
-CERTIFIED_STATUS             = UNCHANGED
+CERTIFIED_STATUS             = MISSING_PENDING_CERTIFICATION
 STARTING_HEAD                = 92da30368775489ecf5e0d059148d69b0bd49e13
 BRANCH                       = g2-w1-datetime-profiling
 ARTIFACT_SCHEMA_BEFORE       = 1.4
 PUBLICATION_SCHEMA           = 1.0 (unchanged)
 PACKAGE_VERSION              = 0.1.0a1 (unchanged)
-REMOTE_ACTIONS               = NONE
+REMOTE_ACTIONS               = BRANCH_PUSH_AND_BRANCH_CI_ONLY
 ```
 
 ## Authorized scope
@@ -27,7 +27,9 @@ feature with unchanged recognition and conversion behavior.
 ### Eligible dtypes
 
 - A column is eligible only when pandas classifies its dtype with
-  `is_datetime64_any_dtype`.
+  `is_datetime64_any_dtype` and its storage is a native pandas `DatetimeArray`.
+  Unsupported datetime extensions, including Arrow timestamps, are not
+  summarized. Their pandas kind classification can differ across pandas majors.
 - Naive `datetime64[s]`, `datetime64[ms]`, `datetime64[us]`, and
   `datetime64[ns]` dtypes are supported.
 - Timezone-aware pandas datetime dtypes are supported. Their physical unit is
@@ -182,9 +184,12 @@ success-shaped values.
 Local implementation and validation can mark G2-W1 only as
 `IMPLEMENTED_PENDING_CTO_REVIEW`. G2-16 retains its current certified status and
 certified progress remains G1 `22/26 = 84.62%`, overall
-`114/232 = 49.14%`.
+`114/232 = 49.14%`, and G2 `15/22 = 68.18%`.
 
-### Local validation evidence
+### Historical implementation validation
+
+The following results belong to the reviewed implementation preceding the
+mutation-closure repair, not to certification of the expanded matrix.
 
 - Focused datetime contract tests: pandas 3, 56 passed and one optional
   PyArrow-extension test skipped because PyArrow is not installed; pandas 2,
@@ -204,8 +209,79 @@ certified progress remains G1 `22/26 = 84.62%`, overall
   fingerprint moved as expected for schema `1.5` and its added config/evidence
   fields.
 
-These are local results, not certification. Platform CI and CTO approval remain
-outstanding.
+These are local results, not certification. The reviewed candidate
+`769e9ea041d3d66702f18c4dac451e25f1b776fb` subsequently passed branch CI run
+38691797127, 10/10. That run does not validate the mutation-closure candidate.
+
+### CTO mutation-closure repair
+
+The repair preserves M-G2W1-01 through M-G2W1-20 unchanged and adds 17 dedicated
+mutants. All 38 required IDs are covered by 37 executable mutants:
+**M-G2W1-27 maps exactly to M-G2W1-10**. M10 removes the regularity guard from
+observed cadence and publishes the first interval of irregular observations;
+its proving test rejects that invented cadence. This is the identical
+weakening requested by M27, not a substitution of a passing baseline test.
+
+| Required ID | Dedicated weakening / semantic kill |
+|---|---|
+| M-G2W1-21 | Missing `NaT` cadence accepted / `missing cadence acceptance` |
+| M-G2W1-22 | `1 month` silently normalized to 30 days / `non-fixed cadence acceptance` |
+| M-G2W1-23 | Native eligibility guard removed / unsupported Arrow storage must return no summary, not crash |
+| M-G2W1-24 | Source datetime array reversed in place / values, index, dtype, order, timezone, and retained source identities checked |
+| M-G2W1-25 | Sorted duplicates replace unique coordinates / duplicate spacing coordinates rejected |
+| M-G2W1-26 | NaT coordinate exclusion removed / NaT participation or resulting overflow rejected |
+| M-G2W1-27 | Exact mapping to preserved M-G2W1-10, described above |
+| M-G2W1-28 | Observed two-point interval promoted to expected cadence / no expected schedule or gap classification without caller cadence |
+| M-G2W1-29 | Gap calculation receives repeated coordinates / distinct off-grid count remains one |
+| M-G2W1-30 | Missing positions replaced with gap count / three missing positions in one contiguous gap remain `(3, 1)` |
+| M-G2W1-31 | Canonical temporal evidence emptied / endpoints, timezone, unit, observed and expected cadence required |
+| M-G2W1-32 | Temporal missing count enters verdict policy / captured verdict inputs and decision evidence must be identical |
+| M-G2W1-33 | Dataclass field order displaces positional source / `EvidenceSource.QUALITY` must remain the source argument |
+| M-G2W1-34 | Duplicate-count invariant disabled / malformed evidence must raise `EvidenceError` |
+| M-G2W1-35 | Chunked scan calls native summarizer / chunked-isolation sentinel must fail |
+| M-G2W1-36 | Actual `pd.date_range` materialization inserted / call guard fails before allocation, independent of memory or timing |
+| M-G2W1-37 | Artifact schema constant reverted to 1.4 / exact schema and reversible 1.4-to-1.5 fingerprint-chain proof |
+| M-G2W1-38 | Exported pandas-2 fixture reverted to 1.4 / pandas-major schema, full default config, config digest, temporal field shape, and verdict contract |
+
+The stable non-fixed input `1 month` is rejected by both pandas 2.1.4 and
+pandas 3.0.5. The unsupported-extension witness calls the summarizer directly
+as well as the full profiler, so pandas-major kind differences cannot hide the
+eligibility mutation. PyArrow is installed for both local closure runs.
+
+Harness rules now additionally expose `baseline_exit`, `baseline_skipped`, the
+required-ID mapping, and final `tree_restored` in the JSON record. A skipped
+witness cannot count as a baseline pass or a kill. Expected testcase names are
+matched exactly (allowing only that test's parametrizations), every failure
+must carry its dedicated semantic reason, and unrelated failures or test
+errors are rejected. Mutation edits are restored in `finally`, with full
+exported-file SHA-256 manifests compared after each mutant.
+
+Initial expanded-matrix evidence on committed test/harness revision
+`7038c3d88b7cea22a673af39d575b9cfd04dea13`:
+
+- Python 3.12.14 / pandas 3.0.5: baseline exit 0, 37 killed, 0 survived,
+  0 harness errors, 0 test-environment errors, all trees restored.
+- Python 3.11.17 / pandas 2.1.4: baseline exit 0, 37 killed, 0 survived,
+  0 harness errors, 0 test-environment errors, all trees restored.
+- Focused datetime, closure, migration and current-example contracts: 116 passed
+  on each pandas major, no skips.
+- Full reference suite after closure: 4,882 passed, 47 skipped, 787.43 seconds.
+- Full minimum suite after closure: 4,782 passed, 56 skipped, 465.10 seconds.
+  Existing platform, declared model-capability, and unavailable optional-extra
+  skips remain visible in JUnit; no tests were disabled or weakened. In
+  particular the Arrow mutation witness ran, without a skip, in both environments.
+- Packaging/build smoke is not re-triggered by this repair: no packaging,
+  release script, dependency manifest, or production file changed. The final
+  branch CI still includes both packaging jobs.
+- No production code, example or fixture changes; no regenerated artifacts.
+  Artifact schema 1.5, publication schema 1.0, package 0.1.0a1, fingerprints,
+  approved semantics, and the Golden verdict are unchanged by this repair.
+
+The complete matrix must also run against the final committed branch tip,
+using `scripts/g2_w1_mutations.py <new-scratch-dir> --rev <exact-tip>`.
+Only exported committed revisions may be mutated; the live worktree is never
+a mutation target. Final exact-tip branch CI (10/10) and CTO review remain
+separate gates, not implied by these local results.
 
 Remaining certification requirements:
 
