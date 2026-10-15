@@ -176,7 +176,7 @@ MUTATIONS = (
         ((DATETIME, "    anchor = int(coordinates[0])\n", "    anchor = 0\n"),),
         f"{TESTS}::TestExpectedCadence::test_expected_grid_is_anchored_at_the_minimum_timestamp",
         "test_expected_grid_is_anchored_at_the_minimum_timestamp",
-        "assert 2 == 1",
+        "missing_expected_observation_count=",
     ),
     Mutation(
         "M-G2W1-17",

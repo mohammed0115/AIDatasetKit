@@ -99,6 +99,7 @@ class TestObservedSpacing:
         )
         assert summary.duplicate_timestamp_count == 1
         assert summary.interval_count == 2
+        assert summary.distinct_spacing_count == 1
         assert summary.is_regular is True
         assert summary.observed_cadence == "P1DT0H0M0S"
 
