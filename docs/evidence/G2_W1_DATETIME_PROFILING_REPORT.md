@@ -186,6 +186,95 @@ Local implementation and validation can mark G2-W1 only as
 certified progress remains G1 `22/26 = 84.62%`, overall
 `114/232 = 49.14%`, and G2 `15/22 = 68.18%`.
 
+### Certification-blocker endpoint repair (pending CTO review)
+
+G2-W1 is **not certified**. G2-16 remains `MISSING_PENDING_CERTIFICATION`.
+The attempted certification of `5d3457d64353164aee71c7c4c1dd123feda0c9c5`
+found an end-to-end range defect: native `s`, `ms`, and `us` arrays with year
+10000 profiled correctly, but evidence validation called Python
+`datetime.fromisoformat`, which cannot represent expanded years. Six naive/UTC
+combinations failed. Historical successful CI and mutations did not prove this
+previously uncovered boundary path.
+
+Repair commit `41e47886db94ff66d02290f3f25e8e7cb536398e` replaces only that
+narrow endpoint validator and its private comparison representation. Source
+values, profiling, schema, fingerprint algorithms, and verdict policy are not
+changed. Endpoints remain the original strings; parsing produces only private
+integer nanosecond coordinates and an awareness flag for invariant checks.
+Gregorian ordinal arithmetic supports astronomical year zero and negative and
+expanded years without conversion through Python datetime, locale, host
+timezone, or a new dependency. Nanosecond ordering is exact, including when two
+endpoints differ below microsecond precision; aware comparisons subtract their
+numeric offsets.
+
+The accepted grammar is the canonical default `Timestamp.isoformat()` form:
+
+- ASCII year text equals signed integer formatting with minimum width four
+  (for example `0000`, `0001`, `-001`, `-10000`, `10000`), within the native
+  signed-64-bit second timeline envelope. Native finer-unit ranges are
+  included; no profiler support is clipped or narrowed.
+- Exactly `-MM-DDTHH:MM:SS`, with valid proleptic Gregorian month/day and leap
+  rules, hour 00-23, minute/second 00-59.
+- An optional nonzero six-digit fractional second, or a nine-digit fraction
+  whose last three digits are nonzero as a group. All-zero fractions and
+  redundant nanosecond padding are not canonical pandas output.
+- Naive endpoints have no suffix. Aware endpoints use `+HH:MM` or `-HH:MM`,
+  with an optional seconds component when seconds or offset microseconds are
+  nonzero, and optional nonzero six-digit offset microseconds as emitted by
+  pandas. Offset magnitude is less than 24 hours;
+  negative zero and redundant zero seconds/fractions are rejected. UTC is
+  `+00:00`, not `Z`, a zone name, or a bracketed suffix.
+- Full-string matching rejects whitespace, trailing data, omitted fields,
+  impossible dates/times, unsupported timezone forms, and arbitrary strings.
+  The existing evidence timezone/awareness, resolution, range-order, count,
+  spacing, and cadence invariants remain enforced.
+
+Committed public-path regressions cover:
+
+- All six year-10000 naive/UTC x s/ms/us combinations.
+- Both signed-64-bit range boundaries and ordinary controls for naive/UTC x
+  s/ms/us/ns (24 cases), preserving exact endpoints through `AuditBuilder`,
+  typed evidence, canonical JSON, JSON decoding, typed revalidation, and HTML.
+- The public local-artifact writer/verified reader round trip, escaped column
+  names, fixed offsets including seconds/microseconds, negative/year-zero/leap
+  controls, nanosecond ordering, malformed text, impossible dates/times.
+- Exact source equality, unchanged dataset fingerprints and config identity,
+  verdict/reasons/findings/decisions/task/plan/lineage isolation, and unchanged
+  text-date inference. Existing dedicated chunked and strict-ISO tests remain.
+
+Nine dedicated executable mutations are added; all original 37 and the
+M-G2W1-27 -> M-G2W1-10 mapping remain unchanged:
+
+| ID | Weakening | Dedicated semantic kill reason |
+|---|---|---|
+| M-G2W1-39 | Restore Python-datetime-limited parsing | Python datetime range restriction restored |
+| M-G2W1-40 | Bypass endpoint parsing for arbitrary strings | arbitrary endpoint text accepted |
+| M-G2W1-41 | Accept impossible calendar dates | impossible calendar or time accepted |
+| M-G2W1-42 | Clip year-10000 minimum to year 9999 | expanded endpoint clipped |
+| M-G2W1-43 | Drop timezone context | expanded endpoint timezone lost |
+| M-G2W1-44 | Drop resolution context | expanded endpoint resolution lost |
+| M-G2W1-45 | Null endpoint during serialization | expanded endpoint serialization lost |
+| M-G2W1-46 | Discard endpoint in public JSON reader | expanded endpoint deserialization lost |
+| M-G2W1-47 | Omit minimum from HTML | expanded endpoint HTML lost |
+
+The expanded matrix is 46 executable mutants, covering 47 required IDs through
+the approved mapping. Final-SHA validation must run both pandas-major focused
+sets, both full suites with JUnit, both complete mutation matrices, and
+wheel/sdist build, twine checks and clean-install smoke before branch push.
+Results are retained as session evidence and returned with the exact final
+SHA and branch CI run. This section records the repair contract, not a
+certification seal or a claim of PASS.
+
+Published summaries remain bounded, with potentially sensitive authorized
+minimum/maximum aggregates, no raw lists/samples or missing-timestamp
+enumeration. Profiling remains O(n log n) worst-case time and O(n) auxiliary
+memory. Endpoint validation is bounded per column. No text parsing, calendar
+cadence inference, source mutation, resampling, chunked datetime profiling,
+facade expansion, or temporal verdict findings are introduced. Artifact schema
+1.5, publication schema 1.0 and package 0.1.0a1 remain unchanged; no examples or
+fixtures are regenerated. Main integration and capability promotion are
+prohibited under this repair authorization.
+
 ### Historical implementation validation
 
 The following results belong to the reviewed implementation preceding the
