@@ -25,6 +25,8 @@ ROOT = Path(__file__).resolve().parents[1]
 TESTS = "tests/unit/test_datetime_profiling.py"
 DATETIME = "aidatasetkit/profiling/datetime.py"
 CONFIG = "aidatasetkit/core/config.py"
+CLOSURE_TESTS = "tests/unit/test_datetime_mutation_closure.py"
+TYPES = "aidatasetkit/evidence/types.py"
 
 
 @dataclass(frozen=True)
@@ -224,6 +226,156 @@ MUTATIONS = (
     ),
 )
 
+# M-G2W1-27 is exactly M-G2W1-10: replace the regularity guard with
+# "if deltas" and publish the first interval for irregular observations.
+REQUIRED_MAPPINGS = {"M-G2W1-27": "M-G2W1-10"}
+
+
+def closure_mutation(
+    number: int, weakening: str, edit: tuple[str, str, str], test: str, reason: str
+) -> Mutation:
+    return Mutation(
+        f"M-G2W1-{number:02d}", weakening, (edit,),
+        f"{CLOSURE_TESTS}::{test}", test, reason,
+    )
+
+
+MUTATIONS += (
+    closure_mutation(
+        21, "missing cadence is accepted",
+        (CONFIG, "        if value is None:\n            return\n",
+         '        if value is None or value == "NaT":\n            return\n'),
+        "test_missing_cadence_is_rejected", "missing cadence acceptance",
+    ),
+    closure_mutation(
+        22, "calendar cadence is silently normalized as fixed",
+        (CONFIG, "cadence = pd.Timedelta(value)",
+         'cadence = pd.Timedelta("30 days" if value == "1 month" else value)'),
+        "test_non_fixed_cadence_is_rejected", "non-fixed cadence acceptance",
+    ),
+    closure_mutation(
+        23, "unsupported extensions bypass native eligibility guard",
+        (DATETIME, "if not isinstance(series.array, pd.arrays.DatetimeArray):",
+         "if False:"),
+        "test_unsupported_extension_is_safely_unsummarized",
+        "unsupported datetime eligibility guard failed",
+    ),
+    closure_mutation(
+        24, "profiling reorders source datetime storage",
+        (DATETIME, "    total_count = int(len(series))",
+         "    series.array[:] = series.array[::-1]\n    total_count = int(len(series))"),
+        "test_profiling_preserves_source_identity_values_index_dtype_order_timezone",
+        "source datetime mutation or reordering",
+    ),
+    closure_mutation(
+        25, "duplicate coordinates enter spacing",
+        (DATETIME,
+         'np.unique(series.array.asi8[series.array.asi8 != np.iinfo("int64").min])',
+         'np.sort(series.array.asi8[series.array.asi8 != np.iinfo("int64").min])'),
+        "test_duplicates_are_excluded_from_spacing_coordinates",
+        "duplicate spacing coordinates",
+    ),
+    closure_mutation(
+        26, "NaT exclusion is removed from temporal coordinates",
+        (DATETIME,
+         'np.unique(series.array.asi8[series.array.asi8 != np.iinfo("int64").min])',
+         "np.unique(series.array.asi8)"),
+        "test_nat_is_excluded_from_duplicate_and_spacing_coordinates",
+        "NaT entered temporal coordinates",
+    ),
+    closure_mutation(
+        28, "two observed timestamps supply an expected schedule",
+        (DATETIME, "expected_cadence=expected_cadence,",
+         "expected_cadence=expected_cadence or observed_cadence,"),
+        "test_two_observations_do_not_imply_expected_schedule",
+        "observed spacing became expected schedule",
+    ),
+    closure_mutation(
+        29, "off-grid counting includes repeated coordinates",
+        (DATETIME, "        coordinates, cadence_units\n",
+         '        np.sort(series.array.asi8[series.array.asi8 != np.iinfo("int64").min]), cadence_units\n'),
+        "test_repeated_off_grid_observations_are_counted_distinctly",
+        "off-grid duplicates inflated count",
+    ),
+    closure_mutation(
+        30, "missing positions are replaced by gap runs",
+        (DATETIME, "    return missing, gaps, off_grid",
+         "    return gaps, gaps, off_grid"),
+        "test_missing_positions_and_contiguous_gaps_are_different_counts",
+        "missing positions conflated with gap runs",
+    ),
+    closure_mutation(
+        31, "canonical datetime evidence loses its context",
+        (TYPES, 'canonical(dict(self.datetime), path="column.datetime")',
+         'canonical({}, path="column.datetime")'),
+        "test_canonical_datetime_evidence_keeps_endpoint_and_cadence_context",
+        "canonical datetime context omitted",
+    ),
+    closure_mutation(
+        32, "datetime gap measurements enter verdict policy",
+        ("aidatasetkit/evidence/builder.py",
+         "            findings, decisions, blocked_reason=blocked_reason\n",
+         '            findings, decisions, blocked_reason=("datetime gap" if any(\n'
+         '                column.datetime and column.datetime["missing_expected_observation_count"]\n'
+         '                for column in columns\n'
+         '            ) else blocked_reason)\n'),
+        "test_datetime_measurements_are_isolated_from_verdict_inputs",
+        "datetime measurements entered verdict inputs",
+    ),
+    closure_mutation(
+        33, "datetime field displaces positional source argument",
+        (TYPES,
+         "    source: EvidenceSource = EvidenceSource.PROFILING\n"
+         "    datetime: Mapping[str, Any] | None = None",
+         "    datetime: Mapping[str, Any] | None = None\n"
+         "    source: EvidenceSource = EvidenceSource.PROFILING"),
+        "test_positional_column_source_remains_compatible",
+        "positional source argument displaced",
+    ),
+    closure_mutation(
+        34, "duplicate-count evidence invariant is not validated",
+        (TYPES, '    if value["duplicate_timestamp_count"] != (\n',
+         '    if False and value["duplicate_timestamp_count"] != (\n'),
+        "test_inconsistent_datetime_evidence_requires_evidence_error",
+        "inconsistent datetime evidence accepted without EvidenceError",
+    ),
+    Mutation(
+        "M-G2W1-35", "chunked scan invokes native datetime summarization",
+        (("aidatasetkit/profiling/chunked.py",
+          "    path = Path(source)\n",
+          "    from aidatasetkit.profiling.profiler import summarize_datetime\n"
+          '    summarize_datetime(pd.Series([], dtype="datetime64[ns]"), expected_cadence=None)\n'
+          "    path = Path(source)\n"),),
+        f"{TESTS}::TestEvidenceAndIsolation::test_chunked_builder_does_not_call_datetime_summarizer",
+        "test_chunked_builder_does_not_call_datetime_summarizer",
+        "chunked mode invoked datetime profiling",
+    ),
+    closure_mutation(
+        36, "expected timestamps are materialized before gap arithmetic",
+        (DATETIME, "    missing_expected, gap_count, off_grid = _gap_counts(",
+         "    if expected_cadence is not None and valid_count:\n"
+         "        pd.date_range(start=minimum, end=maximum, freq=pd.Timedelta(expected_cadence))\n"
+         "    missing_expected, gap_count, off_grid = _gap_counts("),
+        "test_missing_timestamps_are_never_materialized",
+        "missing timestamps were explicitly materialized",
+    ),
+    Mutation(
+        "M-G2W1-37", "artifact schema remains 1.4",
+        ((TYPES, 'ARTIFACT_SCHEMA_VERSION = "1.5"', 'ARTIFACT_SCHEMA_VERSION = "1.4"'),),
+        "tests/unit/test_capability_fingerprint_migration.py::TestTheChain::test_datetime_schema_step_is_exact_and_reversible",
+        "test_datetime_schema_step_is_exact_and_reversible",
+        "datetime migration chain incomplete",
+    ),
+    Mutation(
+        "M-G2W1-38", "pandas-2 semantic fixture retains schema 1.4",
+        (("examples/audit_churn/expected_audit_semantic.pandas2.json",
+          '"schema_version": "1.5"', '"schema_version": "1.4"'),),
+        "tests/unit/test_current_example_contract.py::TestCommittedCurrentExamples::test_pandas_major_datetime_fixture_contract[expected_audit_semantic.pandas2.json]",
+        "test_pandas_major_datetime_fixture_contract[expected_audit_semantic.pandas2.json]",
+        "pandas-major datetime fixture contract",
+    ),
+)
+
 
 def export(revision: str, tree: Path) -> str:
     sha = subprocess.run(
@@ -298,6 +450,20 @@ def failures(junit: Path) -> tuple[dict[str, str], int]:
     return failed, errored
 
 
+def skipped(junit: Path) -> int:
+    return sum(
+        len(case.findall("skipped"))
+        for case in ET.parse(junit).getroot().iter("testcase")
+    )
+
+
+def is_expected_test(name: str, expected: str) -> bool:
+    test_name = name.rsplit("::", 1)[-1]
+    return test_name == expected or (
+        "[" not in expected and test_name.startswith(expected + "[")
+    )
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print("usage: python scripts/g2_w1_mutations.py <scratch-dir> [--rev REV]")
@@ -326,7 +492,11 @@ def main() -> int:
     baseline_failed = (
         [] if baseline.returncode == 0 else [(baseline.returncode, baseline.stdout, baseline.stderr)]
     )
-    environment_ok = imported_from_tree and not baseline_failed and manifest(tree) == pristine
+    baseline_skipped = skipped(scratch / "baseline.xml") if baseline.returncode == 0 else None
+    environment_ok = (
+        imported_from_tree and not baseline_failed and baseline_skipped == 0
+        and manifest(tree) == pristine
+    )
     records: list[dict[str, object]] = []
 
     for mutation in MUTATIONS:
@@ -341,35 +511,35 @@ def main() -> int:
         if not environment_ok:
             record.update(
                 result="TEST_ENVIRONMENT_ERROR",
-                detail=f"imported_from_tree={imported_from_tree}; baseline failures={len(baseline_failed)}",
+                detail=f"imported_from_tree={imported_from_tree}; baseline failures={len(baseline_failed)}; skipped={baseline_skipped}",
             )
             records.append(record)
             continue
 
         edited_files: dict[str, bytes] = {}
         applied = True
-        for relative, old, new in mutation.edits:
-            path = tree / relative
-            if relative not in edited_files:
-                edited_files[relative] = path.read_bytes()
-            text = path.read_text(encoding="utf-8")
-            if text.count(old) != 1:
-                applied = False
-                record["detail"] = f"anchor matched {text.count(old)} times in {relative}"
-                break
-            path.write_text(text.replace(old, new), encoding="utf-8", newline="")
-
         result = None
-        if applied:
-            result = run_pytest(
-                tree,
-                (mutation.selector,),
-                scratch / f"{mutation.id}.xml",
-            )
-            record["exit"] = result.returncode
-
-        for relative, contents in edited_files.items():
-            (tree / relative).write_bytes(contents)
+        try:
+            for relative, old, new in mutation.edits:
+                path = tree / relative
+                if relative not in edited_files:
+                    edited_files[relative] = path.read_bytes()
+                text = path.read_text(encoding="utf-8")
+                if text.count(old) != 1:
+                    applied = False
+                    record["detail"] = f"anchor matched {text.count(old)} times in {relative}"
+                    break
+                path.write_text(text.replace(old, new), encoding="utf-8", newline="")
+            if applied:
+                result = run_pytest(
+                    tree,
+                    (mutation.selector,),
+                    scratch / f"{mutation.id}.xml",
+                )
+                record["exit"] = result.returncode
+        finally:
+            for relative, contents in edited_files.items():
+                (tree / relative).write_bytes(contents)
         record["restored"] = manifest(tree) == pristine
 
         if not applied:
@@ -389,12 +559,13 @@ def main() -> int:
             expected = [
                 (name, details)
                 for name, details in failures_found.items()
-                if mutation.expected_test in name
+                if is_expected_test(name, mutation.expected_test)
             ]
             if (
                 error_count
                 or not expected
-                or not any(mutation.expected_failure in details for _, details in expected)
+                or skipped(scratch / f"{mutation.id}.xml")
+                or not all(mutation.expected_failure in details for _, details in expected)
                 or len(expected) != len(failures_found)
             ):
                 record.update(
@@ -415,7 +586,11 @@ def main() -> int:
         "revision": sha,
         "python": sys.version.split()[0],
         "imported_from_tree": imported_from_tree,
+        "baseline_exit": baseline.returncode,
+        "baseline_skipped": baseline_skipped,
         "baseline_failures": len(baseline_failed),
+        "required_mappings": REQUIRED_MAPPINGS,
+        "tree_restored": manifest(tree) == pristine,
         "total": len(records),
         **{
             state: sum(record.get("result") == state for record in records)
@@ -434,6 +609,7 @@ def main() -> int:
     print(
         f"revision={sha} python={summary['python']} "
         f"imported_from_tree={imported_from_tree} "
+        f"baseline_exit={baseline.returncode} "
         f"baseline_failures={len(baseline_failed)}"
     )
     for record in records:
@@ -454,7 +630,7 @@ def main() -> int:
             )
         }
     )
-    return 0 if summary["KILLED"] == len(MUTATIONS) else 1
+    return 0 if environment_ok and summary["tree_restored"] and summary["KILLED"] == len(MUTATIONS) else 1
 
 
 if __name__ == "__main__":

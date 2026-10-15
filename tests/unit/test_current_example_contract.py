@@ -12,8 +12,10 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from aidatasetkit import __version__
+from aidatasetkit.core import KitConfig
 from aidatasetkit.evidence import (
     ARTIFACT_SCHEMA_VERSION,
     PUBLICATION_SCHEMA_VERSION,
@@ -50,6 +52,27 @@ def _blob() -> str:
 
 
 class TestCommittedCurrentExamples:
+    @pytest.mark.parametrize(
+        "name", ["expected_audit_semantic.json", "expected_audit_semantic.pandas2.json"]
+    )
+    def test_pandas_major_datetime_fixture_contract(self, name):
+        fixture = _load(name)
+        assert fixture["schema_version"] == ARTIFACT_SCHEMA_VERSION == "1.5", (
+            "pandas-major datetime fixture contract"
+        )
+        settings = fixture["config"]["settings"]
+        assert settings["thresholds"] == KitConfig().to_dict(), (
+            "pandas-major datetime fixture contract"
+        )
+        assert fixture["config"]["fingerprint"] == config_fingerprint(settings), (
+            "pandas-major datetime fixture contract"
+        )
+        for column in fixture["columns"]:
+            assert "datetime" in column and column["datetime"] is None, (
+                "pandas-major datetime fixture contract"
+            )
+        assert fixture["verdict"] == "blocked"
+
     def test_the_current_outputs_use_the_live_schema(self):
         audit = _load("audit.json")
         lineage = _load("lineage.json")

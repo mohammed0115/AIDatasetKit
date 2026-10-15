@@ -270,6 +270,26 @@ def semantic() -> dict:
 
 
 class TestTheChain:
+    def test_datetime_schema_step_is_exact_and_reversible(self):
+        from aidatasetkit.evidence import ARTIFACT_SCHEMA_VERSION
+
+        assert ARTIFACT_SCHEMA_VERSION == "1.5", "datetime migration chain incomplete"
+        step = CHAIN[-1]
+        assert (
+            step.name, step.before, step.after
+        ) == (
+            "G2-W1 artifact schema 1.4 -> 1.5 and datetime evidence",
+            "60375e40773cb0849085a4867c31e609b90c34a60a2cb8842c9e34f37b3a237e",
+            "d889bc29c93faa0133d4bee392d9cff9e07c781bf54c2b720bc31fb57f6c7daf",
+        ), "datetime migration chain incomplete"
+        semantic = _stored()
+        assert config_fingerprint(semantic) == step.after
+        step.rollback(semantic)
+        assert semantic["schema_version"] == "1.4"
+        assert all("datetime" not in column for column in semantic["columns"])
+        assert "expected_datetime_cadence" not in semantic["config"]["settings"]["thresholds"]
+        assert config_fingerprint(semantic) == step.before, "datetime migration rollback incorrect"
+
     def test_every_step_moves_the_identity(self):
         """Otherwise a step is asserting that nothing happened."""
         for step in CHAIN:
